@@ -1,0 +1,23 @@
+# All personal workspaces and generated/encrypted outputs
+/runtime/
+*.bin
+.passcode
+.cf_token
+.env
+.env.*
+*.pem
+*.key
+*.bak*
+*.tmp
+*.log
+.stage/
+.wrangler/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+node_modules/
+/diagnostics/
+/backups/
+# Alternate user data roots must remain outside this repository.
