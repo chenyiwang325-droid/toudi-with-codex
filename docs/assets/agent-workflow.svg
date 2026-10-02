@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="326" viewBox="0 0 960 326" role="img" aria-labelledby="title desc">
+  <title id="title">TouDi Agent 协作流程</title>
+  <desc id="desc">用户提供信源、材料和任务，自己的 Agent 按需更新记录、探查岗位、准备面试或整理复盘，结果进入投递中控台。用户也可以手动编辑或通过文件导入。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 9 5 1 9" fill="none" stroke="#557277" stroke-width="1.6"/></marker>
+  </defs>
+  <rect width="960" height="326" rx="8" fill="#f7f9f9"/>
+  <g fill="#fff" stroke="#cedbdc" stroke-width="1.2">
+    <rect x="24" y="46" width="230" height="176" rx="8"/>
+    <rect x="336" y="24" width="288" height="220" rx="8"/>
+    <rect x="706" y="46" width="230" height="176" rx="8"/>
+  </g>
+  <g fill="none" stroke="#557277" stroke-width="1.6" marker-end="url(#arrow)">
+    <path d="M265 134H323"/>
+    <path d="M635 134H693"/>
+    <path d="M139 234V286H821V234"/>
+  </g>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif">
+    <g fill="#243c40" font-size="24" font-weight="600">
+      <text x="48" y="86">你</text>
+      <text x="362" y="66">自己的投递 Agent</text>
+      <text x="730" y="86">投递中控台</text>
+    </g>
+    <g fill="#465a5d" font-size="19">
+      <text x="48" y="128">岗位信源</text>
+      <text x="48" y="163">简历与面试材料</text>
+      <text x="48" y="198">本次任务范围</text>
+      <text x="362" y="110">更新投递记录</text>
+      <text x="362" y="144">探查公司与岗位</text>
+      <text x="362" y="178">整理面试准备</text>
+      <text x="362" y="212">复盘面试与改进</text>
+      <text x="730" y="128">查看并核对结果</text>
+      <text x="730" y="163">标记投递进度</text>
+      <text x="730" y="198">阅读与复习资料</text>
+    </g>
+    <rect x="356" y="270" width="248" height="32" fill="#f7f9f9"/>
+    <text x="480" y="293" fill="#465a5d" font-size="19" text-anchor="middle">手动编辑或文件导入</text>
+  </g>
+</svg>
