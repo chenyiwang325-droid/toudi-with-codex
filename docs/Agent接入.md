@@ -22,6 +22,25 @@
 
 **信源读取与研究使用 Agent 原有工具。** 仓库不内置默认招聘抓取器，也不要求购买额外模型 API。远程聊天工具没有本机权限时，先生成规范材料，由用户在 App 导入。
 
+## 工作区绑定与原地接入
+
+**原工作区已有规则时，先读取这些规则并保留现有标准流程。** 检查工作区 `AGENTS.md`、`投递数据/AGENTS.md` 及用户指定的信源流程说明；全表更新或内容导入有既定核验入口时继续使用，不以通用 JSON 提交跳过这些步骤。再读取随 App 提供的通用文档，确认保存与渲染契约。
+
+**先确认实际工作区，再安排业务写入。** 打包 CLI 可用以下命令；示例采用源码形式，安装用户使用 App 提供的工具路径：
+
+```sh
+python3 app/desktop_runtime.py workspace status
+python3 app/desktop_runtime.py workspace check /path/to/workspace
+python3 app/desktop_runtime.py workspace adopt /path/to/workspace
+python3 app/desktop_runtime.py workspace adopt /path/to/workspace --apply --base PREVIEW_BASE
+python3 app/desktop_runtime.py workspace bind /path/to/workspace
+python3 app/desktop_runtime.py workspace unbind
+```
+
+**`adopt` 默认预览，`--apply` 才执行必要兼容写入。** 按预览、备份与基准核对、apply、check、bind、App 验收顺序操作；不移动正文，不重建题库，不重导最新复盘。重复 id 修正保留内容与映射，基准变化应重新预览。`PREVIEW_BASE` 使用预览返回的 `base`；apply 返回 `recovery`，修正映射保存在工作区 `投递数据/.adoptions/`。具体结果以命令返回的报告为准。
+
+**显式环境优先，持久绑定其次，无绑定使用独立空工作区。** `TOUDI_WORKSPACE` 显式指定目录时优先；macOS 持久连接文件为 `~/Library/Application Support/TouDi/connection.json`，`TOUDI_APP_HOME` 可隔离测试连接配置。日常不要从旧缓存或另一个目录反建母本。解除绑定不删除资料，App 关闭后仍可使用 CLI 更新同一工作区。
+
 ## 公共资料命令
 
 **以下参数由打包资料工具和源码 CLI 共用。** 桌面使用 App 给出的 `agentTool` 可执行文件与命令前缀，不手抄应用包内路径；源码可用 `python3 app/desktop_runtime.py` 或 `python3 app/workbench.py`。以下示例使用源码形式说明参数，不要求安装包用户另装 Python：

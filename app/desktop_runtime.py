@@ -6,17 +6,14 @@ import sys
 import threading
 from pathlib import Path
 
-APP_VERSION = '0.2.1'
+APP_VERSION = '0.3.0'
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / '脚本')]
 
 
 def default_workspace():
-    if sys.platform == 'darwin':
-        return Path.home() / 'Library' / 'Application Support' / 'TouDi' / 'workspace'
-    if os.name == 'nt':
-        return Path(os.environ.get('LOCALAPPDATA', str(Path.home() / 'AppData' / 'Local'))) / 'TouDi' / 'workspace'
-    return Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local' / 'share'))) / 'toudi' / 'workspace'
+    from workspace_link import resolve_workspace
+    return resolve_workspace()
 
 
 def parent_alive(pid):
@@ -126,6 +123,9 @@ def main(argv=None):
         if hasattr(stream, 'reconfigure'):
             stream.reconfigure(encoding='utf-8')
     args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == 'workspace':
+        from workspace_link import main as workspace_main
+        return workspace_main(args[1:])
     if args == ['serve']:
         return serve()
     if args and args[0] == 'export-reading':
@@ -139,4 +139,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

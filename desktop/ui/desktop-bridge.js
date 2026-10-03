@@ -50,6 +50,11 @@
   };
   window.toudiDesktop = {
     showWorkspace: () => invoke('show_workspace'),
+    selectWorkspace: async () => {
+      const path = await invoke('select_workspace');
+      if (path) location.replace('/index.html');
+      return path;
+    },
     exportReading: () => invoke('export_reading'),
     saveBlob: async (blob, name) => {
       const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -57,6 +62,6 @@
       for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
       return invoke('save_file', {name, contentBase64: btoa(chunks.join(''))});
     },
-    get version() {return window.__TOUDI_DESKTOP__?.version || '0.2.1';}
+    get version() {return window.__TOUDI_DESKTOP__?.version || '0.3.0';}
   };
 })();

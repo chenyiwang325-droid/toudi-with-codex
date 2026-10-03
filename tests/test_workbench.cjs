@@ -33,3 +33,31 @@ assert.equal(candidate.item.questions[0].originalAnswer, '新原回答');
 assert.equal(candidate.item.questions[0].diagnosis.结构化, '保留诊断');
 assert.equal(candidate.item.questions[0].followups[0], '保留追问');
 console.log('PASS workbench syntax and review form preserves stable identity, diagnostics, followups and unknown fields');
+
+const refreshContext = vm.createContext({
+  document: {getElementById: () => ({style: {display: 'none'}})},
+  localStorage: {getItem: () => '{}'},
+  listUnsavedDrafts: () => [],
+  detailInputMemory: new Map(),
+  byId: () => ({_researchNote: 'saved', 岗位: '岗位'}),
+  editsDirty: false, editsConflict: false, editsSaveInFlight: false,
+  qbankDirty: false, qbankConflict: false, qbankSaveInFlight: false,
+  qbankFormEditing: () => false, qbFormDrafts: new Map(), qbCategoryEditing: new Map(),
+  reviewDirty: false, reviewConflict: false, reviewSaveInFlight: false,
+  reviewFormEditing: () => false
+});
+for (const name of ['workspaceDetailDraftExists', 'workspaceHasDraft']) {
+  const start = source.indexOf('function ' + name + '(');
+  const end = source.indexOf('\nfunction ', start + 1);
+  vm.runInContext(source.slice(start, end), refreshContext);
+}
+assert.equal(vm.runInContext("workspaceHasDraft('records')", refreshContext), false);
+vm.runInContext("detailInputMemory.set(0,[{id:'researchNote',value:'saved'}])", refreshContext);
+assert.equal(vm.runInContext("workspaceHasDraft('records')", refreshContext), false);
+vm.runInContext("detailInputMemory.set(0,[{id:'researchNote',value:'unsaved'}])", refreshContext);
+assert.equal(vm.runInContext("workspaceHasDraft('records')", refreshContext), true);
+vm.runInContext('reviewDirty = true', refreshContext);
+assert.equal(vm.runInContext("workspaceHasDraft('reviews')", refreshContext), true);
+vm.runInContext("localStorage.getItem = () => JSON.stringify({preps:{base:'original'}})", refreshContext);
+assert.equal(vm.runInContext("workspaceHasDraft('preps')", refreshContext), true);
+console.log('PASS refresh protects stored drafts, dirty reviews and unsaved detail fields');

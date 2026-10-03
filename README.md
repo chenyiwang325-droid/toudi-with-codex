@@ -9,7 +9,7 @@
 
 **普通用户从 GitHub Releases 下载安装包，打开 App 即可开始管理。** 应用随包提供运行组件，无需自行安装 Python 或启动服务。源码运行适合开发与替代部署；应用不内置模型订阅，Agent 工具由你选择。
 
-[下载安装包](https://github.com/chenyiwang325-droid/toudi-workbench/releases/tag/v0.2.1) · [安装与使用](docs/桌面安装与使用.md) · [Agent 接入](docs/Agent接入.md) · [备份与迁移](docs/备份与迁移.md)
+[下载安装包](https://github.com/chenyiwang325-droid/toudi-workbench/releases/tag/v0.3.0) · [安装与使用](docs/桌面安装与使用.md) · [Agent 接入](docs/Agent接入.md) · [备份与迁移](docs/备份与迁移.md)
 
 ## 主要功能
 
@@ -26,16 +26,16 @@
 
 ## 安装与开始使用
 
-**当前桌面包为 v0.2.1 macOS Apple Silicon 预览版。** 完整源码、安装包与已验证范围随 Release 发布，平台与签名边界见安装说明。
+**当前桌面包为 v0.3.0 macOS Apple Silicon 预览版。** 完整源码、安装包与已验证范围随 Release 发布，平台与签名边界见安装说明。
 
 **先选择对应系统与架构的 Release 文件，再按安装说明打开应用。** 当前版本的平台测试与签名情况以 Release 说明为准；macOS 测试构建采用临时签名，未正式公证，首次下载可能遇到系统确认或拦截。Windows 已提供 CI 构建模板，构建结果以实际任务为准，仍待 Windows 实机验收。
 
-1. 从 [桌面 Release](https://github.com/chenyiwang325-droid/toudi-workbench/releases/tag/v0.2.1) 下载对应安装包，按[桌面安装与使用](docs/桌面安装与使用.md)安装。
-2. 打开 TouDi，使用自动建立的空工作区，新增自己的资料或恢复已有备份。
+1. 从 [桌面 Release](https://github.com/chenyiwang325-droid/toudi-workbench/releases/tag/v0.3.0) 下载对应安装包，按[桌面安装与使用](docs/桌面安装与使用.md)安装。
+2. 打开 TouDi，新用户从空工作区开始；已有规范资料可选择“使用已有工作区”，先验证再绑定原目录。
 3. 在工作台手动维护；需要 Agent 时复制接入说明，提供信源、材料和本次任务。
 4. 完成修改后核对保存状态与正文；定期导出完整备份。
 
-**更新应用与保存个人资料分开。** 工作区位于安装目录外，替换 App 不替换资料。迁移和恢复前先备份，核对后只保留一个正式写入位置。
+**App、源码浏览器与 Agent 可以直接使用同一个资料目录。** 推荐让 Agent 整理与管理，也保留手动新增、导入和编辑。已有资料可以原地接入，正文与附件不必搬迁；业务更新保存后刷新显示，不需要重新打包。HTML/CSS 等界面代码修改仍需构建新 App。接入与恢复前先备份，始终明确唯一母本。
 
 ## Agent 协作
 

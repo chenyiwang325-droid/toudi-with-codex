@@ -7,8 +7,14 @@ from urllib.parse import quote
 
 
 def safe_path(root, relative):
-    root=Path(root).resolve(); path=(root/relative).resolve()
-    if not path.is_relative_to(root) or not path.is_file():
+    root=Path(root).resolve()
+    if not isinstance(relative,str) or Path(relative).is_absolute() or any(part.startswith('.') for part in Path(relative).parts if part not in ('.','..')): raise ValueError('探查文件路径无效')
+    lexical=root/relative
+    for cursor in [lexical,*lexical.parents]:
+        if cursor.is_symlink() or (hasattr(cursor,'is_junction') and cursor.is_junction()): raise ValueError('探查符号链接无效')
+        if cursor==root: break
+    path=lexical.resolve()
+    if not path.is_relative_to(root) or not path.is_file() or path.suffix.lower()!='.md':
         raise ValueError('探查文件路径无效: '+relative)
     return path
 
@@ -44,7 +50,10 @@ def read_catalog(root, edits=None):
                          'researchedAt':'','updatedAt':'','filename':'','status':'待探查','attachments':[],
                          'content':'## 待探查\n\n尚无公司主报告，未开展新的调查。\n\n'+'\n\n'.join(item['notes'])})
     rows.sort(key=lambda x: (x.get('researchedAt',''),x['company']),reverse=True)
-    archives=[{**a,'url':'/api/prospect-file?path='+quote(a['file'],safe='')} for a in manifest.get('archives',[])]
+    archives=[]
+    for a in manifest.get('archives',[]):
+        safe_path(root,a['file'])
+        archives.append({**a,'url':'/api/prospect-file?path='+quote(a['file'],safe='')})
     # 新报告漏登记必须可见，不能再次悄悄混入平铺列表。
     unregistered=[p.name for p in root.glob('*.md') if p.name not in files and p.name not in {'探查流程与输出规范.md','README.md'}]
     return {'schemaVersion':1,'prospects':rows,'archives':archives,'unregistered':unregistered,

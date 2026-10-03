@@ -40,17 +40,24 @@ def parser(name):
     tree.body=[node for node in tree.body if not isinstance(node,(ast.Expr,ast.If))]
     mod=types.ModuleType('toudi_'+name); mod.__file__=str(path); mod.Path=Path
     exec(compile(tree,str(path),'exec'),mod.__dict__)
+    def parser_failure(message):
+        raise ValueError(message)
+    mod.fail=parser_failure
     return mod
 
 class Workbench:
     def __init__(self, root):
         self.root=Path(root).resolve(); self.data=self.root/'投递数据'; self.data.mkdir(parents=True, exist_ok=True)
     def path(self, relative):
+        if re.fullmatch(r'投递数据/\.adoptions/[a-f0-9]{32}\.json', relative):
+            target=self.root/relative
+            if any(p.is_symlink() for p in [target,target.parent,target.parent.parent]): raise ValueError('symlink adoption record denied')
+            return target
         if relative == MODULES['drafts'][0]:
             relative_path=Path(relative)
             if (self.root/relative_path).is_symlink(): raise ValueError('symlink denied')
             return self.root/relative_path
-        return remote_files.allowed_path(self.root, relative)
+        return remote_files.allowed_path(self.root, relative, getattr(self,'_materials_override',None))
     def read(self, module):
         relative, default=MODULES[module]; path=self.path(relative)
         if not path.exists(): return copy.deepcopy(default)
@@ -79,12 +86,22 @@ class Workbench:
                 for row in rows:
                     if not isinstance(row.get('questions',[]),list): raise ValueError('questions must be an array')
             if module=='prospects':
+                archives=value.get('archives',[])
+                if not isinstance(archives,list) or any(not isinstance(a,dict) or not isinstance(a.get('file'),str) or not a['file'] for a in archives): raise ValueError('invalid prospect archives')
+                for archive in archives: self.path('岗位探查/'+archive['file'])
                 names=[row.get('company') for row in rows]
                 if len(names)!=len(set(names)): raise ValueError('duplicate prospect company')
                 for row in rows:
                     if not row.get('company') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',row.get('researchedAt','')): raise ValueError('company/date required')
                     self.path('岗位探查/'+row['file'])
         if module=='settings':
+            authority=value.get('recordsAuthority')
+            if authority is not None:
+                if not isinstance(authority,dict) or authority.get('schemaVersion')!=1 or authority.get('source')!=MODULES['records'][0] or not isinstance(authority.get('legacyHtml'),dict): raise ValueError('invalid recordsAuthority')
+                if any(path not in ('投递数据/投递管理.html','投递管理.html') or not isinstance(version,str) or not re.fullmatch('[a-f0-9]{64}',version) for path,version in authority['legacyHtml'].items()): raise ValueError('invalid legacy HTML authority evidence')
+            entries=value.get('materialFiles',[])
+            if not isinstance(entries,list) or any(not isinstance(entry,str) for entry in entries): raise ValueError('materialFiles must be an exact file array')
+            for entry in entries: remote_files.material_path(self.root,entry)
             def check_settings(node):
                 if isinstance(node,dict):
                     for key,child in node.items():
@@ -111,6 +128,8 @@ class Workbench:
             values={k:v for k,v in values.items() if k not in (MODULES['settings'][0],MODULES['drafts'][0])}
         return hashlib.sha256(encoded({k:hashlib.sha256(v).hexdigest() for k,v in sorted(values.items())})).hexdigest()
     def recover_pending(self):
+        from legacy_update import recover
+        recover(self.data)
         folder=self.data/'.transactions'
         if not folder.exists(): return
         for tx in folder.iterdir():
@@ -120,13 +139,22 @@ class Workbench:
             if state['state']!='pending': continue
             self.rollback(tx,state); state['state']='rolledback'; atomic_write(manifest,encoded(state))
     def rollback(self,tx,state):
+        if 'materials' in state:
+            for entry in state['materials']: remote_files.material_path(self.root,entry)
+            self._materials_override=state['materials']
         for relative,exists in state['before'].items():
             target=self.path(relative)
             if exists: atomic_write(target,(tx/'before'/relative).read_bytes())
             else: target.unlink(missing_ok=True)
+        self.__dict__.pop('_materials_override',None)
     def transaction(self, changes):
         tx=self.data/'.transactions'/uuid.uuid4().hex; tx.mkdir(parents=True)
-        state={'state':'pending','before':{}}
+        materials=remote_files.registered_materials(self.root)
+        settings=changes.get(MODULES['settings'][0])
+        if settings is not None: materials=list(dict.fromkeys([*materials,*json.loads(settings).get('materialFiles',[])]))
+        self._materials_override=materials
+        for entry in materials: remote_files.material_path(self.root,entry)
+        state={'state':'pending','before':{},'materials':materials}
         for relative,content in changes.items():
             target=self.path(relative); state['before'][relative]=target.exists()
             if target.exists(): atomic_write(tx/'before'/relative,target.read_bytes())
@@ -138,6 +166,7 @@ class Workbench:
                 if content is None: target.unlink(missing_ok=True)
                 else: atomic_write(target,content)
             state['state']='committed'; atomic_write(tx/'manifest.json',encoded(state))
+            self.__dict__.pop('_materials_override',None)
         except BaseException:
             self.rollback(tx,state); state['state']='rolledback'; atomic_write(tx/'manifest.json',encoded(state)); raise
         return tx.name
@@ -166,7 +195,7 @@ class Workbench:
                     url=urlsplit(href)
                     if url.scheme or url.netloc or not url.path: continue
                     filename=unquote(url.path)
-                    try: target=self.path((Path(item['mdPath']).parent/filename).as_posix())
+                    try: target=self.path(remote_files.canonical_reference(self.root,item['mdPath'],filename))
                     except ValueError: continue
                     if target.is_file() and filename not in known:
                         attachments.append({'file':filename,'label':target.name}); known.add(filename)
@@ -258,7 +287,7 @@ class Workbench:
             return path.read_bytes() if path.exists() else None
         for module,key,folder in [('preps','preps',''),('prospects','companies','岗位探查/')]:
             value=json.loads(content(MODULES[module][0]) or encoded(MODULES[module][1]))
-            for row in value[key]:
+            for row in [*value[key],*(value.get('archives',[]) if module=='prospects' else [])]:
                 relative=folder+row['file'] if folder else row['mdPath']
                 self.path(relative)
                 if content(relative) is None: raise ValueError('missing referenced document '+relative)
@@ -267,13 +296,17 @@ class Workbench:
                     if parsed['sections']!=row['sections']: raise ValueError('preparation Markdown and JSON differ')
                     from prep_resources import LINK
                     for href in LINK.findall(content(relative).decode()):
-                        url=urlsplit(href)
-                        if url.scheme or url.netloc or not url.path: continue
-                        linked=(Path(row['mdPath']).parent/unquote(url.path)).as_posix()
+                        linked=remote_files.linked_reference(self.root,row['mdPath'],href)
+                        if linked is None: continue
                         # Missing historical references remain visible as missing, but a managed deletion cannot break active references.
                         if linked in changes and changes[linked] is None: raise ValueError('document still references deleted attachment')
+                if module=='prospects':
+                    from prep_resources import LINK
+                    for href in LINK.findall(content(relative).decode()):
+                        linked=remote_files.linked_reference(self.root,relative,href)
+                        if linked is not None and content(linked) is None: raise ValueError('missing prospect document reference '+linked)
                 for attachment in row.get('attachments',[]):
-                    relative=folder+attachment['file'] if folder else (Path(row['mdPath']).parent/attachment['file']).as_posix(); self.path(relative)
+                    relative=remote_files.canonical_reference(self.root,row['file'] if folder else row['mdPath'],attachment['file']) if not folder else remote_files.canonical_reference(self.root,folder+row['file'],attachment['file']); self.path(relative)
                     if content(relative) is None: raise ValueError('missing referenced attachment')
     def reassociate(self,old,new,mapping,changes):
         validate_records(new); oldkeys=runtime_keys(old); newkeys=runtime_keys(new)
@@ -336,39 +369,55 @@ class Workbench:
         return result
     def backup(self):
         with data_lock(self.data):
-            self.recover_pending(); files=self.inventory(); manifest={'schemaVersion':1,'files':{k:hashlib.sha256(v).hexdigest() for k,v in files.items()}}
+            self.recover_pending(); self.check_references({}); files=self.inventory(); manifest={'schemaVersion':1,'files':{k:hashlib.sha256(v).hexdigest() for k,v in files.items()}}
             output=io.BytesIO()
             with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr('manifest.json',encoded(manifest))
                 for relative,content in files.items(): archive.writestr(relative,content)
             return output.getvalue()
-    def inspect_backup(self,raw):
+    def _inspect_backup(self,raw):
         if len(raw)>150*1024*1024: raise ValueError('backup too large')
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             infos=archive.infolist()
             if len(infos)>10000 or sum(i.file_size for i in infos)>300*1024*1024: raise ValueError('expanded backup too large')
             names=[i.filename for i in infos]
             if len(names)!=len(set(names)): raise ValueError('duplicate backup paths')
+            settings_name=MODULES['settings'][0]
+            settings=json.loads(archive.read(settings_name)) if settings_name in names else {}
+            self.validate('settings',settings)
+            self._materials_override=settings.get('materialFiles',[])
             for info in infos:
                 if (info.external_attr>>16)&0o170000==0o120000: raise ValueError('symlink denied')
                 if info.filename!='manifest.json': self.path(info.filename)
             manifest=json.loads(archive.read('manifest.json'))
             if manifest.get('schemaVersion')!=1 or set(names)-{'manifest.json'}!=set(manifest['files']): raise ValueError('invalid backup manifest')
             files={k:archive.read(k) for k in manifest['files']}
+            if any(entry not in files for entry in settings.get('materialFiles',[])): raise ValueError('backup missing registered attachment')
             for relative,content in files.items():
                 if hashlib.sha256(content).hexdigest()!=manifest['files'][relative]: raise ValueError('backup checksum mismatch')
                 for module,(path,_) in MODULES.items():
                     if path==relative: self.validate(module,json.loads(content))
             for module,key,folder in [('preps','preps',''),('prospects','companies','岗位探查/')]:
                 data=json.loads(files.get(MODULES[module][0],encoded(MODULES[module][1])))
-                for row in data[key]:
+                for row in [*data[key],*(data.get('archives',[]) if module=='prospects' else [])]:
                     reference=folder+row['file'] if folder else row['mdPath']
                     if reference not in files: raise ValueError('backup missing document '+reference)
+                    if module=='prospects':
+                        from prep_resources import LINK
+                        for href in LINK.findall(files[reference].decode()):
+                            linked=remote_files.linked_reference(self.root,reference,href)
+                            if linked is not None and linked not in files: raise ValueError('backup missing prospect reference '+linked)
                     for attachment in row.get('attachments',[]):
-                        if (folder+attachment['file'] if folder else (Path(row['mdPath']).parent/attachment['file']).as_posix()) not in files: raise ValueError('backup missing attachment')
+                        if remote_files.canonical_reference(self.root,folder+row['file'] if folder else row['mdPath'],attachment['file']) not in files: raise ValueError('backup missing attachment')
             candidates={path:encoded(default) for path,default in MODULES.values() if path not in files}
             candidates.update(files); self.check_references(candidates)
+            self.__dict__.pop('_materials_override',None)
             return files
+    def inspect_backup(self,raw):
+        try:
+            return self._inspect_backup(raw)
+        finally:
+            self.__dict__.pop('_materials_override',None)
     def restore(self,raw,base,preview=False):
         files=self.inspect_backup(raw)
         if preview: return {'ok':True,'files':[{'path':k,'size':len(v)} for k,v in files.items()]}
@@ -376,6 +425,7 @@ class Workbench:
             self.recover_pending()
             if base!=self.version(): raise Conflict('version_conflict')
             changes={k:None for k in self.inventory() if k not in files}; changes.update(files)
+            self._materials_override=list(dict.fromkeys([*remote_files.registered_materials(self.root),*json.loads(files.get(MODULES['settings'][0],b'{}')).get('materialFiles',[])]))
             self.check_references(changes)
             recovery=self.transaction(changes)
             return {'ok':True,'version':self.version(),'recovery':recovery}

@@ -6,23 +6,80 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, unquote
 
 DATA_FILES = {
     '投递记录.json': None, '用户编辑数据.json': 'edits', '逐字稿数据.json': 'categories',
     '面试准备数据.json': 'preps', '面试复盘数据.json': 'sessions', '工作区配置.json': 'schemaVersion',
 }
 MATERIAL_DIRS = {'面试准备', '岗位探查', '复盘'}
-EXTENSIONS = {'.md', '.txt', '.pdf', '.docx', '.png', '.jpg', '.jpeg', '.webp'}
+EXTENSIONS = {'.md', '.txt', '.pdf', '.docx', '.png', '.jpg', '.jpeg', '.webp', '.json', '.xlsx'}
 MAX_FILE = 20 * 1024 * 1024
 
 
-def allowed_path(root, relative):
+def material_path(root, relative):
+    """Validate one explicit attachment path, never a directory-level grant."""
+    root=Path(root).resolve(); parts=Path(relative).parts
+    if not parts or Path(relative).is_absolute() or any(p in {'.','..'} or p.startswith('.') for p in parts): raise ValueError('invalid explicit material path')
+    forbidden={'投递数据','app','desktop','tests','.git'}
+    basename=Path(relative).name
+    if parts[0] in forbidden or Path(relative).suffix.lower() not in EXTENSIONS or basename in DATA_FILES or basename in {'草稿数据.json','探查目录.json'} or any(word in basename.lower() for word in ('password','credential','secret','token','passcode')): raise ValueError('protected file cannot be registered as an attachment')
+    cursor=root
+    for part in parts:
+        cursor=cursor/part
+        if cursor.is_symlink() or (hasattr(cursor,'is_junction') and cursor.is_junction()): raise ValueError('symlink material paths are not supported')
+    if not cursor.resolve().is_relative_to(root): raise ValueError('attachment outside workspace')
+    return cursor.resolve()
+
+
+def registered_materials(root):
+    path=Path(root)/'投递数据'/'工作区配置.json'
+    if not path.exists(): return []
+    if path.is_symlink() or path.parent.is_symlink(): raise ValueError('symlink config denied')
+    value=json.loads(path.read_text(encoding='utf-8'))
+    entries=value.get('materialFiles',[])
+    if not isinstance(entries,list) or any(not isinstance(entry,str) for entry in entries): raise ValueError('materialFiles must be an exact file array')
+    for entry in entries: material_path(root,entry)
+    return entries
+
+
+def linked_reference(root,document,href):
+    """Resolve only supported material API links; other site routes are not files."""
+    url=urlsplit(href)
+    if url.scheme or url.netloc or not url.path: return None
+    if url.path.startswith('/api/'):
+        if url.path not in ('/api/prospect-file','/api/prep-resource'): return None
+        values=parse_qs(url.query).get('path',[])
+        if len(values)!=1 or not values[0]: raise ValueError('resource API link requires one path')
+        relative=('岗位探查/'+values[0]) if url.path=='/api/prospect-file' else values[0]
+        if Path(values[0]).is_absolute(): raise ValueError('absolute resource API path denied')
+        resolved=canonical_reference(root,'root.md',relative)
+        if url.path=='/api/prospect-file' and not resolved.startswith('岗位探查/'): raise ValueError('prospect API reference outside catalog directory')
+        return resolved
+    return canonical_reference(root,document,unquote(url.path))
+
+
+def canonical_reference(root, document, href):
+    root=Path(root).resolve(); lexical=root/Path(document).parent/href
+    for cursor in [lexical,*lexical.parents]:
+        if cursor.is_symlink() or (hasattr(cursor,'is_junction') and cursor.is_junction()): raise ValueError('symlink reference denied')
+        if cursor==root: break
+    target=lexical.resolve()
+    if not target.is_relative_to(root): raise ValueError('reference outside workspace')
+    relative=target.relative_to(root).as_posix()
+    if any(p.startswith('.') for p in Path(relative).parts): raise ValueError('hidden reference denied')
+    return relative
+
+
+def allowed_path(root, relative, material_files=None):
     parts = Path(relative).parts
     if not parts or Path(relative).is_absolute() or any(p in {'.', '..'} or p.startswith('.') for p in parts):
         raise ValueError('invalid material path')
     legal = (len(parts) == 2 and parts[0] == '投递数据' and parts[1] in DATA_FILES) or (
         len(parts) >= 2 and parts[0] in MATERIAL_DIRS and (Path(relative).suffix.lower() in EXTENSIONS or (relative == '岗位探查/探查目录.json')))
+    if not legal:
+        entries=registered_materials(root) if material_files is None else material_files
+        if relative in entries: return material_path(root,relative)
     cursor = root
     for part in parts:
         cursor = cursor / part
@@ -43,8 +100,9 @@ def files(root):
         folder = root / directory
         if folder.is_dir():
             candidates.extend(p for p in folder.rglob('*') if p.is_file())
+    candidates.extend(Path(root)/relative for relative in registered_materials(root))
     result = []
-    for path in candidates:
+    for path in dict.fromkeys(candidates):
         try:
             relative = path.relative_to(root).as_posix()
             safe = allowed_path(root, relative)
@@ -70,6 +128,8 @@ def check_content(relative, content, validate_records):
                 raise ValueError('edits and pref must be objects')
         elif key != 'schemaVersion' and not isinstance(d.get(key), list):
             raise ValueError(f'JSON material requires a {key} array')
+    elif Path(relative).suffix.lower() == '.json':
+        json.loads(content)
     elif Path(relative).suffix in {'.md', '.txt'}:
         content.decode('utf-8')
 

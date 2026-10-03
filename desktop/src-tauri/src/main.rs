@@ -81,10 +81,7 @@ fn native_render_report(
     Ok(())
 }
 
-fn workspace(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os("TOUDI_WORKSPACE") {
-        return Ok(PathBuf::from(path));
-    }
+fn default_workspace(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let home = app.path().home_dir().map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     let root = home.join("Library/Application Support/TouDi/workspace");
@@ -99,6 +96,30 @@ fn workspace(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .unwrap_or_else(|| home.join(".local/share"))
         .join("toudi/workspace");
     Ok(root)
+}
+
+fn workspace_tool(tool: &PathBuf, args: &[&str]) -> Result<serde_json::Value, String> {
+    let mut command = Command::new(tool);
+    command.args(args);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    let output = command.output().map_err(|e| e.to_string())?;
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .map_err(|_| "资料工具未返回有效结果，请保留当前工作区。".to_string())?;
+    if !output.status.success() || result["ok"] != true {
+        return Err(result["error"].as_str().map(str::to_owned)
+            .unwrap_or_else(|| format!("工作区尚未通过检查：{}", result["issues"])));
+    }
+    Ok(result)
+}
+
+fn workspace(tool: &PathBuf) -> Result<PathBuf, String> {
+    let status = workspace_tool(tool, &["workspace", "status"])?;
+    let path = status["workspace"].as_str().ok_or("工作区位置无效")?;
+    Ok(PathBuf::from(path))
 }
 
 fn spawn(runtime: &mut Runtime) -> Result<(), String> {
@@ -293,6 +314,37 @@ fn show_workspace(app: tauri::AppHandle, state: State<AppState>) -> Result<(), S
 }
 
 #[tauri::command]
+async fn select_workspace(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    if std::env::var_os("TOUDI_WORKSPACE").is_some() {
+        return Err("本次启动已指定工作区；请结束此启动方式后再选择已有工作区。".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let selection = app.dialog().file().set_title("选择 TouDi 资料工作区").blocking_pick_folder();
+        let Some(selection) = selection else { return Ok(None); };
+        let path = selection.into_path().map_err(|e| e.to_string())?;
+        let text = path.to_string_lossy().to_string();
+        let state = app.state::<AppState>();
+        let mut current = state.0.lock().map_err(|e| e.to_string())?;
+        workspace_tool(&current.tool, &["workspace", "check", &text])?;
+        let mut replacement = Runtime {
+            child: None, port: 0, token: String::new(), workspace: path,
+            tool: current.tool.clone(), error: None,
+        };
+        if let Err(error) = spawn(&mut replacement) {
+            stop(&mut replacement);
+            return Err(error);
+        }
+        if let Err(error) = workspace_tool(&current.tool, &["workspace", "bind", &text]) {
+            stop(&mut replacement);
+            return Err(error);
+        }
+        stop(&mut current);
+        *current = replacement;
+        Ok(Some(text))
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn save_file(
     name: String,
     content_base64: String,
@@ -360,6 +412,16 @@ fn main() {
     if std::env::var_os("TOUDI_RENDER_REPORT").is_some() {
         for window in &mut context.config_mut().app.windows {
             window.incognito = true;
+            if let Ok(width) = std::env::var("TOUDI_RENDER_WIDTH") {
+                if let Ok(width) = width.parse::<f64>() {
+                    if (860.0..=1920.0).contains(&width) { window.width = width; }
+                }
+            }
+            if let Ok(height) = std::env::var("TOUDI_RENDER_HEIGHT") {
+                if let Ok(height) = height.parse::<f64>() {
+                    if (600.0..=1200.0).contains(&height) { window.height = height; }
+                }
+            }
         }
     }
     let mut builder = tauri::Builder::default();
@@ -381,12 +443,16 @@ fn main() {
                 let webview = webview.clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_secs(2));
+                    if let Ok(view) = std::env::var("TOUDI_RENDER_VIEW") {
+                        if ["table","kanban","charts","qbank","company","prospect","review","settings"].contains(&view.as_str()) {
+                            let _ = webview.eval(format!("window.__TOUDI_DIAG_VIEW__ = '{view}';"));
+                        }
+                    }
                     let _ = webview.eval(include_str!("render_check.js"));
                 });
             }
         })
         .setup(|app| {
-            let root = workspace(app.handle()).map_err(std::io::Error::other)?;
             let resources = app.path().resource_dir()?;
             let name = if cfg!(target_os = "windows") {
                 "toudi-runtime.exe"
@@ -394,16 +460,21 @@ fn main() {
                 "toudi-runtime"
             };
             let tool = resources.join("runtime/toudi-runtime").join(name);
+            let selected = workspace(&tool);
+            let root = match &selected {
+                Ok(path) => path.clone(),
+                Err(_) => default_workspace(app.handle()).map_err(std::io::Error::other)?,
+            };
             let mut runtime = Runtime {
                 child: None,
                 port: 0,
                 token: String::new(),
                 workspace: root,
                 tool,
-                error: None,
+                error: selected.err(),
             };
-            if let Err(error) = spawn(&mut runtime) {
-                runtime.error = Some(error);
+            if runtime.error.is_none() {
+                if let Err(error) = spawn(&mut runtime) { runtime.error = Some(error); }
             }
             app.manage(AppState(Mutex::new(runtime)));
             Ok(())
@@ -414,6 +485,7 @@ fn main() {
             restart_runtime,
             open_external,
             show_workspace,
+            select_workspace,
             save_file,
             export_reading,
             native_render_report

@@ -567,7 +567,7 @@ renderSettings = function () {
   });
   document.getElementById('settingsView').insertAdjacentHTML('beforeend', `<section class="settings-section"><h3>完整资料与恢复</h3><p class="settings-help">完整备份包含业务正文、配置和登记附件。恢复前先检查范围；服务会保留恢复前副本。</p><div class="settings-actions"><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="exportFullBackup()">下载完整备份</button><label class="btn">选择备份恢复<input type="file" accept=".zip" hidden ${managementWritable() ? '' : 'disabled'} onchange="previewBackup(event)"></label><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="openRecovery()">恢复删除与旧版本</button><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="resumeManagementDraft()">恢复管理草稿</button></div><div id="backupPreview"></div></section>`);
   if (window.toudiDesktop) {
-    document.getElementById('settingsView').insertAdjacentHTML('beforeend', `<section class="settings-section"><h3>桌面资料与查阅</h3><p class="settings-help">资料保存在安装目录外。加密查阅版用于在其他设备阅读，导出后按部署文档发布。</p><p class="connection-path">${esc(window.__TOUDI_DESKTOP__.workspace)}</p><div class="settings-actions"><button class="btn" onclick="openDesktopWorkspace()">打开资料目录</button><button class="btn" onclick="exportDesktopReading()">导出加密查阅版</button></div><div id="desktopReadingStatus" role="status"></div></section>`);
+    document.getElementById('settingsView').insertAdjacentHTML('beforeend', `<section class="settings-section"><h3>桌面资料与查阅</h3><p class="settings-help">资料保存在安装目录外。加密查阅版用于在其他设备阅读，导出后按部署文档发布。</p><div class="desktop-workspace-row"><p class="connection-path">当前工作区：${esc(window.__TOUDI_DESKTOP__.workspace)}</p><button class="btn" onclick="selectDesktopWorkspace()">使用已有工作区</button></div><div class="settings-actions"><button class="btn" onclick="openDesktopWorkspace()">打开资料目录</button><button class="btn" onclick="exportDesktopReading()">导出加密查阅版</button></div><div id="desktopReadingStatus" role="status"></div></section>`);
   }
 };
 async function openDesktopWorkspace() {
@@ -718,10 +718,216 @@ const basicAgentBootstrap = agentBootstrapText;
 agentBootstrapText = function () {
   const desktop = window.__TOUDI_DESKTOP__;
   if (!desktop) return basicAgentBootstrap();
-  return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + desktop.workspace + '\n资料工具：' + desktop.agentTool + '\n流程文档目录：' + desktop.guideRoot + '\n\n先读取文档目录下的 AGENTS.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
+  return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + desktop.workspace + '\n资料工具：' + desktop.agentTool + '\n流程文档目录：' + desktop.guideRoot + '\n\n先读取正式工作区已有的 AGENTS.md、投递数据/AGENTS.md 或信源流程说明（如有），保留现有标准流程和命令入口。然后读取文档目录下的 AGENTS.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
 };
 if (window.__TOUDI_DESKTOP_READY__) {
   window.__TOUDI_DESKTOP_READY__.then(managementInit).catch(() => {});
 } else {
   managementInit();
 }
+
+// Empty-state actions and refresh share the existing management and save contracts.
+async function startWorkspaceContent(module, importing = false) {
+  await openManagement(module);
+  if (importing && document.getElementById('managementOverlay').style.display === 'flex') {
+    document.querySelector('#managementTools input[type=file]')?.click();
+  }
+}
+copyAgentBootstrap = async function () {
+  const text = agentBootstrapText();
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('接入说明已复制');
+  } catch (error) {
+    const field = document.createElement('textarea');
+    field.value = text;
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand('copy');
+    field.remove();
+    showToast(copied ? '接入说明已复制' : '复制未完成，请在设置中选择接入说明');
+  }
+};
+const workspaceRefreshSnapshots = new Map();
+const workspacePendingUpdates = new Set();
+let workspaceRefreshRunning = false;
+function workspaceDetailDraftExists() {
+  return [...detailInputMemory.entries()].some(([index, fields]) => {
+    const row = byId(index);
+    return fields.some(field => {
+      const expected = field.id === 'researchNote' ? row?._researchNote || '' : field.id.startsWith('fe_') ? row?.[field.id.slice(3)] || '' : field.value;
+      return field.value !== expected;
+    });
+  });
+}
+function workspaceHasDraft(module) {
+  const domain = module === 'records' ? 'edits' : module;
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}'); } catch (error) { return true; }
+  const managerOpen = document.getElementById('managementOverlay')?.style.display === 'flex';
+  if (managerOpen || stored[module] || listUnsavedDrafts().some(item => item.domain === domain)) return true;
+  if (module === 'records' || module === 'edits') {
+    return workspaceDetailDraftExists() || editsDirty || editsConflict || editsSaveInFlight || document.getElementById('detailModal')?.style.display === 'flex' || document.getElementById('noteModal')?.style.display === 'flex';
+  }
+  if (module === 'qbank' || module === 'preps') return qbankDirty || qbankConflict || qbankSaveInFlight || qbankFormEditing() || qbFormDrafts.size > 0 || qbCategoryEditing.size > 0;
+  if (module === 'reviews') return reviewDirty || reviewConflict || reviewSaveInFlight || reviewFormEditing();
+  return false;
+}
+function showWorkspaceRefreshNotice(message) {
+  const notice = document.getElementById('workspaceRefreshNotice');
+  if (!notice) return;
+  notice.hidden = !message;
+  notice.querySelector('span').textContent = message;
+}
+function repaintWorkspaceEmptySurfaces() {
+  const activeModule = view === 'qbank' ? (qbMode === 'company' ? 'preps' : 'qbank') : view === 'review' ? 'reviews' : view === 'prospect' ? 'prospects' : 'records';
+  if (workspaceHasDraft(activeModule)) return;
+  if (['table', 'kanban', 'charts'].includes(view)) render();
+  else if (view === 'qbank' && !qbankFormEditing()) renderQbank();
+  else if (view === 'review' && !reviewFormEditing()) renderReview();
+  else if (view === 'prospect') renderProspect();
+}
+async function refreshWorkspaceData(manual = false) {
+  if (window.__SNAPSHOT__ || workspaceRefreshRunning) return;
+  if (manual && (!serverMode || apiBase === null)) await initServerStorage();
+  if (!serverMode || apiBase === null) {showWorkspaceRefreshNotice('工作区服务未连接，请检查后重新读取。');return;}
+  workspaceRefreshRunning = true;
+  const originalFocus = document.activeElement;
+  const focusState = originalFocus?.id ? {id: originalFocus.id, start: originalFocus.selectionStart, end: originalFocus.selectionEnd} : null;
+  const button = document.getElementById('workspaceRefreshButton');
+  if (button) { button.disabled = true; button.textContent = '正在检查…'; }
+  const modules = ['edits', 'records', 'qbank', 'preps', 'prospects', 'reviews'];
+  try {
+    const results = await Promise.allSettled(modules.map(module => managementRequest(module)));
+    let changed = false;
+    let emptyStateChanged = false;
+    const updatedModules = new Set();
+    const failures = [];
+    for (let index = 0; index < modules.length; index++) {
+      const module = modules[index], result = results[index];
+      if (result.status !== 'fulfilled') {
+        emptyStateChanged ||= workspaceReadStates[module] !== 'error';
+        workspaceReadStates[module] = 'error';
+        failures.push(managementLabels[module] || '个人标记');
+        continue;
+      }
+      emptyStateChanged ||= workspaceReadStates[module] !== 'ready';
+      workspaceReadStates[module] = 'ready';
+      const fingerprint = JSON.stringify(result.value.data);
+      if (workspaceRefreshSnapshots.get(module) === fingerprint) continue;
+      if (workspaceHasDraft(module) || (module === 'records' && workspaceHasDraft('edits'))) {
+        workspacePendingUpdates.add(module);
+        continue;
+      }
+      // Protect forms opened while the read was in flight. Never advance their save base.
+      if (module === 'edits') await initServerStorage();
+      else if (module === 'records') {
+        const keys = new Set(data.filter(row => selected.has(row._idx)).map(row => row._key));
+        detailInputMemory.clear();
+        initData(result.value.data);
+        selected = new Set(data.filter(row => keys.has(row._key)).map(row => row._idx));
+        render();
+      } else if (module === 'qbank') await initQbankStorage();
+      else if (module === 'preps') await initPrepsStorage();
+      else if (module === 'prospects') await initProspectsStorage();
+      else if (module === 'reviews') await initReviewsStorage();
+      const readFailed = SAVE_DOMAINS[module]?.readFailed || (module === 'preps' && workspaceReadStates.preps === 'error') || (module === 'prospects' && !!prospectLoadError);
+      if (readFailed) {workspaceReadStates[module]='error';failures.push(managementLabels[module]||'个人标记');emptyStateChanged=true;continue;}
+      workspaceRefreshSnapshots.set(module, fingerprint);
+      workspacePendingUpdates.delete(module);
+      changed = true;
+      updatedModules.add(module);
+    }
+    if (failures.length) showWorkspaceRefreshNotice(failures.join('、') + '读取失败，当前内容保留。可检查连接后重新读取。');
+    else if (workspacePendingUpdates.size) showWorkspaceRefreshNotice('检测到新资料；当前编辑和草稿已保留。请先保存后刷新；如遇冲突，可先导出草稿进行对账。');
+    else {
+      showWorkspaceRefreshNotice('');
+      if (manual) showToast(changed ? '已读取工作区最新资料' : '资料没有变化');
+    }
+    // Unchanged content never redraws, so focus, selection and reader scroll remain intact.
+    const visibleModules = view === 'qbank' ? ['qbank','preps'] : view === 'review' ? ['reviews'] : view === 'prospect' ? ['prospects'] : ['records','edits'];
+    if (emptyStateChanged || visibleModules.some(module=>updatedModules.has(module))) repaintWorkspaceEmptySurfaces();
+  } finally {
+    workspaceRefreshRunning = false;
+    if (focusState && (document.activeElement === document.body || document.activeElement === originalFocus)) {
+      const current = document.getElementById(focusState.id);
+      if (current && current !== originalFocus) {current.focus({preventScroll:true});try {current.setSelectionRange(focusState.start,focusState.end);} catch(error) {}}
+    }
+    if (button) { button.disabled = false; button.textContent = '刷新资料'; }
+  }
+}
+function installWorkspaceRefresh() {
+  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<button id="workspaceRefreshButton" class="btn btn-sm" onclick="refreshWorkspaceData(true)">刷新资料</button>');
+  document.querySelector('.topbar').insertAdjacentHTML('afterend', '<div id="workspaceRefreshNotice" class="workspace-refresh-note" role="status" hidden><span></span></div>');
+  if (window.__SNAPSHOT__) {
+    document.getElementById('workspaceRefreshButton').disabled = true;
+    return;
+  }
+  window.addEventListener('focus', () => refreshWorkspaceData());
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshWorkspaceData(); });
+  // Initialization may restore drafts before the first remote read.
+  const ready = setInterval(() => {
+    if (!serverMode) return;
+    clearInterval(ready);
+    refreshWorkspaceData();
+  }, 200);
+  setTimeout(() => {clearInterval(ready);if(!serverMode){for(const module of ['records','qbank','preps','prospects','reviews'])workspaceReadStates[module]='error';repaintWorkspaceEmptySurfaces();}}, 6000);
+}
+const workspaceBaseKanban = renderKanban;
+renderKanban = function (...args) {
+  document.querySelectorAll('#kanbanView>.workspace-empty').forEach(node=>node.remove());
+  workspaceBaseKanban(...args);
+  if (!data.length) document.getElementById('kanbanBoard').insertAdjacentHTML('beforebegin', workspaceEmptyState('records'));
+};
+const workspaceBaseCharts = renderCharts;
+renderCharts = function (...args) {
+  document.querySelectorAll('#chartsView>.workspace-empty').forEach(node=>node.remove());
+  workspaceBaseCharts(...args);
+  if (!data.length) document.getElementById('chartsGrid').insertAdjacentHTML('beforebegin', workspaceEmptyState('records'));
+};
+const workspaceBaseRender = render;
+render = function (...args) {
+  document.querySelectorAll('#kanbanView>.workspace-empty,#chartsView>.workspace-empty').forEach(node => node.remove());
+  workspaceBaseRender(...args);
+};
+installWorkspaceRefresh();
+
+async function selectDesktopWorkspace() {
+  if (['records','edits','qbank','preps','prospects','reviews'].some(workspaceHasDraft) || workspaceSettingsSaving || localStorage.getItem('toudiPendingSettings')) {
+    showToast('请先保存或导出未提交草稿，再切换工作区');
+    return;
+  }
+  try {
+    const selected = await window.toudiDesktop.selectWorkspace();
+    if (selected) location.reload();
+  } catch (error) {
+    showToast('工作区未切换：' + error);
+  }
+}
+
+let workspaceSettingsSaving = 0;
+const workspaceOriginalSaveSettings = saveWorkspace;
+saveWorkspace = async function (...args) {
+  workspaceSettingsSaving++;
+  try { return await workspaceOriginalSaveSettings(...args); }
+  finally { workspaceSettingsSaving--; }
+};
+
+function trackWorkspaceReader(module, load, isEmpty, failed) {
+  return async function (...args) {
+    const loadingEmpty = isEmpty() && !workspaceHasDraft(module);
+    if (loadingEmpty) workspaceReadStates[module] = 'loading';
+    try {
+      const result = await load(...args);
+      workspaceReadStates[module] = failed() ? 'error' : 'ready';
+      return result;
+    } finally {
+      const visibleLoading = document.querySelector('.workspace-empty[data-empty-module="' + module + '"][data-empty-state="loading"]');
+      if (visibleLoading) repaintWorkspaceEmptySurfaces();
+    }
+  };
+}
+initQbankStorage = trackWorkspaceReader('qbank', initQbankStorage, () => !qbData.categories.length, () => SAVE_DOMAINS.qbank.readFailed);
+initPrepsStorage = trackWorkspaceReader('preps', initPrepsStorage, () => !prepData.preps.length, () => workspaceReadStates.preps === 'error');
+initReviewsStorage = trackWorkspaceReader('reviews', initReviewsStorage, () => !reviewData.sessions.length, () => SAVE_DOMAINS.reviews.readFailed);
+initProspectsStorage = trackWorkspaceReader('prospects', initProspectsStorage, () => !prospectData.prospects.length, () => !!prospectLoadError);

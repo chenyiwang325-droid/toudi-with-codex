@@ -853,6 +853,51 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
 .pref-save-hint { margin-right:auto; color:var(--text3); font-size:12px; }
 @media(max-width:600px) { .detail-modal .detail-sticky { padding:12px 16px; } #detailContent { padding:0 16px 20px; } .detail-sticky h2 { font-size:18px; } .detail-facts { gap:14px 16px; } .pref-options { grid-template-columns:1fr; } .pref-tabs { gap:18px; } .pref-save-hint { max-width:150px; } }
 
+
+/* Shared empty surfaces keep the existing reading and dashboard structure. */
+.workspace-empty { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); min-height:320px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 22px; text-align:center; gap:12px; }
+.workspace-empty h3 { font-size:16px; font-weight:600; }
+.workspace-empty p { color:var(--text3); font-size:13px; max-width:48ch; }
+.workspace-empty-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.rv-main:has(>.workspace-empty) { display:flex; flex-direction:column; }
+.rv-main>.workspace-empty { flex:1; min-height:280px; }
+.table-empty .workspace-empty { border:0; min-height:clamp(300px,calc(100dvh - 350px),600px); }
+.rv-tabs { flex-wrap:wrap; }
+.rv-list>.rv-empty { padding:24px 12px; font-size:12px; }
+.rv-tab,.qb-side-title { white-space:nowrap; }
+.rv-tabs .rv-collapse-btn { flex-shrink:0; }
+.workspace-refresh-note { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:12px; padding:9px 20px; border-bottom:1px solid var(--border); color:var(--text2); background:var(--primary-faint); }
+.workspace-refresh-note[hidden] { display:none; }
+#workspaceRefreshButton { white-space:nowrap; }
+.desktop-workspace-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; }
+.desktop-workspace-row .connection-path { flex:1 1 260px; min-width:0; overflow-wrap:anywhere; margin:0; }
+#kanbanView>.workspace-empty,#chartsView>.workspace-empty { min-height:140px; margin-bottom:16px; padding:20px; }
+.kanban-col { min-height:clamp(320px,calc(100dvh - 330px),680px); }
+.chart-card { min-height:230px; }
+.kanban-col.empty-col { width:auto; min-width:0; max-width:none; }
+@media(max-width:1100px) and (min-width:901px) { .rv-side:not(.rv-collapsed) { width:210px; } .rv-tabs .rv-tab { flex:1 0 70px; } .topbar-actions { gap:6px; } }
+@media(max-width:900px) { .workspace-empty { min-height:340px; } .rv-side:not(.rv-collapsed) { max-height:200px; } #prospectSide:not(.rv-collapsed) { height:auto; max-height:250px; } .rv-tabs { flex-wrap:nowrap; } .qb-workbar input { flex:1 1 200px; } .topbar-actions { flex-wrap:wrap; } .table-empty .workspace-empty { min-height:320px; } }
+/* Reading panes share one viewport row; padding belongs inside the scroll frame. */
+@media (min-width:760px) {
+ body.reader-module { overflow:hidden; }
+ .reader-module .app,.reader-module .main { height:100dvh; min-height:0; overflow:hidden; }
+ .reader-module .topbar { position:relative; flex:0 0 auto; }
+ .reader-module .content { display:flex; flex-direction:column; min-height:0; overflow:hidden; flex:1 1 auto; padding:18px 20px; }
+ .reader-module #qbView,.reader-module #reviewView,.reader-module #prospectView { display:flex; flex-direction:column; height:100%; min-height:0; }
+ .reader-module .qb-workbar { position:static; }
+ .reader-module .qb-workbar,.reader-module #qbLoadNotice,.reader-module #reviewView>button { flex:0 0 auto; }
+ .reader-module .rv-layout { display:grid; grid-template-columns:auto minmax(0,1fr); grid-template-rows:minmax(0,1fr); flex:1 1 auto; height:auto; min-height:0; overflow:hidden; gap:16px; }
+ .reader-module .rv-side:not(.rv-collapsed),.reader-module #prospectSide:not(.rv-collapsed) { width:210px; height:100%; min-height:0; max-height:none; position:static; align-self:stretch; overflow:hidden; }
+ .reader-module .rv-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+ .reader-module .rv-main { box-sizing:border-box; height:100%; min-height:0; max-width:none; overflow-y:auto; padding:0; border:1px solid var(--border); border-radius:var(--radius); background:var(--card); scrollbar-gutter:stable; overscroll-behavior:contain; }
+ .reader-module .rv-main>.workspace-empty { border:0; border-radius:0; min-height:0; margin:0; }
+ .reader-module .rv-layout:has(>.rv-side.rv-collapsed) { grid-template-columns:minmax(0,1fr); grid-template-rows:34px minmax(0,1fr); gap:8px; }
+ .reader-module .rv-side.rv-collapsed { width:100%; height:34px; position:static; }
+ .reader-module .rv-side.rv-collapsed .rv-rail { position:static; width:auto; padding:0; }
+ .reader-module .rv-side.rv-collapsed+.rv-main { padding:0; }
+ .reader-module .rv-tabs { flex-wrap:wrap; }
+ .reader-module .rv-tabs .rv-tab { flex:1 0 70px; }
+}
 </style>
 </head>
 <body>
@@ -1564,7 +1609,7 @@ function render() {
     </tr>`;
   }).join('');
 
-  if(!filtered.length)tbody.innerHTML='<tr><td class="table-empty" colspan="17"><p>当前条件没有匹配记录</p><button class="btn btn-sm" onclick="clearAdditional()">清除附加条件</button> <button class="btn btn-sm" onclick="resetFilters()">重置全部</button></td></tr>';
+  if(!filtered.length)tbody.innerHTML='<tr><td class="table-empty" colspan="17">'+workspaceEmptyState('records',data.length>0)+(data.length?'<button class="btn btn-sm" onclick="resetFilters()">重置筛选</button>':'')+'</td></tr>';
   document.getElementById('resultCount').textContent = `共 ${filtered.length} 条`;
   renderPagination(filtered.length, totalPages);
   if (view==='kanban') renderKanban(filtered);
@@ -2018,7 +2063,7 @@ function renderReviewDetail(){
   const oldPosition=captureReaderPosition('reviewMain');
   const main=document.getElementById('reviewMain');
   const s=sessionById(currentReviewId)||reviewData.sessions[0];
-  if(!s){currentReviewId=null;main.innerHTML='<div class="rv-panel rv-empty">暂无复盘数据。<br>面试结束后按仓库 docs/流程协作.md 产出复盘 Markdown，然后运行<br><code>python3 app/脚本/6_复盘导入.py runtime/复盘/场次.md</code><br>即可导入本板块。</div>';return;}
+  if(!s){currentReviewId=null;main.innerHTML=workspaceEmptyState('reviews');return;}
   currentReviewId=s.id;
   main.innerHTML=rvSummaryPanel(s)+rvMetaPanel(s)+rvTreePanel(s)+rvQuestionsPanel(s)+rvIntelPanel(s)+rvTrackingPanel(s);
   retainReaderPosition('reviewMain',oldPosition);
@@ -2177,7 +2222,7 @@ function renderWeakness(){
       agg[t.weakness].timeline.push({s,status:t.status||'',evidence:t.evidence||''});});
   });
   const items=Object.values(agg);
-  if(!items.length){main.innerHTML='<div class="rv-panel rv-empty">暂无弱项追踪数据。</div>';return;}
+  if(!items.length){main.innerHTML=workspaceEmptyState('reviews',reviewData.sessions.length>0);return;}
   items.sort((a,b)=>(b.timeline[b.timeline.length-1].s.date||'').localeCompare(a.timeline[a.timeline.length-1].s.date||''));
   main.innerHTML=`<div class="rv-panel"><div class="rv-panel-head"><h3>弱项追踪总表（${items.length} 项 · 按各场次纵向追踪聚合）</h3></div>
     <table class="rv-table"><thead><tr><th style="width:20%">弱项</th><th style="width:26%">首次出现</th><th style="width:12%">最近状态</th><th>场次轨迹（旧→新，点击查看场次）</th></tr></thead><tbody>
@@ -2202,9 +2247,11 @@ async function initPrepsStorage(){
   try{
     const res=await fetch(apiBase+'/api/preps');
     if(!res.ok)throw new Error('bad status');
-    const disk=((await res.json())||{}).preps||[];
+    const disk=((await res.json())||{}).preps;
+    if(!Array.isArray(disk))throw new Error('invalid preps');
+    workspaceReadStates.preps='ready';
     prepData.preps=disk;localStorage.setItem('toudiPreps',JSON.stringify(prepData));
-  }catch(e){showToast('公司准备读取失败，请检查本地数据文件');}
+  }catch(e){workspaceReadStates.preps='error';showToast('公司准备读取失败，请检查本地数据文件');}
   if(view==='qbank'&&!qbankFormEditing())renderQbank();
 }
 function prepById(id){return prepData.preps.find(p=>p.id===id);}
@@ -2249,7 +2296,7 @@ function renderProspectSide(el,list=prospectVisible()){
 }
 function renderProspectMain(el){
   if(!el)return;const p=prospectById(currentProspectId);
-  if(!p){el.innerHTML='<div class="rv-panel rv-empty">没有符合条件的公司，请调整搜索或筛选。</div>';return;}
+  if(!p){el.innerHTML=workspaceEmptyState('prospects',prospectData.prospects.length>0);return;}
   let bodyMd=(p.content||'').replace(/^#\s+.*\n?/,'');
   bodyMd=bodyMd.replace(/\]\(((?:归档|证据)\/[^)]+\.md)\)/g,(_,path)=>`](/api/prospect-file?path=${encodeURIComponent(path)})`);
   const attachments=(p.attachments||[]).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.label)}</a>`).join(' · ');
@@ -2317,29 +2364,24 @@ function viewScrollKey(){
   return view;
 }
 // Desktop content modules scroll only their reader pane. Narrow screens retain document reading.
-function readerScrollElement(){if(innerWidth>900&&['qbank','review','prospect'].includes(view))return document.getElementById({qbank:'qbMain',review:'reviewMain',prospect:'prospectMain'}[view]);return document.scrollingElement;}
+function readerScrollElement(){if(innerWidth>=760&&['qbank','review','prospect'].includes(view))return document.getElementById({qbank:'qbMain',review:'reviewMain',prospect:'prospectMain'}[view]);return document.scrollingElement;}
 function saveViewScroll(){try{const node=readerScrollElement();sessionStorage.setItem('scroll_'+viewScrollKey(),String(node?.scrollTop||0));if(view==='qbank')sessionStorage.setItem('scroll_qbSide_'+qbMode,String(document.getElementById('qbCatList').scrollTop));}catch(e){}}
 function restoreViewScroll(){try{const node=readerScrollElement(),top=Number(sessionStorage.getItem('scroll_'+viewScrollKey()))||0;if(node)node.scrollTop=top;if(view==='qbank')document.getElementById('qbCatList').scrollTop=Number(sessionStorage.getItem('scroll_qbSide_'+qbMode))||0;}catch(e){}}
 function captureReaderPosition(id){const main=document.getElementById(id);return {key:main?.dataset.documentKey,top:readerScrollElement()?.scrollTop||0};}
-function retainReaderPosition(id,old){const main=document.getElementById(id);if(!main)return;const key=viewScrollKey();main.dataset.documentKey=key;if(innerWidth>900)main.scrollTop=old.key===key?old.top:0;}
-function scrollReaderStart(){const node=readerScrollElement();if(innerWidth>900&&node)node.scrollTop=0;else if(node){const root=document.getElementById(view==='qbank'?'qbView':view==='review'?'reviewView':'prospectView');const header=document.querySelector('.topbar').getBoundingClientRect().height;node.scrollTop=Math.max(0,(root?.getBoundingClientRect().top||0)+node.scrollTop-header);}}
-function scrollReaderTo(target){if(!target)return;const node=readerScrollElement();if(innerWidth>900&&node&&node.contains(target)){node.scrollTop+=target.getBoundingClientRect().top-node.getBoundingClientRect().top-10;}else{const header=document.querySelector('.topbar').getBoundingClientRect().height;const bar=view==='qbank'?document.querySelector('.qb-workbar')?.getBoundingClientRect().height||0:0;window.scrollTo({top:Math.max(0,window.scrollY+target.getBoundingClientRect().top-header-bar-12),behavior:'auto'});}}
+function retainReaderPosition(id,old){const main=document.getElementById(id);if(!main)return;const key=viewScrollKey();main.dataset.documentKey=key;if(innerWidth>=760)main.scrollTop=old.key===key?old.top:0;}
+function scrollReaderStart(){const node=readerScrollElement();if(innerWidth>=760&&node)node.scrollTop=0;else if(node){const root=document.getElementById(view==='qbank'?'qbView':view==='review'?'reviewView':'prospectView');const header=document.querySelector('.topbar').getBoundingClientRect().height;node.scrollTop=Math.max(0,(root?.getBoundingClientRect().top||0)+node.scrollTop-header);}}
+function scrollReaderTo(target){if(!target)return;const node=readerScrollElement();if(innerWidth>=760&&node&&node.contains(target)){node.scrollTop+=target.getBoundingClientRect().top-node.getBoundingClientRect().top-10;}else{const header=document.querySelector('.topbar').getBoundingClientRect().height;const bar=view==='qbank'?document.querySelector('.qb-workbar')?.getBoundingClientRect().height||0:0;window.scrollTo({top:Math.max(0,window.scrollY+target.getBoundingClientRect().top-header-bar-12),behavior:'auto'});}}
 
-let focusRefreshing=false;
-function setupFocusRefresh(){
-  window.addEventListener('focus', async ()=>{
-    if(focusRefreshing||!serverMode||apiBase===null)return;
-    focusRefreshing=true;
-    try{
-      await ensureViewData(view,true);
-      if(view==='qbank'&&!qbankFormEditing())renderQbank();
-      else if(view==='review'&&!reviewFormEditing())renderReview();
-      else if(view==='prospect')renderProspect();
-    }catch(e){}
-    focusRefreshing=false;
-  });
+// The shared workbench script owns version-aware refresh for every module.
+const workspaceReadStates = {};
+function workspaceEmptyState(module, filtered=false) {
+  const state=workspaceReadStates[module]||((window.__SNAPSHOT__||serverMode)?'ready':'loading');
+  const names={records:'招聘记录',qbank:'通用准备',preps:'公司准备',prospects:'探查报告',reviews:'面试复盘'};
+  const title=state==='loading'?'正在读取'+names[module]:state==='error'?names[module]+'读取失败':filtered?'没有匹配结果':'尚无'+names[module];
+  const note=state==='loading'?'请稍候。':state==='error'?'已有资料不会被清空，请检查连接后重新读取。':filtered?'可调整搜索或筛选条件。':'从新增、导入或自己的 Agent 开始整理资料。';
+  const actions=state==='ready'&&!filtered&&!window.__SNAPSHOT__?`<button class="btn btn-sm" onclick="startWorkspaceContent('${module}')">新增</button><button class="btn btn-sm" onclick="startWorkspaceContent('${module}',true)">导入资料</button><button class="btn btn-sm" onclick="copyAgentBootstrap()">复制 Agent 接入说明</button>`:state==='error'?'<button class="btn btn-sm" onclick="refreshWorkspaceData(true)">重新读取</button>':'';
+  return `<div class="workspace-empty" data-empty-module="${module}" data-empty-state="${state}"><h3>${title}</h3><p>${note}</p><div class="workspace-empty-actions">${actions}</div></div>`;
 }
-setupFocusRefresh();
 
 // ---- mini markdown 渲染（先整体转义，再解析白名单语法；不识别的原样显示）----
 function mdInline(s){
@@ -2746,7 +2788,7 @@ function renderQbankMain(main){
   if(!cat){
     // 自愈：有大类数据但 currentQbCat 失效（时序/坏缓存）时回退到第一个大类重渲染，而不是直接报错
     if(qbMode==='general'&&qbData.categories.length){currentQbCat=qbData.categories[0].id;renderQbankMain(main);return;}
-    main.innerHTML='<div class="rv-panel rv-empty">'+(qbMode==='company'?'暂无公司准备':qbLoadState==='ready'?'暂无通用准备':'通用准备暂未加载')+'</div>';return;
+    main.innerHTML=workspaceEmptyState(qbMode==='company'?'preps':'qbank');return;
   }
   const items=cat.items.filter(qbMatch);
   let html=`<div class="rv-panel"><div class="rv-panel-head"><h3>${esc(cat.name)}（${items.length}）</h3><div><button class="btn btn-sm btn-primary" onclick="qbAddItem('${cat.id}')">+ 新增条目</button></div></div>`;
@@ -3026,7 +3068,7 @@ function exportHandoff(){if(!handoffIsCurrent()){updateHandoffControls();showToa
 function saveAgentSettings(){WORKFLOWS.forEach(f=>workspace.agents[f.id]={name:document.getElementById('agent_'+f.id).value.trim(),entry:document.getElementById('entry_'+f.id).value.trim(),notes:document.getElementById('notes_'+f.id).value.trim()});saveWorkspace();updateHandoffControls();}
 const maintenanceTools=document.querySelector('.topbar-tools');
 
-function renderMobileRecords(){const el=document.getElementById('mobileRecords');if(!el)return;const filtered=getFiltered(),items=filtered.slice((currentPage-1)*pageSize,currentPage*pageSize);el.innerHTML=`<label class="mobile-record-summary"><input type="checkbox" onchange="toggleSelectAll(this.checked)" ${items.length&&items.every(x=>selected.has(x._idx))?'checked':''}>选择本页记录</label>`+items.map(item=>`<article class="mobile-record ${item._starred?'row-starred':''} ${item._excluded?'row-excluded':''} ${selected.has(item._idx)?'row-selected':''}" data-record="${item._idx}"><div class="mobile-record-head"><input type="checkbox" aria-label="选择${esc(item['名称'])}" ${selected.has(item._idx)?'checked':''} onchange="toggleSelect(${item._idx})"><h3>${esc(item['名称'])}</h3><button class="status-badge ${STATUSES.includes(item._status)?'s-'+item._status:'s-unknown'}" onclick="showStatusDropdown(event,${item._idx})">${esc(STATUSES.includes(item._status)?item._status:UNKNOWN_STATUS)}</button></div><p class="mobile-record-job">${esc(item['岗位']||'岗位详见公告')}</p><p class="mobile-record-place">${esc(item['地点']||'地点详见公告')}</p><div class="mobile-record-footer"><span>截止</span>${renderDeadlineBadge(item._deadline)}<button class="btn btn-sm" onclick="showDetail(${item._idx})">详情</button></div></article>`).join('')+(items.length?'':'<p class="settings-help">当前条件没有匹配记录，可清除附加条件或切换快捷视图。</p>');}
+function renderMobileRecords(){const el=document.getElementById('mobileRecords');if(!el)return;const filtered=getFiltered(),items=filtered.slice((currentPage-1)*pageSize,currentPage*pageSize);el.innerHTML=`<label class="mobile-record-summary"><input type="checkbox" onchange="toggleSelectAll(this.checked)" ${items.length&&items.every(x=>selected.has(x._idx))?'checked':''}>选择本页记录</label>`+items.map(item=>`<article class="mobile-record ${item._starred?'row-starred':''} ${item._excluded?'row-excluded':''} ${selected.has(item._idx)?'row-selected':''}" data-record="${item._idx}"><div class="mobile-record-head"><input type="checkbox" aria-label="选择${esc(item['名称'])}" ${selected.has(item._idx)?'checked':''} onchange="toggleSelect(${item._idx})"><h3>${esc(item['名称'])}</h3><button class="status-badge ${STATUSES.includes(item._status)?'s-'+item._status:'s-unknown'}" onclick="showStatusDropdown(event,${item._idx})">${esc(STATUSES.includes(item._status)?item._status:UNKNOWN_STATUS)}</button></div><p class="mobile-record-job">${esc(item['岗位']||'岗位详见公告')}</p><p class="mobile-record-place">${esc(item['地点']||'地点详见公告')}</p><div class="mobile-record-footer"><span>截止</span>${renderDeadlineBadge(item._deadline)}<button class="btn btn-sm" onclick="showDetail(${item._idx})">详情</button></div></article>`).join('')+(items.length?'':workspaceEmptyState('records',data.length>0));}
 const originalRender=render;render=function(){originalRender();applyWorkspace();if(innerWidth<=900)renderMobileRecords();};
 // CSS switches the record surface at this breakpoint; populate cards on entry
 // without resetting the module, filters, pagination or preparation drafts.

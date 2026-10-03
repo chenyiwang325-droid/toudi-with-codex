@@ -29,5 +29,10 @@ window.toudiDesktopStartupError = error => {
   const retry = document.createElement('button');
   retry.className = 'btn'; retry.textContent = '重新打开';
   retry.addEventListener('click', () => location.replace('/index.html'));
-  panel.append(title, message, retry); document.body.prepend(panel);
+  const choose = document.createElement('button');
+  choose.className = 'btn'; choose.textContent = '选择已有工作区';
+  choose.addEventListener('click', () => window.toudiDesktop.selectWorkspace().catch(e => {
+    message.textContent = String(e);
+  }));
+  panel.append(title, message, retry, choose); document.body.prepend(panel);
 };
