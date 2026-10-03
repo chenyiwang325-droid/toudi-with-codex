@@ -100,10 +100,29 @@ class Hosted(unittest.TestCase):
                 (work/'投递数据/.passcode').write_text('private fixture')
                 (work/'面试准备/leak.md').symlink_to(work/'投递数据/.passcode')
                 self.assertEqual(request('/api/agent/files?path=面试准备/leak.md',headers=agent)[0],400)
-                current=json.loads(request('/api/edits',headers=browser)[2]);payload={'edits':{},'pref':{},'base':current['version']}
+                current=json.loads(request('/api/edits',headers=browser)[2])
+                saved_personal={'edits':{'{公司}':{'status':'面试','note':'{个人备注}','starred':True}},
+                                'pref':{'industries':['{行业}'],'education':['硕士及以上']}}
+                payload={**saved_personal,'base':current['version']}
                 self.assertEqual(request('/api/edits','POST',payload,browser)[0],403)
                 browser['Origin']=ORIGIN;self.assertEqual(request('/api/edits','POST',payload,browser)[0],200)
                 self.assertEqual(request('/api/edits','POST',payload,browser)[0],409)
+                saved_collections={
+                    '/api/questionbank':('categories',[{'id':'{分类}','name':'{分类名称}',
+                        'items':[{'id':'{条目}','q':'{问题}','a':'{用户编辑的答案}'}]}]),
+                    '/api/reviews':('sessions',[{'id':'{场次}','company':'{公司}',
+                        'summary':{'strengths':'{用户编辑的全场要点}'},'questions':[]}])}
+                for path,(key,value) in saved_collections.items():
+                    collection=json.loads(request(path,headers=browser)[2])
+                    change={key:value,'base':collection['version']}
+                    self.assertEqual(request(path,'POST',change,browser)[0],200)
+                    self.assertEqual(request(path,'POST',change,browser)[0],409)
+                    self.assertEqual(json.loads(request(path,headers=browser)[2])[key],value)
+                # Audit the current boundary: company Markdown has no browser write endpoint.
+                self.assertEqual(request('/api/preps','POST',{'preps':[]},browser)[0],405)
+                self.assertEqual(request('/api/prospects','POST',{'prospects':[]},browser)[0],404)
+                agent_personal=json.loads(request('/api/agent/files?path='+urllib.parse.quote('投递数据/用户编辑数据.json'),headers=agent)[2])
+                self.assertEqual(json.loads(base64.b64decode(agent_personal['contentBase64'])),saved_personal)
                 self.assertEqual(request('/auth/logout','POST','',browser)[0],303)
                 # Material files survive service restarts; credentials do not go into those files.
                 proc.terminate();proc.wait(timeout=5)
@@ -113,7 +132,15 @@ class Hosted(unittest.TestCase):
                         if request('/healthz')[0]==200:break
                     except OSError:pass
                     time.sleep(.02)
-                self.assertEqual(len(json.loads(request('/api/agent/files',headers=agent)[2])['files']),3)
+                self.assertEqual(len(json.loads(request('/api/agent/files',headers=agent)[2])['files']),5)
+                # A fresh browser session reads durable data; it does not depend on browser storage.
+                code,new_headers,_=request('/auth/login','POST','password='+PASSWORD,{'Origin':ORIGIN})
+                self.assertEqual(code,303)
+                fresh_browser={'Cookie':new_headers['Set-Cookie'].split(';',1)[0]}
+                after=json.loads(request('/api/edits',headers=fresh_browser)[2])
+                self.assertEqual({k:after[k] for k in saved_personal},saved_personal)
+                for path,(key,value) in saved_collections.items():
+                    self.assertEqual(json.loads(request(path,headers=fresh_browser)[2])[key],value)
             finally:
                 proc.terminate();proc.wait(timeout=5)
 
