@@ -1,6 +1,6 @@
 [package]
 name = "toudi"
-version = "0.2.0"
+version = "0.2.1"
 description = "TouDi personal application workbench"
 authors = ["TouDi contributors"]
 edition = "2021"
@@ -19,6 +19,10 @@ serde_json = "1"
 base64 = "0.22"
 getrandom = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["blocking"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
 
 [profile.release]
 strip = true

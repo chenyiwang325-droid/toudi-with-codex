@@ -34,7 +34,8 @@ async function managementRequest(module, body) {
   return result;
 }
 function managementStyle() {
-  document.head.insertAdjacentHTML('beforeend', `<style>.management-dialog{width:min(1060px,94vw);max-height:90vh;display:flex;flex-direction:column;background:var(--card);border-radius:10px;padding:22px;gap:14px}.management-body{overflow:auto;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px}.management-list{border-right:1px solid var(--border);padding-right:14px;overflow:auto}.management-list button{width:100%;text-align:left;margin-bottom:5px;white-space:normal}.management-form label{display:grid;gap:6px;font-size:12px;color:var(--text2);margin-bottom:12px}.management-form input,.management-form textarea,.management-form select{width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:10px;border-radius:5px;font:inherit}.management-form textarea{min-height:220px;resize:vertical;line-height:1.65}.management-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start}.management-fields textarea{height:90px;min-height:90px}.management-form details{margin:12px 0}.management-form details>summary{cursor:pointer;margin-bottom:10px}.management-preview{padding:15px;background:var(--bg);border:1px solid var(--border);max-height:360px;overflow:auto}.management-actions{display:flex;gap:8px;flex-wrap:wrap}.management-message{color:var(--text3);font-size:12px;line-height:1.6;white-space:pre-wrap}.management-status{min-height:20px;color:var(--text2);font-size:13px}.management-dialog h2{margin:0;font-size:19px}@media(max-width:700px){.management-body{grid-template-columns:1fr}.management-list{max-height:130px;border-right:0;border-bottom:1px solid var(--border)}.management-fields{grid-template-columns:1fr}.management-dialog{padding:14px}}</style>`);
+  const nonce = document.querySelector('style[nonce]')?.nonce;
+  document.head.insertAdjacentHTML('beforeend', `<style${nonce ? ' nonce="' + nonce + '"' : ''}>.management-dialog{width:min(1060px,94vw);max-height:90vh;display:flex;flex-direction:column;background:var(--card);border-radius:10px;padding:22px;gap:14px}.management-body{overflow:auto;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px}.management-list{border-right:1px solid var(--border);padding-right:14px;overflow:auto}.management-list button{width:100%;text-align:left;margin-bottom:5px;white-space:normal}.management-form label{display:grid;gap:6px;font-size:12px;color:var(--text2);margin-bottom:12px}.management-form input,.management-form textarea,.management-form select{width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:10px;border-radius:5px;font:inherit}.management-form textarea{min-height:220px;resize:vertical;line-height:1.65}.management-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start}.management-fields textarea{height:90px;min-height:90px}.management-form details{margin:12px 0}.management-form details>summary{cursor:pointer;margin-bottom:10px}.management-preview{padding:15px;background:var(--bg);border:1px solid var(--border);max-height:360px;overflow:auto}.management-actions{display:flex;gap:8px;flex-wrap:wrap}.management-message{color:var(--text3);font-size:12px;line-height:1.6;white-space:pre-wrap}.management-status{min-height:20px;color:var(--text2);font-size:13px}.management-dialog h2{margin:0;font-size:19px}@media(max-width:700px){.management-body{grid-template-columns:1fr}.management-list{max-height:130px;border-right:0;border-bottom:1px solid var(--border)}.management-fields{grid-template-columns:1fr}.management-dialog{padding:14px}}</style>`);
   document.body.insertAdjacentHTML('beforeend', `<div id="managementOverlay" class="modal-overlay" style="display:none"><section class="management-dialog" role="dialog" aria-modal="true" aria-labelledby="managementTitle"><div class="filter-dialog-head"><h2 id="managementTitle">管理资料</h2><button class="btn" onclick="closeManagement()">关闭</button></div><div id="managementTools" class="management-actions"></div><div id="managementBody" class="management-body"></div><div id="managementStatus" class="management-status" role="status"></div><div id="managementActions" class="management-actions"></div></section></div>`);
 }
 function closeManagement() {
@@ -530,6 +531,7 @@ async function managementInit() {
       localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
       applyWorkspace();
       if (workspace.defaultView && workspace.defaultView !== view) switchView(workspace.defaultView);
+      else if (view === 'settings') renderSettings();
     } else if (localStorage.getItem(WORKSPACE_KEY)) {
       await saveWorkspace();
     }
@@ -718,4 +720,8 @@ agentBootstrapText = function () {
   if (!desktop) return basicAgentBootstrap();
   return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + desktop.workspace + '\n资料工具：' + desktop.agentTool + '\n流程文档目录：' + desktop.guideRoot + '\n\n先读取文档目录下的 AGENTS.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
 };
-managementInit();
+if (window.__TOUDI_DESKTOP_READY__) {
+  window.__TOUDI_DESKTOP_READY__.then(managementInit).catch(() => {});
+} else {
+  managementInit();
+}

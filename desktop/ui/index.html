@@ -9,12 +9,8 @@ async function loadWorkbench(retry=false){
   if(retry)await window.__TAURI__.core.invoke('restart_runtime');
   const context=await window.__TAURI__.core.invoke('desktop_context');
   if(context.error)throw Error(context.error);
-  window.__TOUDI_DESKTOP__=context;
-  const result=await window.__TAURI__.core.invoke('backend_request',{path:'/投递管理.html',method:'GET',body:null});
-  if(result.status!==200)throw Error('资料暂时无法读取。请保留工作区并重试。');
-  const bytes=Uint8Array.from(atob(result.contentBase64),c=>c.charCodeAt(0));
-  const html=new TextDecoder().decode(bytes).replace('<head>','<head><script src="/desktop-bridge.js"><\/script>');
-  document.open();document.write(html);document.close();
+  // Navigate to a bundled document so Tauri applies its script hashes and style nonces.
+  location.replace('/workbench.html');
  }catch(e){status.textContent='工作台未能打开，已保存的资料仍保留。';error.textContent=String(e);document.getElementById('retry').hidden=false;}
 }
 loadWorkbench();

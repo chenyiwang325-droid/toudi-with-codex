@@ -41,6 +41,46 @@ struct BackendResponse {
     content_base64: String,
 }
 
+// Opt-in local development diagnostics; never enabled by a normal app launch.
+// It records only structure/layout and snapshots this app's own WebView.
+#[tauri::command]
+fn native_render_report(
+    window: tauri::WebviewWindow,
+    mut report: serde_json::Value,
+) -> Result<(), String> {
+    let path = std::env::var_os("TOUDI_RENDER_REPORT").ok_or("渲染诊断未启用")?;
+    report["nativePid"] = serde_json::json!(std::process::id());
+    let text = serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?;
+    if text.len() > 65536 {
+        return Err("诊断超出范围".into());
+    }
+    std::fs::write(path, text).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    if let Some(path) = std::env::var_os("TOUDI_RENDER_SNAPSHOT") {
+        window.with_webview(move |raw| unsafe {
+            use objc2::{class, msg_send, runtime::AnyObject};
+            let path = PathBuf::from(path);
+            let completion = block2::RcBlock::new(move |image: *mut AnyObject, error: *mut AnyObject| {
+                if image.is_null() || !error.is_null() { return; }
+                let tiff: *mut AnyObject = msg_send![image, TIFFRepresentation];
+                if tiff.is_null() { return; }
+                let bitmap: *mut AnyObject = msg_send![class!(NSBitmapImageRep), imageRepWithData: tiff];
+                let properties: *mut AnyObject = msg_send![class!(NSDictionary), dictionary];
+                let png: *mut AnyObject = msg_send![bitmap, representationUsingType: 4_usize, properties: properties];
+                if png.is_null() { return; }
+                let bytes: *const u8 = msg_send![png, bytes];
+                let length: usize = msg_send![png, length];
+                let _ = std::fs::write(&path, std::slice::from_raw_parts(bytes, length));
+            });
+            let view: &AnyObject = &*raw.inner().cast();
+            let _: () = msg_send![view, takeSnapshotWithConfiguration: std::ptr::null::<AnyObject>(), completionHandler: &*completion];
+        }).map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
+    Ok(())
+}
+
 fn workspace(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if let Some(path) = std::env::var_os("TOUDI_WORKSPACE") {
         return Ok(PathBuf::from(path));
@@ -316,15 +356,35 @@ async fn export_reading(
 }
 
 fn main() {
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+    let mut context = tauri::generate_context!();
+    if std::env::var_os("TOUDI_RENDER_REPORT").is_some() {
+        for window in &mut context.config_mut().app.windows {
+            window.incognito = true;
+        }
+    }
+    let mut builder = tauri::Builder::default();
+    if std::env::var_os("TOUDI_RENDER_REPORT").is_none() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
                 let _ = w.set_focus();
             }
-        }))
+        }));
+    }
+    let app = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .on_page_load(|webview, payload| {
+            if std::env::var_os("TOUDI_RENDER_REPORT").is_some()
+                && payload.event() == tauri::webview::PageLoadEvent::Finished
+            {
+                let webview = webview.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_secs(2));
+                    let _ = webview.eval(include_str!("render_check.js"));
+                });
+            }
+        })
         .setup(|app| {
             let root = workspace(app.handle()).map_err(std::io::Error::other)?;
             let resources = app.path().resource_dir()?;
@@ -355,9 +415,10 @@ fn main() {
             open_external,
             show_workspace,
             save_file,
-            export_reading
+            export_reading,
+            native_render_report
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("TouDi desktop could not initialize");
     app.run(|app, event| {
         if matches!(event, tauri::RunEvent::Exit) {

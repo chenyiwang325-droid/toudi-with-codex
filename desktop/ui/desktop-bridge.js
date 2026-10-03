@@ -6,11 +6,12 @@
   window.fetch = async (input, options = {}) => {
     const raw = input instanceof Request ? input.url : String(input);
     const url = new URL(raw, location.href);
-    if (url.origin !== location.origin || !url.pathname.startsWith('/api/')) return originalFetch(input, options);
+    const apiPath = decodeURIComponent(url.pathname) === '/逐字稿数据.json' ? '/api/questionbank' : url.pathname;
+    if (url.origin !== location.origin || !apiPath.startsWith('/api/')) return originalFetch(input, options);
     const method = (options.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
     const body = options.body === undefined ? null : String(options.body);
     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    const result = await invoke('backend_request', {path: url.pathname + url.search, method, body});
+    const result = await invoke('backend_request', {path: apiPath + url.search, method, body});
     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const bytes = Uint8Array.from(atob(result.contentBase64), c => c.charCodeAt(0));
     return new Response(bytes, {status: result.status, headers: result.headers});
@@ -56,6 +57,6 @@
       for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
       return invoke('save_file', {name, contentBase64: btoa(chunks.join(''))});
     },
-    version: window.__TOUDI_DESKTOP__?.version || '0.2.0'
+    get version() {return window.__TOUDI_DESKTOP__?.version || '0.2.1';}
   };
 })();

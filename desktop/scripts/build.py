@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from frontend import prepare_frontend
 
 DESKTOP = Path(__file__).resolve().parents[1]
 ROOT = DESKTOP.parent
@@ -47,6 +48,7 @@ def main():
     # All visual and UI assets come from the current application, without a separate design.
     ui_assets = DESKTOP/'ui/assets'
     shutil.copytree(ROOT/'app/assets', ui_assets, dirs_exist_ok=True)
+    prepare_frontend(ROOT)
     run([npx, 'tauri', 'icon', ROOT/'app/assets/favicon.svg', '--output', DESKTOP/'src-tauri/icons'], env=env)
     if not args.skip_runtime:
         runtime = DESKTOP/'src-tauri/runtime'
