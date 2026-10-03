@@ -35,6 +35,9 @@ from prep_resources import resource_paths, resource_payload
 from prospect_catalog import read_catalog, safe_path
 from publish_records import validate
 from update_common import data_lock
+from workbench import Workbench, Conflict
+import base64
+import zipfile
 WORKSPACE = os.path.abspath(os.environ.get('TOUDI_WORKSPACE', os.path.join(os.path.dirname(CODE_DIR), 'runtime')))
 BASE_DIR = os.path.join(WORKSPACE, '投递数据')
 os.makedirs(BASE_DIR, exist_ok=True)
@@ -78,7 +81,21 @@ class Handler(SimpleHTTPRequestHandler):
         if not hosted.authorize(self, PORT): return
         if any(part.startswith('.') for part in unquote(urlsplit(self.path).path).split('/') if part):
             return self._send_json({'error': 'private workspace file'}, 403)
+        route = urlsplit(self.path).path
+        if route == '/api/health': return self._send_json({'ok': True, 'mode': hosted.MODE})
+        if route in ('/api/manage', '/api/backup'):
+            try:
+                workbench = Workbench(WORKSPACE)
+                if route == '/api/manage':
+                    module = parse_qs(urlsplit(self.path).query).get('module', ['workspace'])[0]
+                    return self._send_json(workbench.get(module))
+                body = workbench.backup()
+                self.send_response(200); self.send_header('Content-Type', 'application/zip')
+                self.send_header('Content-Disposition', 'attachment; filename="toudi-backup.zip"')
+                self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
+            except (ValueError, OSError, KeyError) as exc: return self._send_json({'error': str(exc)}, 400)
         with data_lock(BASE_DIR):
+            Workbench(WORKSPACE).recover_pending()
             return self._serve_GET()
 
     def _serve_GET(self):
@@ -86,7 +103,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not hosted.is_agent(self): return self._send_json({'error': 'agent_token_required'}, 403)
             try: return remote_files.serve_get(self, WORKSPACE)
             except (ValueError, OSError) as exc: return self._send_json({'error': str(exc)}, 400)
-        if urlsplit(self.path).path in ('/', '/投递管理.html'):
+        if unquote(urlsplit(self.path).path) in ('/', '/投递管理.html'):
             try:
                 path = os.path.join(BASE_DIR, '投递记录.json')
                 rows = json.load(open(path, encoding='utf-8')) if os.path.exists(path) else []
@@ -102,10 +119,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers(); self.wfile.write(body); return
-        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg'):
+        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js'):
             name = os.path.basename(urlsplit(self.path).path)
             body = open(os.path.join(CODE_DIR, 'assets', name), 'rb').read()
-            self.send_response(200); self.send_header('Content-Type', 'image/svg+xml')
+            self.send_response(200); self.send_header('Content-Type', 'text/javascript; charset=utf-8' if name.endswith('.js') else 'image/svg+xml')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers(); self.wfile.write(body); return
         if self.path in ('/api/workspace', '/api/agent'):
@@ -124,6 +141,7 @@ class Handler(SimpleHTTPRequestHandler):
                       'missing': [key for key, path in paths.items() if key != 'prospects' and not os.path.exists(path)]}
             if self.path == '/api/agent':
                 guide = os.path.join(os.path.dirname(CODE_DIR), 'docs', '流程协作.md')
+                if not os.path.exists(guide): guide = os.path.join(CODE_DIR, 'docs', '流程协作.md')
                 try:
                     with open(guide, encoding='utf-8') as f:
                         result['guide'] = f.read()
@@ -198,6 +216,20 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if not hosted.authorize(self, PORT): return
+        if urlsplit(self.path).path in ('/api/manage', '/api/backup'):
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                if length <= 0 or length > 210 * 1024 * 1024: raise ValueError('invalid payload size')
+                payload = json.loads(self.rfile.read(length))
+                if not isinstance(payload, dict): raise ValueError('payload must be an object')
+                workbench = Workbench(WORKSPACE)
+                if urlsplit(self.path).path == '/api/manage': result = workbench.mutate(payload)
+                else:
+                    result = workbench.restore(base64.b64decode(payload['contentBase64'], validate=True), payload.get('base'), payload.get('action') == 'preview')
+                    if payload.get('action') == 'preview': result['base'] = workbench.get('workspace')['version']
+                return self._send_json(result)
+            except Conflict as exc: return self._send_json({'error': str(exc)}, 409)
+            except (ValueError, OSError, KeyError, TypeError, zipfile.BadZipFile) as exc: return self._send_json({'error': str(exc)}, 400)
         if urlsplit(self.path).path == '/api/agent/files':
             if not hosted.is_agent(self): return self._send_json({'error': 'agent_token_required'}, 403)
             try:
@@ -214,6 +246,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('edits and pref must be objects')
                 print(f'[保存] {len(edits)} 条 base={payload.get("base")} <- {self.headers.get("User-Agent","?")[:60]}')
                 with EDITS_LOCK, data_lock(BASE_DIR):
+                    Workbench(WORKSPACE).recover_pending()
                     current = str(self._data_version())
                     base = payload.get('base')
                     base = str(base) if base is not None else None
@@ -236,6 +269,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('payload must contain a sessions array')
                 print(f'[保存] 复盘 {len(sessions)} 场 base={payload.get("base")} <- {self.headers.get("User-Agent","?")[:60]}')
                 with EDITS_LOCK, data_lock(BASE_DIR):
+                    Workbench(WORKSPACE).recover_pending()
                     conflict = self._check_collection_base(payload, REVIEWS_FILE, self._read_reviews)
                     if conflict:
                         return self._send_json(conflict, 409)
@@ -259,6 +293,7 @@ class Handler(SimpleHTTPRequestHandler):
                 n = sum(len(c.get('items') or []) for c in categories if isinstance(c, dict))
                 print(f'[保存] 问答库 {len(categories)} 类 {n} 条 base={payload.get("base")} <- {self.headers.get("User-Agent","?")[:60]}')
                 with EDITS_LOCK, data_lock(BASE_DIR):
+                    Workbench(WORKSPACE).recover_pending()
                     conflict = self._check_collection_base(payload, QBANK_FILE, self._read_qbank)
                     if conflict:
                         return self._send_json(conflict, 409)
@@ -309,40 +344,19 @@ class Handler(SimpleHTTPRequestHandler):
         return None  # 持续不可读：503，绝不让页面误以为"磁盘为空"而反推旧缓存
 
     def _write_data(self, d):
-        tmp = DATA_FILE + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(d, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, DATA_FILE)  # 原子写入，避免中途断电损坏文件
+        return Workbench(WORKSPACE).legacy_commit_locked('edits', d)
 
     def _read_reviews(self):
         return self._read_collection(REVIEWS_FILE, 'sessions')
 
     def _write_reviews(self, d):
-        if os.path.exists(REVIEWS_FILE):  # 覆盖前自动备份
-            try:
-                import shutil
-                shutil.copy2(REVIEWS_FILE, REVIEWS_FILE + '.bak_auto')
-            except Exception:
-                pass
-        tmp = REVIEWS_FILE + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(d, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, REVIEWS_FILE)  # 原子写入
+        return Workbench(WORKSPACE).legacy_commit_locked('reviews', d)
 
     def _read_qbank(self):
         return self._read_collection(QBANK_FILE, 'categories')
 
     def _write_qbank(self, d):
-        if os.path.exists(QBANK_FILE):  # 覆盖前自动备份
-            try:
-                import shutil
-                shutil.copy2(QBANK_FILE, QBANK_FILE + '.bak_auto')
-            except Exception:
-                pass
-        tmp = QBANK_FILE + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(d, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, QBANK_FILE)  # 原子写入
+        return Workbench(WORKSPACE).legacy_commit_locked('qbank', d)
 
     def _read_preps(self):
         return self._read_collection(PREPS_FILE, 'preps')
@@ -396,11 +410,14 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
+    global PORT
     try:
         server = ThreadingHTTPServer(('0.0.0.0' if hosted.MODE == 'hosted' else '127.0.0.1', PORT), Handler)
     except OSError:
         print(f'端口 {PORT} 已被占用，服务多半已在运行。')
         return
+    PORT = server.server_address[1]
+    print(json.dumps({'event': 'ready', 'port': PORT}), flush=True)
     print('投递中控台已启动: ' + (hosted.PUBLIC_URL if hosted.MODE == 'hosted' else f'http://127.0.0.1:{PORT}/投递管理.html'))
     print(f'编辑数据自动保存到: {DATA_FILE}')
     print('按 Ctrl+C 停止服务')
@@ -408,6 +425,8 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        server.server_close()
 
 
 if __name__ == '__main__':

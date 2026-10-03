@@ -1,0 +1,91 @@
+name: Desktop packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            runner: macos-15
+            bundles: app,dmg
+            arch: arm64
+          - platform: macos-x64
+            runner: macos-15-intel
+            bundles: app,dmg
+            arch: x64
+          - platform: windows-x64
+            runner: windows-2022
+            bundles: nsis
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.arch }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check publishable source
+        run: python tests/check_source.py
+      - name: Verify isolated data and frontend contracts
+        run: |
+          python -m pip install -r requirements.txt
+          python -m unittest discover -s tests -v
+          node tests/test_preferences.cjs
+          node tests/test_workbench.cjs
+      - name: Build native package
+        run: python desktop/scripts/build.py --bundles ${{ matrix.bundles }}
+      - name: Verify bundled runtime without system dependencies
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          name = 'toudi-runtime.exe' if os.name == 'nt' else 'toudi-runtime'
+          runtime = Path('desktop/src-tauri/runtime/toudi-runtime') / name
+          env = dict(os.environ, TOUDI_TEST_RUNTIME=str(runtime.resolve()))
+          subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_desktop.py', '-v'], env=env, check=True)
+          PY
+      - name: Collect installers and checksums
+        shell: bash
+        env:
+          TOUDI_ARTIFACT_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import os
+          import shutil
+          bundle = Path('desktop/src-tauri/target/release/bundle')
+          output = Path('desktop/dist') / os.environ['TOUDI_ARTIFACT_PLATFORM']
+          output.mkdir(parents=True, exist_ok=True)
+          installers = sorted(p for p in bundle.rglob('*') if p.is_file() and p.suffix in {'.dmg', '.exe', '.msi'})
+          if not installers:
+              raise SystemExit('No installer produced')
+          lines = []
+          for source in installers:
+              target = output / source.name
+              shutil.copy2(source, target)
+              lines.append(hashlib.sha256(target.read_bytes()).hexdigest() + '  ' + target.name)
+          (output / 'SHA256SUMS.txt').write_text('\n'.join(lines) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TouDi-${{ matrix.platform }}
+          path: desktop/dist/${{ matrix.platform }}/
+          if-no-files-found: error
+          retention-days: 14

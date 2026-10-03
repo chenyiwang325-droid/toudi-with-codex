@@ -20,4 +20,15 @@ venv/
 node_modules/
 /diagnostics/
 /backups/
+/desktop/.toolchain/
+/desktop/.venv/
+/desktop/dist/
+/desktop/build/
+/desktop/src-tauri/target/
+/desktop/src-tauri/runtime/
+/desktop/src-tauri/icons/
+/desktop/src-tauri/gen/
+/desktop/ui/assets/
+*.dmg
+*.app/
 # Alternate user data roots must remain outside this repository.

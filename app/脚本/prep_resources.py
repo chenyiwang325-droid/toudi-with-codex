@@ -42,7 +42,12 @@ def resource_payload(path):
             try:
                 payload['text'] = subprocess.run(['pdftotext', '-enc', 'UTF-8', str(path), '-'], check=True, capture_output=True, text=True).stdout
             except (FileNotFoundError, subprocess.CalledProcessError):
-                payload['text'] = 'PDF正文未提取，可查看原件；如需文本请安装pdftotext并检查文件。'
+                try:
+                    from pypdf import PdfReader
+                    payload['text'] = '\n\n'.join(page.extract_text() or '' for page in PdfReader(path).pages)
+                    if not payload['text'].strip(): payload['text'] = '该 PDF 没有可提取的文字，请查看原件。'
+                except Exception:
+                    payload['text'] = 'PDF 正文未能提取，请查看原件。'
         if path.suffix.lower() == '.docx':
             with zipfile.ZipFile(path) as z:
                 doc = ET.fromstring(z.read('word/document.xml'))

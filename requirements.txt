@@ -1,2 +1,3 @@
-# Local and hosted servers use the Python standard library. Snapshot encryption only:
+# Encryption and portable PDF text extraction; core storage uses the standard library.
 cryptography>=42,<47
+pypdf>=5,<7

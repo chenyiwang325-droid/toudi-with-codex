@@ -16,6 +16,7 @@ PUBLIC_URL = (os.environ.get('TOUDI_PUBLIC_URL') or os.environ.get('RENDER_EXTER
 PASSWORD = os.environ.get('TOUDI_PASSWORD', '')
 SESSION_SECRET = os.environ.get('TOUDI_SESSION_SECRET', '')
 AGENT_TOKEN = os.environ.get('TOUDI_AGENT_TOKEN', '')
+DESKTOP_TOKEN = os.environ.get('TOUDI_DESKTOP_TOKEN', '')
 _failures = {}
 _guard = threading.Lock()
 SESSION_SECONDS = 12 * 3600
@@ -23,8 +24,10 @@ MAX_BODY = 32 * 1024 * 1024
 
 
 def validate_configuration():
-    if MODE not in {'local', 'hosted'}:
-        raise ValueError('TOUDI_MODE must be local or hosted')
+    if MODE not in {'local', 'hosted', 'desktop'}:
+        raise ValueError('TOUDI_MODE must be local, hosted or desktop')
+    if MODE == 'desktop' and len(DESKTOP_TOKEN) < 32:
+        raise ValueError('desktop mode requires an ephemeral TOUDI_DESKTOP_TOKEN')
     if MODE == 'hosted':
         u = urlsplit(PUBLIC_URL)
         if u.scheme != 'https' or not u.netloc or u.username or u.password or u.path or u.query or u.fragment:
@@ -39,13 +42,16 @@ def validate_configuration():
 
 def origin_allowed(handler, port):
     host, origin = handler.headers.get('Host', ''), handler.headers.get('Origin')
-    if MODE == 'local':
+    if MODE in {'local', 'desktop'}:
         allowed = {f'127.0.0.1:{port}', f'localhost:{port}', f'[::1]:{port}'}
         return host in allowed and (not origin or origin in {'http://' + h for h in allowed})
     return host == urlsplit(PUBLIC_URL).netloc and (not origin or origin == PUBLIC_URL)
 
 
 def is_agent(handler):
+    if MODE == 'desktop':
+        header = handler.headers.get('Authorization', '')
+        return header.startswith('Bearer ') and bool(DESKTOP_TOKEN) and hmac.compare_digest(header[7:].encode(), DESKTOP_TOKEN.encode())
     if MODE != 'hosted' or not AGENT_TOKEN:
         return False
     header = handler.headers.get('Authorization', '')
@@ -101,6 +107,10 @@ def authorize(handler, port):
             handler._send_json({'error': 'invalid_or_excessive_body_size'}, 413); return False
     if MODE == 'local':
         return True
+    if MODE == 'desktop':
+        if is_agent(handler): return True
+        handler._send_json({'error': 'desktop_session_required'}, 401)
+        return False
     if handler.command == 'POST' and not is_agent(handler) and handler.headers.get('Origin') != PUBLIC_URL:
         handler._send_json({'error': 'same_origin_required'}, 403); return False
     if path == '/auth/login' and handler.command == 'GET':

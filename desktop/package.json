@@ -1,0 +1,12 @@
+{
+  "name": "toudi-desktop",
+  "private": true,
+  "version": "0.2.0",
+  "scripts": {
+    "tauri": "tauri",
+    "build": "python3 scripts/build.py"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.0"
+  }
+}
