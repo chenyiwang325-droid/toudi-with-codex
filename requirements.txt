@@ -1,2 +1,2 @@
-# Local server uses the Python standard library. Snapshot encryption only:
+# Local and hosted servers use the Python standard library. Snapshot encryption only:
 cryptography>=42,<47

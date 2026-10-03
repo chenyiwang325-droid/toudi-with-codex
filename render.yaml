@@ -1,0 +1,25 @@
+# Single-owner instance. The persistent disk requires a paid service plan.
+services:
+  - type: web
+    name: toudi-workbench
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 run.py
+    plan: starter
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    disk:
+      name: toudi-materials
+      mountPath: /var/data/toudi
+      sizeGB: 1
+    envVars:
+      - key: TOUDI_MODE
+        value: hosted
+      - key: TOUDI_WORKSPACE
+        value: /var/data/toudi
+      - key: TOUDI_PASSWORD
+        sync: false
+      - key: TOUDI_SESSION_SECRET
+        generateValue: true
+      - key: TOUDI_AGENT_TOKEN
+        generateValue: true

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch the loopback workspace; no account, source adapter or sample data."""
+"""Launch a local or authenticated hosted workspace; no sample data."""
 import os
 import runpy
 from pathlib import Path
