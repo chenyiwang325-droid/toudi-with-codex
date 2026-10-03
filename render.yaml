@@ -5,7 +5,8 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: python3 run.py
-    plan: starter
+    plan: 0.5c-512mb
+    region: singapore
     autoDeployTrigger: off
     healthCheckPath: /healthz
     disk:

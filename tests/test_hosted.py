@@ -61,8 +61,14 @@ class Hosted(unittest.TestCase):
                 self.assertEqual(request('/api/agent/files',headers=browser)[0],403)
                 self.assertEqual(request('/用户编辑数据.json',headers=browser)[0],404)
                 self.assertEqual(request('/api/agent/files?path=投递数据/.passcode',headers=agent)[0],400)
-                payload={'changes':[material('投递数据/投递记录.json',json.dumps([{'名称':'{公司}','岗位':'{岗位}'}])), material('面试准备/{稿}.md','# {标题}\n{正文}') ]}
+                records=[{'名称':'{公司}','岗位':'{岗位}','归并类型':'{归并依据}','归并来源':[{'名称':'{来源主体}','公告链接':'https://example.invalid/source','编辑键':'{独立来源键}'}]}]
+                payload={'changes':[material('投递数据/投递记录.json',json.dumps(records)), material('面试准备/{稿}.md','# {标题}\n{正文}') ]}
                 self.assertEqual(request('/api/agent/files','POST',payload,agent)[0],200)
+                published=json.loads((work/'投递数据/投递记录.json').read_text())
+                self.assertEqual(published,records)
+                malformed={'changes':[material('投递数据/投递记录.json',json.dumps([{'名称':'{公司}','归并来源':[{'名称':'{来源}','编辑键':[]}]}]),hashlib.sha256((work/'投递数据/投递记录.json').read_bytes()).hexdigest())]}
+                self.assertEqual(request('/api/agent/files','POST',malformed,agent)[0],400)
+                self.assertEqual(json.loads((work/'投递数据/投递记录.json').read_text()),records)
                 self.assertEqual(request('/api/agent/files','POST',payload,agent)[0],409)
                 manifest=json.loads(request('/api/agent/files',headers=agent)[2]);self.assertEqual(len(manifest['files']),2)
                 # Exercise the actual CLI workflow against this isolated service.

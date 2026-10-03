@@ -17,8 +17,17 @@ def validate(rows):
     for i, row in enumerate(rows):
         if not isinstance(row, dict) or not isinstance(row.get('名称'), str) or not row['名称'].strip():
             raise ValueError(f'record {i}: a nonempty 名称 is required')
-        if any(k not in FIELDS or not isinstance(v, str) for k, v in row.items()):
-            raise ValueError(f'record {i}: only documented string fields are allowed')
+        if any(k not in FIELDS | {'归并类型', '归并来源'} or (k != '归并来源' and not isinstance(v, str)) for k, v in row.items()):
+            raise ValueError(f'record {i}: only documented record fields are allowed')
+        if '归并来源' in row:
+            sources = row['归并来源']
+            if not isinstance(sources, list):
+                raise ValueError(f'record {i}: 归并来源 must be an array')
+            for n, source in enumerate(sources):
+                if not isinstance(source, dict) or not isinstance(source.get('名称'), str) or not source['名称'].strip():
+                    raise ValueError(f'record {i}, source {n}: a nonempty 名称 is required')
+                if any(k not in FIELDS | {'编辑键'} or not isinstance(v, str) for k, v in source.items()):
+                    raise ValueError(f'record {i}, source {n}: only documented string source fields are allowed')
     return rows
 
 def main():
