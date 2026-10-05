@@ -10,6 +10,7 @@ vm.runInContext(block,context);const run=s=>vm.runInContext(s,context);
 assert.equal(run('industryPreferenceGroups().length'),19); // Available even in an empty workspace.
 assert.equal(run('industryPreferenceGroups()[0].children[0].name'),'软件与数字服务');
 assert.equal(run(`normalizePreference('民企','nature')`),'民营企业');
+assert.equal(run(`normalizePreference('toString','industry')`),'toString');
 assert.equal(run(`normalizePreference('硕士研究生','education')`),'硕士');
 assert.equal(run(`normalizePreference('博士研究生','education')`),'博士');
 assert.equal(run(`normalizePreference('本科及研究生','education')`),'本科及研究生');
@@ -50,4 +51,12 @@ assert.deepEqual(Array.from(run(`readPreferenceChoices('prefEducation')`)),['硕
 assert.equal(run(`preferenceMatch('博士',readPreferenceChoices('prefEducation'),'education')`),false);
 controls=[];assert.deepEqual(Array.from(run(`readPreferenceChoices('prefEducation')`)),['MBA']);
 run("preferences.natures=[];preferences.industries=[];preferences.education=[]");assert.equal(run(`matchesJobPreferences({})`),true);
+// Counts must remain responsive with thousands of records and the full default vocabulary.
+run("sourcePreferenceRules=null;preferences.industries=['软件'];preferences.education=['硕士']");
+const start=performance.now();
+const count=run(`Array.from({length:6000},(_,i)=>({'行业':i%2?'软件/人工智能':'银行/国企','学历要求':'本科及以上'})).filter(matchesJobPreferences).length`);
+assert.equal(count,3000);assert(performance.now()-start<1500,'Preference filtering regressed with the full catalog');
+// Replacing initialization rules must invalidate the cached meanings.
+run("sourcePreferenceRules=rules;preferences.industries=['Source A']");
+assert.equal(run(`preferenceMatch('Source B',['Source A'],'industry')`),false);
 console.log('PASS defaults in empty workspace, hierarchy, source overrides, education ranges, special fallback, metadata, exact matching and lossless legacy choices');

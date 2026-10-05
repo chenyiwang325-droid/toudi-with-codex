@@ -3154,21 +3154,27 @@ function disclosureAction(){return '<span class="disclosure-action" aria-hidden=
 // Common defaults stay usable; source initialization corrects their meaning and hierarchy.
 let sourcePreferenceRules=window.__TOUDI_SNAPSHOT_PREFERENCE_RULES__||null;
 let prefDraftOriginal=null,prefDraftInitial=null;
+const preferenceRuleCache=new Map(),EMPTY_PREFERENCE_RULE=Object.freeze({});
 function preferenceDimension(kind){return ({nature:'natures',industry:'industries',education:'education'})[kind]||kind;}
 function cleanPreference(value){return String(value??'').normalize('NFKC').replace(/[\u200b-\u200d\ufeff]/g,'').trim();}
 function preferenceRule(kind){
-  const dimension=preferenceDimension(kind),base=window.__TOUDI_PREFERENCE_DEFAULTS__?.dimensions?.[dimension]||{},patch=sourcePreferenceRules?.dimensions?.[dimension]||{};
-  return {...base,...patch,aliases:{...base.aliases,...patch.aliases},levels:{...base.levels,...patch.levels},groups:dimension==='education'?base.groups:patch.groups?.length?patch.groups:base.groups||[]};
+  const dimension=preferenceDimension(kind),base=window.__TOUDI_PREFERENCE_DEFAULTS__?.dimensions?.[dimension]||EMPTY_PREFERENCE_RULE,patch=sourcePreferenceRules?.dimensions?.[dimension]||EMPTY_PREFERENCE_RULE;
+  const cached=preferenceRuleCache.get(dimension);
+  if(cached&&cached.base===base&&cached.patch===patch)return cached.rule;
+  const rule={...base,...patch,aliases:{...base.aliases,...patch.aliases},levels:{...base.levels,...patch.levels},groups:dimension==='education'?base.groups:patch.groups?.length?patch.groups:base.groups||[]};
+  rule.canonicalAliases=new Map(Object.entries(rule.aliases).map(([key,value])=>[cleanPreference(key),cleanPreference(value)]));
+  rule.known=new Set(preferenceGroupValues(rule.groups).map(value=>rule.canonicalAliases.get(cleanPreference(value))||cleanPreference(value)));
+  rule.ignoredValues=new Set((rule.ignored||[]).map(value=>rule.canonicalAliases.get(cleanPreference(value))||cleanPreference(value)));
+  rule.selectedCache=new WeakMap();
+  preferenceRuleCache.set(dimension,{base,patch,rule});return rule;
 }
 function normalizePreference(value,kind='industry'){
-  const raw=cleanPreference(value),aliases=preferenceRule(kind).aliases||{};
-  const match=Object.entries(aliases).find(([key])=>cleanPreference(key)===raw);
-  return match?cleanPreference(match[1]):raw;
+  const raw=cleanPreference(value);return preferenceRule(kind).canonicalAliases.get(raw)||raw;
 }
 function preferenceGroupValues(groups){return groups.flatMap(group=>[...(group.values||[]),...preferenceGroupValues(group.children||[])]);}
-function preferenceKnown(kind){return new Set(preferenceGroupValues(preferenceRule(kind).groups).map(v=>normalizePreference(v,kind)));}
+function preferenceKnown(kind){return preferenceRule(kind).known;}
 function sourcePreferenceValues(value,kind){
-  const rule=preferenceRule(kind),separator=kind==='education'?'':rule.separator||'',ignored=new Set((rule.ignored||[]).map(v=>normalizePreference(v,kind)));
+  const rule=preferenceRule(kind),separator=kind==='education'?'':rule.separator||'',ignored=rule.ignoredValues;
   return (separator?String(value||'').split(separator):[String(value||'')]).map(v=>normalizePreference(v,kind)).filter(v=>v&&!ignored.has(v));
 }
 function educationLevels(value){
@@ -3177,9 +3183,11 @@ function educationLevels(value){
   return preferenceKnown('education').has(canonical)?[canonical]:null;
 }
 function selectedPreferenceLabels(selected,kind){
+  const rule=preferenceRule(kind),cached=rule.selectedCache.get(selected);if(cached)return cached;
   if(selected.includes(''))return [];
   const known=preferenceKnown(kind);
-  return [...new Set(selected.flatMap(value=>kind==='education'?educationLevels(value)||[]:[normalizePreference(value,kind)]).filter(value=>known.has(value)))];
+  const result=[...new Set(selected.flatMap(value=>kind==='education'?educationLevels(value)||[]:[normalizePreference(value,kind)]).filter(value=>known.has(value)))];
+  rule.selectedCache.set(selected,result);return result;
 }
 function beginPreferenceDraft(){
   prefDraftOriginal={};prefDraftInitial={};
