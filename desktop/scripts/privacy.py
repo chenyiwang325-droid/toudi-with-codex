@@ -28,7 +28,7 @@ def stage_resources(root, stage, names=None):
         if rel.is_absolute() or '..' in rel.parts or set(rel.parts) & EXCLUDED_PARTS:
             continue
         eligible = name == 'AGENTS.md' or (rel.parts[0] in {'app', 'docs'} and rel.suffix.lower() in RESOURCE_TYPES)
-        if name == 'app/browser-extension/manifest.json':
+        if name in ('app/browser-extension/manifest.json', 'app/assets/preference-defaults.json'):
             eligible = True
         if not eligible:
             continue

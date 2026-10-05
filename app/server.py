@@ -118,6 +118,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._serve_GET()
 
     def _serve_GET(self):
+        if urlsplit(self.path).path == '/assets/preference-defaults.js':
+            from preference_rules import bootstrap_script
+            body = bootstrap_script().encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/javascript; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers(); self.wfile.write(body); return
         if urlsplit(self.path).path == '/api/agent/files':
             if not hosted.is_agent(self): return self._send_json({'error': 'agent_token_required'}, 403)
             try: return remote_files.serve_get(self, WORKSPACE)

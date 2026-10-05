@@ -6,6 +6,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_JSON = {
+    'app/assets/preference-defaults.json',
     'app/browser-extension/manifest.json',
     'desktop/package.json',
     'desktop/package-lock.json',

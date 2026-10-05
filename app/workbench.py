@@ -97,7 +97,7 @@ class Workbench:
                     if not row.get('company') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',row.get('researchedAt','')): raise ValueError('company/date required')
                     self.path('岗位探查/'+row['file'])
         if module=='settings':
-            if 'preferenceRules' in value: preference_rules.validate_rules(value['preferenceRules'])
+            if 'preferenceRules' in value: preference_rules.effective_rules(value['preferenceRules'])
             authority=value.get('recordsAuthority')
             if authority is not None:
                 if not isinstance(authority,dict) or authority.get('schemaVersion')!=1 or authority.get('source')!=MODULES['records'][0] or not isinstance(authority.get('legacyHtml'),dict): raise ValueError('invalid recordsAuthority')

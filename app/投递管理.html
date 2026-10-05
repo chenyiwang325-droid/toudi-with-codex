@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script src="/assets/preference-defaults.js"></script>
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1097,9 +1098,9 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
   <div class="modal pref-dialog" role="dialog" aria-modal="true" aria-labelledby="prefDialogTitle">
     <div class="pref-dialog-head"><div><h2 id="prefDialogTitle">求职偏好</h2><p>用于“符合偏好”快捷视图。</p></div><button id="prefClose" class="btn btn-sm" aria-label="关闭偏好设置" onclick="closePrefModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>关闭</button></div>
     <div class="pref-tabs" role="tablist" aria-label="偏好分类"><button id="prefTab-natures" role="tab" aria-controls="prefPanel-natures" onclick="switchPrefTab('natures')">企业性质</button><button id="prefTab-industries" role="tab" aria-controls="prefPanel-industries" onclick="switchPrefTab('industries')">行业方向</button><button id="prefTab-education" role="tab" aria-controls="prefPanel-education" onclick="switchPrefTab('education')">学历要求</button></div><div class="pref-dialog-body">
-    <section class="pref-section" id="prefPanel-natures" role="tabpanel" aria-labelledby="prefTab-natures"><h4>企业性质</h4><p class="pref-help">选择已确认的信源词条。未知标签继续保留，不改变手动标记。</p><div class="pref-options" id="prefNatures"></div></section>
-    <section class="pref-section" id="prefPanel-industries" role="tabpanel" aria-labelledby="prefTab-industries"><h4>行业方向</h4><p class="pref-help">先展开自己的信源分类，再选择具体方向；未分类词条保留原文。</p><div class="pref-options" id="prefIndustries"></div></section>
-    <section class="pref-section" id="prefPanel-education" role="tabpanel" aria-labelledby="prefTab-education"><h4>学历要求</h4><p class="pref-help">只按已确认的学历词条筛选；未注明或无法判断的要求仍保留。</p><div class="pref-options" id="prefEducation"></div></section>
+    <section class="pref-section" id="prefPanel-natures" role="tabpanel" aria-labelledby="prefTab-natures"><h4>企业性质</h4><p class="pref-help">按常用企业性质选择；未确认的标签继续保留。</p><div class="pref-options" id="prefNatures"></div></section>
+    <section class="pref-section" id="prefPanel-industries" role="tabpanel" aria-labelledby="prefTab-industries"><h4>行业方向</h4><p class="pref-help">按大类、细分方向展开，再选择具体小类；未分类记录继续保留。</p><div class="pref-options" id="prefIndustries"></div></section>
+    <section class="pref-section" id="prefPanel-education" role="tabpanel" aria-labelledby="prefTab-education"><h4>学历要求</h4><p class="pref-help">选择要查看的常用学历。“及以上”要求按明确范围匹配，同义名称统一显示。</p><div class="pref-options" id="prefEducation"></div></section>
     </div><div class="modal-actions">
       <span class="pref-save-hint">保存后应用于“符合偏好”</span><button class="btn" onclick="closePrefModal()">取消</button>
       <button class="btn btn-primary" onclick="savePref()">保存偏好</button>
@@ -1406,7 +1407,7 @@ function switchQV(id) {
 // ============== PREFERENCES ==============
 let prefReturnFocus=null;
 function openPrefModal(tab='natures') {
-  prefReturnFocus=document.activeElement;
+  prefReturnFocus=document.activeElement;beginPreferenceDraft();
   renderNaturePreferences();renderIndustryPreferences();renderEducationPreferences();switchPrefTab(['natures','industries','education'].includes(tab)?tab:'natures');
   document.getElementById('prefModal').style.display = 'flex';
   document.querySelector('#prefModal .pref-dialog-body').scrollTop=0;
@@ -1416,9 +1417,8 @@ function closePrefModal() { document.getElementById('prefModal').style.display =
 document.addEventListener('keydown',event=>{const modal=document.getElementById('prefModal');if(modal.style.display!=='flex')return;if(event.key==='Escape'){event.preventDefault();closePrefModal();return;}if(event.key==='Tab'){const nodes=[...modal.querySelectorAll('button,input,select,summary,textarea,[tabindex]')].filter(e=>!e.disabled&&e.getClientRects().length);const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
 function savePref() {
   if(!personalMutationAllowed())return;
-  preferences.natures = readPreferenceChoices('prefNatures');
-  preferences.industries = readPreferenceChoices('prefIndustries');
-  preferences.education = readPreferenceChoices('prefEducation');
+  const choices={natures:readPreferenceChoices('prefNatures'),industries:readPreferenceChoices('prefIndustries'),education:readPreferenceChoices('prefEducation')};
+  Object.assign(preferences,choices);
   savePrefStorage(); closePrefModal(); render();
   showToast('偏好已修改，正在保存…');
 }
@@ -3151,80 +3151,105 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(wor
 function updateDirectoryControls(){for(const id of ['qbSide','rvSide','prospectSide']){const side=document.getElementById(id);if(!side)continue;const collapsed=side.classList.contains('rv-collapsed');for(const button of side.querySelectorAll('.rv-collapse-btn,.rv-rail-btn:first-child')){button.textContent=button.classList.contains('rv-collapse-btn')?'收起目录':'展开目录';button.title=button.textContent;button.setAttribute('aria-label',button.textContent);button.setAttribute('aria-controls',id);button.setAttribute('aria-expanded',String(!collapsed));}}}
 // Shared, explicit disclosure controls; the summary alone expands the content.
 function disclosureAction(){return '<span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></span>';}
-// Canonical display labels are defined by the user's source initialization, never guessed.
-let sourcePreferenceRules=null;
+// Common defaults stay usable; source initialization corrects their meaning and hierarchy.
+let sourcePreferenceRules=window.__TOUDI_SNAPSHOT_PREFERENCE_RULES__||null;
+let prefDraftOriginal=null,prefDraftInitial=null;
 function preferenceDimension(kind){return ({nature:'natures',industry:'industries',education:'education'})[kind]||kind;}
 function cleanPreference(value){return String(value??'').normalize('NFKC').replace(/[\u200b-\u200d\ufeff]/g,'').trim();}
-function preferenceRule(kind){return sourcePreferenceRules?.dimensions?.[preferenceDimension(kind)]||{};}
+function preferenceRule(kind){
+  const dimension=preferenceDimension(kind),base=window.__TOUDI_PREFERENCE_DEFAULTS__?.dimensions?.[dimension]||{},patch=sourcePreferenceRules?.dimensions?.[dimension]||{};
+  return {...base,...patch,aliases:{...base.aliases,...patch.aliases},levels:{...base.levels,...patch.levels},groups:dimension==='education'?base.groups:patch.groups?.length?patch.groups:base.groups||[]};
+}
 function normalizePreference(value,kind='industry'){
   const raw=cleanPreference(value),aliases=preferenceRule(kind).aliases||{};
   const match=Object.entries(aliases).find(([key])=>cleanPreference(key)===raw);
   return match?cleanPreference(match[1]):raw;
 }
+function preferenceGroupValues(groups){return groups.flatMap(group=>[...(group.values||[]),...preferenceGroupValues(group.children||[])]);}
+function preferenceKnown(kind){return new Set(preferenceGroupValues(preferenceRule(kind).groups).map(v=>normalizePreference(v,kind)));}
 function sourcePreferenceValues(value,kind){
-  const separator=preferenceRule(kind).separator||'';
-  return (separator?String(value||'').split(separator):[String(value||'')]).map(v=>normalizePreference(v,kind)).filter(Boolean);
+  const rule=preferenceRule(kind),separator=kind==='education'?'':rule.separator||'',ignored=new Set((rule.ignored||[]).map(v=>normalizePreference(v,kind)));
+  return (separator?String(value||'').split(separator):[String(value||'')]).map(v=>normalizePreference(v,kind)).filter(v=>v&&!ignored.has(v));
+}
+function educationLevels(value){
+  const canonical=normalizePreference(value,'education'),levels=preferenceRule('education').levels||{};
+  if(Object.hasOwn(levels,canonical))return levels[canonical];
+  return preferenceKnown('education').has(canonical)?[canonical]:null;
+}
+function selectedPreferenceLabels(selected,kind){
+  if(selected.includes(''))return [];
+  const known=preferenceKnown(kind);
+  return [...new Set(selected.flatMap(value=>kind==='education'?educationLevels(value)||[]:[normalizePreference(value,kind)]).filter(value=>known.has(value)))];
+}
+function beginPreferenceDraft(){
+  prefDraftOriginal={};prefDraftInitial={};
+  for(const kind of ['nature','industry','education']){
+    const dimension=preferenceDimension(kind);
+    prefDraftOriginal[dimension]=[...(preferences[dimension]||[])];
+    prefDraftInitial[dimension]=selectedPreferenceLabels(prefDraftOriginal[dimension],kind);
+  }
 }
 function preferenceEntries(values,selected,kind){
-  const entries=new Map();
-  // Saved spellings stay intact on open/cancel/save. A confirmed alias can share a display label.
-  [...values,...selected].filter(v=>v!==null&&v!==undefined).forEach(raw=>{
-    const label=normalizePreference(raw,kind);if(!label&&raw!=='')return;
-    if(!entries.has(label))entries.set(label,{label,aliases:[],original:[]});
+  const choices=new Set(selectedPreferenceLabels(selected,kind)),entries=new Map();
+  values.filter(v=>v!==null&&v!==undefined).forEach(raw=>{
+    const label=normalizePreference(raw,kind);if(!label)return;
+    if(!entries.has(label))entries.set(label,{label,aliases:[],original:[],checked:choices.has(label)});
     const entry=entries.get(label);if(!entry.aliases.includes(raw))entry.aliases.push(raw);
     if(selected.includes(raw)&&!entry.original.includes(raw))entry.original.push(raw);
-  });return [...entries.values()];
-}
-function preferenceSourceEntries(kind){
-  const dimension=preferenceDimension(kind),field={natures:'性质',industries:'行业',education:'学历要求'}[dimension];
-  const separator=preferenceRule(kind).separator||'';
-  const values=data.flatMap(row=>separator?String(row[field]||'').split(separator):[row[field]]).filter(Boolean);
-  return preferenceEntries(values,preferences[dimension]||[],kind);
+  });
+  for(const [raw,canonical] of Object.entries(preferenceRule(kind).aliases||{})){
+    const entry=entries.get(cleanPreference(canonical));
+    if(entry&&!entry.aliases.includes(raw))entry.aliases.push(raw);
+  }
+  return [...entries.values()];
 }
 function configuredPreferenceGroups(kind){
-  const entries=preferenceSourceEntries(kind),used=new Set();
-  const groups=(preferenceRule(kind).groups||[]).map(group=>{
-    const values=new Set(group.values.map(v=>normalizePreference(v,kind)));
-    const matched=entries.filter(entry=>values.has(entry.label)&&!used.has(entry.label));
-    matched.forEach(entry=>used.add(entry.label));return {name:group.name,values:matched};
-  }).filter(group=>group.values.length);
-  const remaining=entries.filter(entry=>!used.has(entry.label));
-  if(remaining.length)groups.push({name:'原始词条 · 待整理',values:remaining,unmapped:true});
-  return groups;
+  const selected=preferences[preferenceDimension(kind)]||[];
+  function group(node){return {name:node.name,values:preferenceEntries(node.values||[],selected,kind),children:(node.children||[]).map(group)};}
+  return preferenceRule(kind).groups.map(group);
 }
 function preferenceMatch(value,selected,kind){
-  if(!selected.length||selected.includes(''))return null; // inactive dimension
+  const choices=new Set(selectedPreferenceLabels(selected,kind));if(!choices.size)return null;
+  if(kind==='education'){
+    const levels=educationLevels(value);
+    if(!levels?.length)return null; // Missing, unrestricted or special requirements stay visible.
+    return levels.some(level=>choices.has(level));
+  }
   const values=sourcePreferenceValues(value,kind);if(!values.length)return null;
-  const choices=new Set(selected.map(v=>normalizePreference(v,kind)));
   if(values.some(v=>choices.has(v)))return true;
-  const rule=preferenceRule(kind),known=new Set([
-    ...Object.values(rule.aliases||{}).map(v=>cleanPreference(v)),
-    ...(rule.groups||[]).flatMap(g=>g.values.map(v=>normalizePreference(v,kind)))
-  ]);
-  // Uninitialized or newly encountered vocabulary is undecided, never a negative qualification.
-  if(values.some(v=>!known.has(v)))return null;
+  if(values.some(v=>!preferenceKnown(kind).has(v)))return null;
   return false;
 }
 function matchesJobPreferences(item){
-  const active=[['性质',preferences.natures,'nature'],['行业',preferences.industries,'industry']].filter(([,selected])=>selected.length&&!selected.includes(''));
+  const active=[['性质',preferences.natures,'nature'],['行业',preferences.industries,'industry']].filter(([,selected,kind])=>selectedPreferenceLabels(selected,kind).length);
   const values=active.map(([field,selected,kind])=>preferenceMatch(item[field],selected,kind));
   const direction=!values.length||(sourcePreferenceRules?.directionMatch==='all'?values.every(v=>v!==false):values.some(v=>v!==false));
   return direction&&preferenceMatch(item['学历要求'],preferences.education,'education')!==false;
 }
-function preferenceChoice(entry,description=''){
-  return `<label class="pref-option" data-industry-leaf="${esc(entry.label)}" title="${esc(entry.label+(description?' · '+description:''))}"><input type="checkbox" value="${esc(entry.label)}" data-aliases="${esc(JSON.stringify(entry.aliases))}" data-original="${esc(JSON.stringify(entry.original))}" ${entry.original.length?'checked':''} onchange="updateIndustrySelection()"><span>${esc(entry.label||'所有学历要求')}</span></label>`;
+function preferenceChoice(entry,path=[]){
+  return `<label class="pref-option" data-industry-leaf="${esc(entry.label)}" data-preference-path="${esc([...path,...entry.aliases].join(' '))}" title="${esc(entry.label)}"><input type="checkbox" value="${esc(entry.label)}" ${entry.checked?'checked':''} onchange="updateIndustrySelection()"><span>${esc(entry.label)}</span></label>`;
 }
-function readPreferenceChoices(id){return [...new Set([...document.querySelectorAll('#'+id+' input[type=checkbox]:checked')].flatMap(el=>{const original=JSON.parse(el.dataset.original||'[]');return original.length?original:JSON.parse(el.dataset.aliases||'[]');}))];}
+function readPreferenceChoices(id){
+  const kind={prefNatures:'nature',prefIndustries:'industry',prefEducation:'education'}[id],dimension=preferenceDimension(kind);
+  const selected=[...document.querySelectorAll('#'+id+' input[type=checkbox]:checked')].map(el=>el.value);
+  const original=prefDraftOriginal?.[dimension]||preferences[dimension]||[],initial=prefDraftInitial?.[dimension]||selectedPreferenceLabels(original,kind);
+  if(selected.length===initial.length&&selected.every(v=>initial.includes(v)))return [...original];
+  const retained=original.filter(value=>value!==''&&!selectedPreferenceLabels([value],kind).length);
+  return [...new Set([...selected,...retained])];
+}
 function switchPrefTab(key){
   document.querySelectorAll('.pref-tabs [role=tab]').forEach(el=>{const active=el.id==='prefTab-'+key;el.setAttribute('aria-selected',String(active));el.tabIndex=active?0:-1;});
   document.querySelectorAll('.pref-section[role=tabpanel]').forEach(el=>el.hidden=el.id!=='prefPanel-'+key);
   document.querySelector('#prefModal .pref-dialog-body').scrollTop=0;
 }
 document.addEventListener('keydown',event=>{if(!event.target.matches('.pref-tabs [role=tab]')||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const tabs=[...document.querySelectorAll('.pref-tabs [role=tab]')],i=tabs.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(i+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;switchPrefTab(tabs[next].id.replace('prefTab-',''));tabs[next].focus();});
+function preferenceFallbackNote(kind){
+  const dimension=preferenceDimension(kind),legacy=(preferences[dimension]||[]).filter(v=>v!==''&&!selectedPreferenceLabels([v],kind).length);
+  const note=kind==='education'?'未注明、MBA 等特殊或复杂学历要求自动保留，请查阅原文核实。':'未分类或含义不明的记录自动保留，原始标签仍可在详情中查看。';
+  return `<p class="pref-fallback-note">${note}${legacy.length?' 已有 '+legacy.length+' 项未确认的偏好值已保留。':''}</p>`;
+}
 function preferenceGroupsMarkup(kind){
-  const groups=configuredPreferenceGroups(kind);
-  if(!groups.length)return '<p class="pref-help">还没有可选词条。先让 Agent 根据你的信源初始化，或手动添加招聘记录。</p>';
-  return groups.map(group=>`<details class="pref-special" ${groups.length===1?'open':''}><summary><span class="disclosure-title">${esc(group.name)}</span><span class="industry-count">${group.values.length} 项</span>${disclosureAction()}</summary><div class="pref-special-content">${group.unmapped?'<p class="pref-help">保留信源原文，等待确认归类。未选中这些词条也不会被当作不符合资格。</p>':''}<div class="pref-options">${group.values.map(entry=>preferenceChoice(entry,entry.aliases.length>1?'已确认同义词：'+entry.aliases.join('、'):'')).join('')}</div></div></details>`).join('');
+  return configuredPreferenceGroups(kind).map(group=>`<div class="pref-subgroup"><h5>${esc(group.name)}</h5><div class="pref-options">${group.values.map(entry=>preferenceChoice(entry)).join('')}</div></div>`).join('')+preferenceFallbackNote(kind);
 }
 function renderNaturePreferences(){const host=document.getElementById('prefNatures');host.classList.remove('pref-options');host.innerHTML=preferenceGroupsMarkup('nature');}
 function renderEducationPreferences(){const host=document.getElementById('prefEducation');host.classList.remove('pref-options');host.innerHTML=preferenceGroupsMarkup('education');}
@@ -3232,12 +3257,36 @@ let industryOnlySelected=false;
 function industryPreferenceGroups(){return configuredPreferenceGroups('industry');}
 function renderIndustryPreferences(){
   const groups=industryPreferenceGroups();industryOnlySelected=false;
+  function subtree(group,path=[],rootIndex=null){
+    const trail=[...path,group.name],root=rootIndex!==null,entries=[...group.values,...group.children.flatMap(child=>allEntries(child))],selected=entries.some(e=>e.checked);
+    return `<details class="${root?'industry-group':'industry-subgroup'}" ${root?`data-industry-group="${rootIndex}"`:''} ${selected?'open':''}><summary><span class="disclosure-title">${esc(group.name)}</span><span class="industry-count"></span>${disclosureAction()}</summary><div class="${root?'industry-group-content':'industry-subgroup-content'}">${root?`<div class="industry-group-actions"><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${rootIndex},true)">选择本组可见项</button><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${rootIndex},false)">取消本组可见项</button></div>`:''}${group.values.length?`<div class="pref-options">${group.values.map(entry=>preferenceChoice(entry,trail)).join('')}</div>`:''}${group.children.map(child=>subtree(child,trail)).join('')}</div></details>`;
+  }
+  function allEntries(group){return [...group.values,...group.children.flatMap(allEntries)];}
   document.getElementById('prefIndustries').classList.remove('pref-options');
-  document.getElementById('prefIndustries').innerHTML=`<div class="industry-tools"><input id="industrySearch" type="search" placeholder="查找信源词条" aria-label="查找行业选项" oninput="filterIndustryPreferences(this.value)"><button id="industrySelectedToggle" class="btn btn-sm" aria-pressed="false" onclick="showSelectedIndustries()">只看已选</button></div><div id="industrySelection" class="industry-selection" aria-live="polite"></div>${groups.map((group,i)=>`<details class="industry-group" data-industry-group="${i}" ${groups.length===1?'open':''}><summary><span class="disclosure-title">${esc(group.name)}</span><span class="industry-count"></span>${disclosureAction()}</summary><div class="industry-group-content">${group.unmapped?'<p class="pref-help">尚未归类的原始词条继续保留。让 Agent 按你的信源确认分组后，再选择具体方向。</p>':''}<div class="industry-group-actions"><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},true)">选择本组可见项</button><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},false)">取消本组可见项</button></div><div class="pref-options">${group.values.map(entry=>preferenceChoice(entry)).join('')}</div></div></details>`).join('')}<p id="industryEmpty" class="pref-help" ${groups.length?'hidden':''}>没有匹配的选项。可以先初始化信源，或调整搜索条件。</p>`;updateIndustrySelection();
+  document.getElementById('prefIndustries').innerHTML=`<div class="industry-tools"><input id="industrySearch" type="search" placeholder="搜索行业、细分方向或小类" aria-label="查找行业选项" oninput="filterIndustryPreferences(this.value)"><button id="industrySelectedToggle" type="button" class="btn btn-sm" aria-pressed="false" onclick="showSelectedIndustries()">只看已选</button></div><div id="industrySelection" class="industry-selection" aria-live="polite"></div>${groups.map((group,i)=>subtree(group,[],i)).join('')}<p id="industryEmpty" class="pref-help" hidden>没有匹配的选项，请调整搜索条件。</p>${preferenceFallbackNote('industry')}`;
+  updateIndustrySelection();
 }
-function updateIndustrySelection(){const summary=document.getElementById('industrySelection');if(!summary)return;let total=0,selectedGroups=0;document.querySelectorAll('.industry-group').forEach(group=>{const all=group.querySelectorAll('input[type=checkbox]').length,n=group.querySelectorAll('input[type=checkbox]:checked').length;total+=n;if(n)selectedGroups++;group.querySelector('.industry-count').textContent=n?`已选 ${n} / ${all}`:`${all} 项`;});summary.textContent=`已选 ${total} 项，分布于 ${selectedGroups} 个分类`;}
+function updateIndustrySelection(){
+  const summary=document.getElementById('industrySelection');if(!summary)return;let total=0,selectedGroups=0;
+  document.querySelectorAll('#prefIndustries .industry-group,#prefIndustries .industry-subgroup').forEach(group=>{
+    const all=group.querySelectorAll('input[type=checkbox]').length,n=group.querySelectorAll('input[type=checkbox]:checked').length;
+    if(group.matches('.industry-group')){total+=n;if(n)selectedGroups++;}
+    group.querySelector(':scope > summary .industry-count').textContent=n?`已选 ${n} / ${all}`:`${all} 项`;
+  });summary.textContent=`已选 ${total} 项，分布于 ${selectedGroups} 个大类`;
+  if(industryOnlySelected)filterIndustryPreferences(document.getElementById('industrySearch').value);
+}
 function selectIndustryGroup(index,checked){document.querySelectorAll(`[data-industry-group="${index}"] .pref-option:not([hidden]) input[type=checkbox]`).forEach(el=>el.checked=checked);updateIndustrySelection();}
-function filterIndustryPreferences(query){const needle=cleanPreference(query).toLowerCase();let shown=0;document.querySelectorAll('.industry-group').forEach(group=>{const groupMatch=group.querySelector('summary').textContent.toLowerCase().includes(needle);let visible=0;group.querySelectorAll('[data-industry-leaf]').forEach(label=>{const show=(!needle||groupMatch||label.dataset.industryLeaf.toLowerCase().includes(needle))&&(!industryOnlySelected||label.querySelector('input').checked);label.hidden=!show;visible+=show?1:0;});group.hidden=visible===0;shown+=visible;group.open=!!(visible&&(needle||industryOnlySelected));});document.getElementById('industryEmpty').hidden=shown>0;}
+function filterIndustryPreferences(query){
+  const needle=cleanPreference(query).toLowerCase();let shown=0;
+  document.querySelectorAll('#prefIndustries [data-industry-leaf]').forEach(option=>{
+    const show=(!needle||(option.dataset.industryLeaf+' '+option.dataset.preferencePath).toLowerCase().includes(needle))&&(!industryOnlySelected||option.querySelector('input').checked);
+    option.hidden=!show;shown+=show?1:0;
+  });
+  document.querySelectorAll('#prefIndustries .industry-group,#prefIndustries .industry-subgroup').forEach(group=>{
+    const visible=!!group.querySelector('.pref-option:not([hidden])');group.hidden=!visible;
+    if(needle||industryOnlySelected)group.open=visible;
+  });document.getElementById('industryEmpty').hidden=shown>0;
+}
 function showSelectedIndustries(){industryOnlySelected=!industryOnlySelected;const button=document.getElementById('industrySelectedToggle');button.textContent=industryOnlySelected?'返回全部':'只看已选';button.setAttribute('aria-pressed',String(industryOnlySelected));filterIndustryPreferences(document.getElementById('industrySearch').value);}
 
 // One fixed entry point replaces repeated per-workflow Agent fields. Existing exports retain legacy settings.
@@ -3253,7 +3302,7 @@ const GENERIC_AGENT_BOOTSTRAP=`请帮我接入 TouDi 投递中控台，并完成
 
 请按以下顺序执行：
 1. 先阅读开始指南。在我已授权的电脑上定位已安装的 TouDi 资料工具，运行 workspace status 确认当前绑定，再读取随包文档及工作区已有规则。无需让我重新填写目录；若无法访问，说明缺少的权限或材料，不扫描无关目录。
-2. 读取我的信源，列出实际字段、原始标签、学历词条及更新方式。已有规则继续沿用；首次使用或新增来源时，用 preference-catalog 清点词条，只就会影响筛选含义的歧义向我确认，再保存自己的 preferenceRules。无法判断的词条保留原文。
+2. 读取我的信源，列出实际字段、原始标签、学历词条及更新方式。以产品默认的行业层级和常用学历为基础，用 preference-catalog 核对实际词条；首次使用或新增来源时，只修正分类、同义词和明确学历范围的差异。已有规则继续沿用，只就影响筛选含义的歧义向我确认，再保存自己的 preferenceRules。地区、企业性质等附带信息不列为行业选项；MBA 等特殊、复杂或不明学历要求保留原文并兜底保留。
 3. 读取最新资料及版本，完成本次小范围任务，保留既有进度、收藏、备注和无关内容。候选先 validate，再 commit，最后 read 读回；版本冲突保留候选并对账。
 4. 告诉我本次保存了什么、还有什么待确认，并让我在 App 点击“刷新资料”核对正文、标记与附件。后续沿用已确认流程，不重复初始化。
 
@@ -3291,11 +3340,12 @@ function settingsSegment(key,label,entries){return `<div class="settings-segment
 function settingsPalette(){return `<div class="settings-palettes" role="group" aria-label="界面配色" data-setting="colorPalette">${COLOR_PALETTES.map(([key,label,color])=>`<button type="button" data-value="${key}" aria-label="${label}配色" aria-pressed="${workspace.colorPalette===key}" onclick="setSettingsOption('colorPalette','${key}')"><span class="palette-swatch" style="--swatch:${color}" aria-hidden="true"></span><span>${label}</span></button>`).join('')}</div>`;}
 function settingsSelect(key,label,entries){return `<div class="settings-select"><select aria-label="${label}" onchange="setSettingsOption('${key}',this.value)">${entries.map(([value,text])=>`<option value="${value}" ${workspace[key]===value?'selected':''}>${text}</option>`).join('')}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></div>`;}
 function settingsPreferenceSummary(values,kind){
-  const names=[...new Set(values.map(value=>normalizePreference(value,kind)))].filter(Boolean);
+  const names=selectedPreferenceLabels(values,kind);
+  if(!names.length&&values.some(Boolean))return '已有偏好值保留，等待信源核对';
   return names.length?esc(names.slice(0,3).join('、')+(names.length>3?'等 '+names.length+' 项':'')):'尚未选择';
 }
 document.addEventListener('keydown',event=>{const label=event.target.closest('.backup-file-control');if(label&&['Enter',' '].includes(event.key)&&label.getAttribute('aria-disabled')!=='true'){event.preventDefault();label.querySelector('input').click();}});
-function preferenceInitializationNote(){return sourcePreferenceRules?'分类与同义词来自当前工作区的初始化规则。未映射的新词条继续保留。':data.length?'已有资料；信源分类尚未初始化，筛选暂时保留未确认词条。':'先提供自己的信源，由 Agent 初始化分类、同义词和筛选口径。';}
+function preferenceInitializationNote(){return sourcePreferenceRules?'在默认分类上沿用当前工作区的信源纠偏规则。新增或无法判断的词条继续保留。':'默认行业层级与常用学历可直接使用；首次接入信源时，由 Agent 核对并修正分类和同义词。';}
 function openAgentInitialization(){switchView('settings');switchSettingsTab('agent');}
 function renderSettings(){
   const row=settingsRow;
@@ -3314,12 +3364,12 @@ function renderSettings(){
     </div>
     <div class="settings-panel" id="settings-panel-preferences" role="tabpanel" aria-labelledby="settings-tab-preferences">
       <section class="settings-section"><h3>求职偏好</h3><p class="settings-help">用于“符合偏好”视图，不修改记录或投递状态。未选择的维度不限制结果。</p>
-        ${row('信源规则',sourcePreferenceRules?'已初始化；新增或无法判断的词条继续保留。':'尚未初始化；先根据自己的信源整理词条。','<button class="btn" onclick="openAgentInitialization()">查看初始化流程</button>')}
+        ${row('筛选分类',sourcePreferenceRules?'已沿用当前信源规则；通用学历与默认分类继续可用。':'已提供默认行业层级与常用学历；首次接入信源时再纠偏。','<button class="btn" onclick="openAgentInitialization()">查看初始化流程</button>')}
         ${row('企业性质',settingsPreferenceSummary(preferences.natures,'nature'),'<button class="btn" onclick="openPrefModal(\'natures\')">调整企业性质</button>')}
         ${row('行业方向',settingsPreferenceSummary(preferences.industries,'industry'),'<button class="btn" onclick="openPrefModal(\'industries\')">调整行业方向</button>')}
         ${row('学历要求',settingsPreferenceSummary(preferences.education,'education'),'<button class="btn" onclick="openPrefModal(\'education\')">调整学历要求</button>')}
         <p class="settings-note">${esc(preferenceInitializationNote())}</p>
-        <p class="settings-note">${sourcePreferenceRules?.directionMatch==='all'?'已选企业性质与行业须同时满足':'已选企业性质或行业满足一项即可'}，并按已确认的学历词条筛选；这不等同于招聘资格审核。</p>
+        <p class="settings-note">${sourcePreferenceRules?.directionMatch==='all'?'已选企业性质与行业须同时满足':'已选企业性质或行业满足一项即可'}，并按常用学历筛选。特殊或不明要求自动保留；这不等同于招聘资格审核。</p>
       </section>
     </div>
     <div class="settings-panel" id="settings-panel-data" role="tabpanel" aria-labelledby="settings-tab-data">
@@ -3332,7 +3382,7 @@ function renderSettings(){
         <ol class="agent-setup-flow">
           <li><span class="setup-number">1</span><div><strong>把信源和材料发给 Agent</strong><p>提供招聘网站链接、表格或文件，以及这次要用的简历、JD 等材料。信源由 Agent 读取，无需在设置中另外添加。</p></div></li>
           <li><span class="setup-number">2</span><div><strong>复制启动消息，补充后发送</strong><p>点击下方“复制启动消息”，填好信源、材料与本次任务，发给已获本机文件权限的 Agent。它会先查找 TouDi 并确认当前资料。</p></div></li>
-          <li><span class="setup-number">3</span><div><strong>确认分类，完成一次小范围任务</strong><p>Agent 列出原始标签、学历词条及有歧义的分类。你确认必要含义后，先更新几条记录或整理一份材料；不明词条继续保留。</p></div></li>
+          <li><span class="setup-number">3</span><div><strong>确认分类，完成一次小范围任务</strong><p>Agent 以默认行业层级和常用学历为基础，核对实际信源并修正差异。你只需确认歧义，再完成一项小范围任务；特殊或不明要求继续保留。</p></div></li>
           <li><span class="setup-number">4</span><div><strong>刷新 App，核对后继续协作</strong><p>Agent 保存并读回后，点击右上角“刷新资料”，检查正文、进度与附件。以后直接告诉它要更新、准备、探查或复盘什么。</p></div></li>
         </ol>
         ${row('启动消息','复制后填好花括号中的内容，发送给你的 Agent。','<button class="btn" onclick="copyAgentBootstrap()">复制启动消息</button>')}

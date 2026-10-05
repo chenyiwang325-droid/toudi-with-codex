@@ -1,5 +1,6 @@
 """Keep the complete HTML in Tauri's asset pipeline; fetch personal records separately."""
 from pathlib import Path
+import json
 
 ROOT = Path(__file__).resolve().parents[2]
 BOOT = '''loadEdits();loadPref();initData(RAW_DATA);updateDataDate();
@@ -20,6 +21,10 @@ def prepare_frontend(root=ROOT):
         raise ValueError('Desktop builds require the clean public template.')
     html = source.replace('<head>', '<head>\n<script src="/desktop-bridge.js"></script>\n<script src="/desktop-entry.js"></script>\n<style>.desktop-startup-error{position:fixed;inset:32px;z-index:10000;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:32px;display:flex;flex-direction:column;align-items:flex-start;gap:20px}</style>', 1)
     html = html.replace(BOOT, DESKTOP_BOOT, 1)
+    defaults = json.loads((root/'app/assets/preference-defaults.json').read_text(encoding='utf-8'))
+    bootstrap = 'window.__TOUDI_PREFERENCE_DEFAULTS__=' + json.dumps(defaults, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c') + ';'
+    (root/'desktop/ui/assets').mkdir(parents=True, exist_ok=True)
+    (root/'desktop/ui/assets/preference-defaults.js').write_text(bootstrap, encoding='utf-8')
     output = root/'desktop/ui/workbench.html'
     output.write_text(html, encoding='utf-8')
     return output

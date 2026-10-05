@@ -35,6 +35,7 @@ from prospect_catalog import read_catalog, safe_path
 from pathlib import Path
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, str(Path(SCRIPT_DIR).parent))
 DATA_DIR = os.path.join(os.environ.get('TOUDI_WORKSPACE', str(Path(__file__).resolve().parents[2] / 'runtime')), '投递数据')
 os.makedirs(DATA_DIR, exist_ok=True)
 HTML_FILE = str(Path(__file__).resolve().parents[1] / '投递管理.html')
@@ -60,6 +61,10 @@ def read_json(path, default):
 def build_payload(resources=None):
     """中控台 HTML + 种子数据脚本 → 明文快照。"""
     html = open(HTML_FILE, encoding='utf-8').read()
+    from preference_rules import bootstrap_script
+    settings = read_json(os.path.join(DATA_DIR, '工作区配置.json'), {})
+    html = html.replace('<script src="/assets/preference-defaults.js"></script>',
+                        '<script>' + bootstrap_script(settings.get('preferenceRules')) + '</script>')
     settings_style = Path(HTML_FILE).parent / 'assets' / 'settings.css'
     html = html.replace('<link rel="stylesheet" href="/assets/settings.css">', '<style>' + settings_style.read_text(encoding='utf-8') + '</style>')
     management = Path(HTML_FILE).parent / 'assets' / 'workbench.js'

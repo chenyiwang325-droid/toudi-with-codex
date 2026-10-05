@@ -192,6 +192,19 @@ details[open] > summary .disclosure-action svg { transform: rotate(90deg); }
 .industry-group-actions .btn { padding: 0; min-height: 24px; font-size: 12px; color: var(--primary); border: 0; background: none; text-decoration: underline; text-underline-offset: 3px; }
 .pref-special .pref-options { grid-template-columns: 1fr; }
 .pref-special .pref-help { margin-bottom: 12px; }
+.industry-subgroup { border-bottom: 1px solid var(--border-light); }
+.industry-subgroup:last-child { border-bottom: 0; }
+.industry-subgroup > summary {
+  display: flex; align-items: center; gap: 12px; min-height: 44px;
+  padding: 10px 0; cursor: pointer; list-style: none;
+  font-size: 13px; font-weight: 500; color: var(--text2);
+}
+.industry-subgroup > summary::-webkit-details-marker { display: none; }
+.industry-subgroup > summary:hover { color: var(--primary); }
+.industry-subgroup-content { padding: 4px 0 12px; }
+.industry-subgroup[hidden] { display: none !important; }
+.pref-fallback-note { padding: 12px 0 0; margin: 8px 0 0; border-top: 1px solid var(--border-light); color: var(--text3); font-size: 12px; line-height: 1.7; }
+#prefEducation .pref-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pref-dialog .modal-actions { padding: 14px 24px; gap: 8px; }
 .pref-dialog .modal-actions .btn { min-height: 36px; font-size: 13px; padding: 7px 16px; }
 .pref-save-hint { font-size: 12px; line-height: 1.6; }
