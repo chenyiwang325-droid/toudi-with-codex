@@ -2,11 +2,13 @@
 const el=id=>document.getElementById(id);
 const esc=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const modules={personal:'个人信息',education:'教育经历',internship:'实习／工作',project:'项目经历',language:'语言能力'};
-let currentPack=null, pref={profile:'general',autoLuna:false}, editingKey=null, saving=false;
+let currentPack=null, pref=TouDiAgentConfig.normalize(), editingKey=null, saving=false;
 const openRecords=new Set();
 let recordsInitialized=false;
 function disclosureAction(){return '<span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span>';}
 function selectTab(key,focus=false){
+  if(!['profile','rules','agent','data'].includes(key))key='profile';
+  history.replaceState(null,'','#'+key);
   document.querySelectorAll('.settings-tabs [role=tab]').forEach(button=>{const selected=button.dataset.tab===key;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;if(selected&&focus)button.focus();});
   document.querySelectorAll('main > .settings-panel').forEach(panel=>panel.hidden=panel.id!=='panel-'+key);
 }
@@ -20,7 +22,7 @@ document.querySelector('label[for=importFile]').addEventListener('keydown',event
 async function send(op,data={}) {const result=await chrome.runtime.sendMessage({op,...data});if(result?.error)throw Error(result.error);return result.value;}
 function notice(message,error=false) {el('notice').hidden=!message;el('notice').textContent=message;el('notice').classList.toggle('error',error);}
 async function action(fn) {if(saving)return;saving=true;try{await fn();}catch(e){notice(e.message,true);if(el('editor').open){el('editorError').hidden=false;el('editorError').textContent=e.message;}}finally{saving=false;}}
-async function reload() {const value=await send('profile-read');currentPack=value.pack;pref=value.preferences;el('profile').value=pref.profile;el('autoLuna').checked=pref.autoLuna;render();}
+async function reload() {const value=await send('profile-read');currentPack=value.pack;pref=value.preferences;el('profile').value=pref.profile;syncAgentSettings();render();}
 async function save(candidate,imported=false) {await send('profile-save',{pack:candidate,base:currentPack?.sourceVersion || null,imported});await reload();}
 function dateLabel(value){if(!value)return '未注明';if(/^\d{4}-\d{2}-\d{2}$/.test(value))return value;const date=new Date(value);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat('zh-CN',{dateStyle:'medium',timeStyle:'short'}).format(date);}
 function emptyPack() {return {schemaVersion:1,name:'个人填报资料',savedAt:null,facts:[],rules:[],warnings:[],supplements:[]};}
@@ -60,12 +62,44 @@ async function chooseProfile(value){
 }
 document.querySelectorAll('[data-profile]').forEach(button=>button.addEventListener('click',()=>chooseProfile(button.dataset.profile)));
 el('profile').addEventListener('change',()=>chooseProfile(el('profile').value));el('search').addEventListener('input',render);
-el('autoLuna').addEventListener('change',()=>action(async()=>{try{pref=await send('preferences',{preferences:{autoLuna:el('autoLuna').checked}});notice(pref.autoLuna?'已启用自动核对，消耗现有 Codex 额度；明确字段仍由本地规则处理。':'已关闭自动核对。');}catch(e){el('autoLuna').checked=pref.autoLuna;throw e;}}));
-el('checkCodex').addEventListener('click',()=>action(async()=>{
-  el('checkCodex').disabled=true;el('codexStatus').textContent='正在检查本机工具、登录方式与 Luna 目录…';
-  try {const status=await send('codex-status');if(!status.available || status.auth!=='chatgpt')throw Error(status.message);if(!status.models.some(m=>m.id==='gpt-6-luna'))throw Error('当前 Codex 未提供 GPT-6 Luna。请更新官方客户端；不会替换模型。');el('codexStatus').textContent='GPT-6 Luna 已连接 · 现有 Codex 额度。连接检查没有发起模型生成。';notice('连接可用，可以返回网申页面核对歧义。');}
-  catch(e){el('codexStatus').textContent=e.message;throw e;}finally{el('checkCodex').disabled=false;}
+let modelCatalog=[];
+function renderAgentRoute(){
+  const codex=el('agentMode').value==='codex';
+  el('codexSettings').hidden=!codex;el('externalSettings').hidden=el('agentMode').value!=='external';
+  el('autoAgent').disabled=!codex || !el('agentModel').value;
+}
+function syncAgentSettings(){
+  el('agentMode').value=pref.agentMode;
+  el('agentModel').replaceChildren(new Option('选择核对模型…',''));
+  const models=[...modelCatalog];if(pref.agentModel && !models.some(m=>m.id===pref.agentModel))models.push({id:pref.agentModel,label:pref.agentModel+'（已保存，连接待检查）'});
+  for(const model of models)el('agentModel').add(new Option(model.label+' · '+model.id,model.id));
+  el('agentModel').value=pref.agentModel;el('autoAgent').checked=pref.autoAgent;
+  el('agentSummary').textContent=pref.agentMode==='codex' ? '已保存：本机 Codex · '+(pref.agentModel || '模型待选择') : pref.agentMode==='external' ? '已保存：自己的 Agent · 复制任务与导入结果' : '尚未配置 Agent；本地识别与填写可用。';
+  renderAgentRoute();
+}
+el('agentMode').addEventListener('change',renderAgentRoute);
+el('agentModel').addEventListener('change',renderAgentRoute);
+el('saveAgent').addEventListener('click',()=>action(async()=>{
+  const agentMode=el('agentMode').value,agentModel=agentMode==='codex'?el('agentModel').value:'';
+  if(agentMode==='codex' && !agentModel)throw Error('请检查连接并明确选择一个模型，再保存。');
+  pref=await send('preferences',{preferences:{agentMode,agentModel,autoAgent:agentMode==='codex' && el('autoAgent').checked}});
+  syncAgentSettings();notice('协作设置已保存。返回招聘网页重新识别后生效。');
 }));
+el('checkCodex').addEventListener('click',()=>action(async()=>{
+  el('checkCodex').disabled=true;el('codexStatus').textContent='正在检查本机连接、ChatGPT 登录与模型目录…';
+  try{
+    const status=await send('codex-status');if(!status.available || status.auth!=='chatgpt')throw Error(status.message);
+    modelCatalog=status.models;const selected=el('agentModel').value;
+    el('agentModel').replaceChildren(new Option('选择核对模型…',''));
+    for(const model of modelCatalog)el('agentModel').add(new Option(model.label+' · '+model.id,model.id));
+    el('agentModel').value=modelCatalog.some(m=>m.id===selected)?selected:'';
+    el('codexStatus').textContent='ChatGPT 登录已确认 · '+modelCatalog.length+' 个目录模型。请自行选择，实际调用是否可用以核对结果为准。';
+    renderAgentRoute();notice('连接检查完成，没有发起模型生成。选择模型后保存。');
+  }catch(e){el('codexStatus').textContent=e.message;throw e;}finally{el('checkCodex').disabled=false;}
+}));
+el('openWorkbench').addEventListener('click',()=>action(async()=>{await send('open-workbench');notice('投递中控台已打开。招聘网页的填写仍在插件内完成。');}));
+window.addEventListener('hashchange',()=>selectTab(location.hash.slice(1)));
+selectTab(location.hash.slice(1));
 function openEditor(key=null) {
   editingKey=key;const fact=currentPack?.facts.find(f=>f.key===key);
   el('editForm').reset();el('matchingOptions').open=false;el('editor').querySelector('.dialog-body').scrollTop=0;el('editorError').hidden=true;el('editorTitle').textContent=fact?'编辑已确认资料':'添加已确认字段';

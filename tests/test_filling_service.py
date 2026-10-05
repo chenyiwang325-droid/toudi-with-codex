@@ -151,26 +151,39 @@ class FillingServiceTests(unittest.TestCase):
              patch('codex_mapping.subprocess.run',side_effect=fake_run):
             map_with_codex(state['profile'],self.scan,state['plan'],model='fixture-luna')
 
-    def test_missing_or_expensive_model_never_uses_cli_default(self):
+    def test_missing_or_unlisted_model_never_uses_cli_default(self):
         plan=self.service.plan(self.scan);state=self.service.plans[plan['planId']]
         with patch('codex_mapping.codex_binary',return_value='codex'), patch('codex_mapping.chatgpt_login',return_value={'available':True}), \
              patch('codex_mapping.codex_status',return_value={'available':True,'models':[{'id':'gpt-5.5','default':True,'effort':'low'}]}), \
              patch('codex_mapping.subprocess.run') as execute:
-            for model in ('','gpt-5.5','gpt-6-astra'):
+            for model in ('','unlisted-model'):
                 with self.subTest(model=model), self.assertRaises(ValueError):
                     map_with_codex(state['profile'],self.scan,state['plan'],model=model)
             execute.assert_not_called()
 
+    def test_user_selected_catalog_model_is_allowed_without_lightweight_restriction(self):
+        plan=self.service.plan(self.scan);state=self.service.plans[plan['planId']]
+        def execute(command,**kwargs):
+            self.assertEqual(command[command.index('-m')+1],'fixture-user-model')
+            Path(command[command.index('-o')+1]).write_text('{"mappings":[]}')
+            return SimpleNamespace(returncode=0,stdout='',stderr='')
+        with patch('codex_mapping.codex_binary',return_value='codex'), patch('codex_mapping.chatgpt_login',return_value={'available':True}), \
+             patch('codex_mapping.codex_status',return_value={'available':True,'models':[{'id':'fixture-user-model','default':False,'effort':'low'}]}), \
+             patch('codex_mapping.subprocess.run',side_effect=execute):
+            _,provider=map_with_codex(state['profile'],self.scan,state['plan'],model='fixture-user-model')
+            self.assertEqual(provider['model'],'fixture-user-model')
+
     def test_extension_bundle_contains_only_code_and_shared_engine(self):
         with zipfile.ZipFile(io.BytesIO(extension_bundle())) as bundle:
             names=bundle.namelist()
-            self.assertEqual(len(names),12)
+            self.assertEqual(len(names),13)
             self.assertIn('TouDi-filling/form-engine.js',names)
             manifest=json.loads(bundle.read('TouDi-filling/manifest.json'))
             self.assertEqual(manifest['permissions'],['activeTab','scripting','storage','nativeMessaging'])
             self.assertNotIn('host_permissions',manifest)
             self.assertIn('TouDi-filling/options.html',names)
             self.assertIn('TouDi-filling/filling-core.js',names)
+            self.assertIn('TouDi-filling/agent-config.js',names)
             self.assertNotIn('content_scripts',manifest)
 
 

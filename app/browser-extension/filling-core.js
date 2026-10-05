@@ -151,10 +151,10 @@
     });
     return {protocol:1,origin:plan.origin,path:plan.path,fingerprint:plan.fingerprint,actions,submitted:false};
   }
-  function agentRequest(p,scan,plan) {
+  function agentRequest(p,scan,plan,model='') {
     const pending=new Set(plan.rows.filter(r=>['missing','ambiguous'].includes(r.status)).map(r=>r.fieldId));
     const pick=(item,keys)=>Object.fromEntries(keys.filter(k=>item[k]!==undefined).map(k=>[k,item[k]]));
-    return {protocol:1,op:'map',model:'gpt-6-luna',fields:scan.fields.filter(f=>pending.has(f.id)).map(f=>pick(f,['id','label','module','groupLabel','recordHint','type','options'])),allowedFacts:p.facts.filter(f=>!f.manual).map(f=>pick(f,['key','label','module','recordId','recordLabel','recordHint','aliases']))};
+    return {protocol:1,op:'map',model,fields:scan.fields.filter(f=>pending.has(f.id)).map(f=>pick(f,['id','label','module','groupLabel','recordHint','type','options'])),allowedFacts:p.facts.filter(f=>!f.manual).map(f=>pick(f,['key','label','module','recordId','recordLabel','recordHint','aliases']))};
   }
   function safeAgentMappings(p,scan,mappings) {
     const accepted={}, rejected=[];

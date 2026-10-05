@@ -27,6 +27,8 @@ class DesktopFrontendTests(unittest.TestCase):
             self.assertIn('RAW_DATA.push(...window.__TOUDI_INITIAL_RECORDS__);', html)
             self.assertEqual(original.count('onclick='), html.count('onclick='))
             self.assertIn('/assets/workbench.js', html)
+            self.assertIn('/assets/filling.js', html)
+            self.assertIn('/assets/filling.css', html)
             self.assertIn('/assets/preference-defaults.js', html)
             script = (root/'desktop/ui/assets/preference-defaults.js').read_text()
             self.assertEqual(json.loads(script.split('=', 1)[1][:-1]), json.loads(default_catalog))

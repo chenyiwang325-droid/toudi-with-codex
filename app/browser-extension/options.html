@@ -9,7 +9,7 @@
 <body>
 <header class="page-header">
   <div class="brand"><img src="logo.svg" width="32" height="32" alt=""><div><strong>TouDi · 填报资料</strong><small>浏览器中的个人资料库</small></div></div>
-  <div class="buttons"><label class="button primary" for="importFile" tabindex="0" role="button">导入／更新资料包</label><input id="importFile" type="file" accept=".json,application/json" hidden><button id="export" disabled>导出备份</button></div>
+  <div class="buttons"><button id="openWorkbench">打开投递中控台</button><label class="button primary" for="importFile" tabindex="0" role="button">导入／更新资料包</label><input id="importFile" type="file" accept=".json,application/json" hidden><button id="export" disabled>导出备份</button></div>
 </header>
 <main>
   <div class="intro"><h1>填报资料与设置</h1><p>核对资料口径，再回到招聘网页填写。</p></div>
@@ -17,7 +17,7 @@
   <nav class="settings-tabs" role="tablist" aria-label="填报设置分类">
     <button id="tab-profile" role="tab" aria-controls="panel-profile" aria-selected="true" tabindex="0" data-tab="profile">个人资料</button>
     <button id="tab-rules" role="tab" aria-controls="panel-rules" aria-selected="false" tabindex="-1" data-tab="rules">填写要求</button>
-    <button id="tab-luna" role="tab" aria-controls="panel-luna" aria-selected="false" tabindex="-1" data-tab="luna">Luna 协作</button>
+    <button id="tab-agent" role="tab" aria-controls="panel-agent" aria-selected="false" tabindex="-1" data-tab="agent">Agent 协作</button>
     <button id="tab-data" role="tab" aria-controls="panel-data" aria-selected="false" tabindex="-1" data-tab="data">资料管理</button>
   </nav>
   <section id="panel-profile" class="settings-panel library" role="tabpanel" aria-labelledby="tab-profile">
@@ -38,12 +38,19 @@
     <div id="rules"><p>尚未保存额外填写要求。</p></div>
     <p class="hint section-note">日期精度、经历归属、选项和长度由表单引擎检查；新增的自然语言规则需要在填写计划中人工核对。</p>
   </section>
-  <section id="panel-luna" class="settings-panel" role="tabpanel" aria-labelledby="tab-luna" hidden>
-    <h2>Luna 协作</h2><p class="section-intro">用现有 Codex 额度核对有歧义的字段，明确字段继续由本地规则处理。</p>
-    <div class="setting-row"><div><strong>自动核对歧义</strong><p>识别网页后，自动检查需要进一步判断的字段。</p></div><label class="switch"><input id="autoLuna" type="checkbox" role="switch" aria-label="识别后自动核对歧义"><span aria-hidden="true"></span></label></div>
-    <div class="setting-row"><div><strong>本机 Codex 连接</strong><p id="codexStatus">基本识别与填写可独立使用。</p></div><button id="checkCodex">检查连接</button></div>
-    <p class="hint section-note">固定使用 GPT-6 Luna 和现有 ChatGPT 登录。仅发送字段说明与候选资料键，具体填写值留在本机。</p>
-    <details class="disclosure"><summary><span>首次启用与费用</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><ol><li>运行下载包中的「TouDi 浏览器连接」安装程序一次。</li><li>保持官方 Codex 客户端已安装，并使用 ChatGPT 登录。</li><li>点击上方「检查连接」。检查成功后即可在插件中核对。</li></ol><p>连接工具由 Chrome 按需启动，日常无需打开 TouDi App 或终端。本地功能不收费，不需要 API Key；模型核对消耗现有 Codex 额度。额度不足时保留本地计划，不替换模型。</p></div></details>
+  <section id="panel-agent" class="settings-panel" role="tabpanel" aria-labelledby="tab-agent" hidden>
+    <h2>Agent 协作</h2><p class="section-intro">首次选择自己的协作方式与模型，之后在这里调整。明确字段始终先用本地规则匹配。</p>
+    <div class="setting-row"><div><strong>协作方式</strong><p>Codex 可直接核对；其他 Agent 使用复制任务、导入结果。</p></div><select id="agentMode" aria-label="协作方式"><option value="">暂不接入 Agent</option><option value="codex">本机 Codex · 现有额度</option><option value="external">使用自己的 Agent</option></select></div>
+    <div id="codexSettings" hidden>
+      <div class="setting-row"><div><strong>本机 Codex 连接</strong><p id="codexStatus">检查连接后，从当前客户端的模型目录选择。</p></div><button id="checkCodex">检查连接与模型</button></div>
+      <div class="setting-row"><div><strong>核对模型</strong><p>由你指定；不可用时保留原计划，不替换模型。</p></div><select id="agentModel" aria-label="核对模型"><option value="">先检查连接，再选择模型</option></select></div>
+      <div class="setting-row"><div><strong>识别后自动核对</strong><p>开启后仅对歧义字段调用所选模型，消耗现有 Codex 额度。</p></div><label class="switch"><input id="autoAgent" type="checkbox" role="switch" aria-label="识别后自动核对歧义"><span aria-hidden="true"></span></label></div>
+    </div>
+    <div id="externalSettings" class="agent-instructions" hidden><ol><li>在招聘网页点击插件，先识别并查看填写计划。</li><li>点击「复制匹配任务」，交给自己正在使用的 Agent。</li><li>将返回的 JSON 粘贴到插件，点击「导入并重新核对」。</li></ol><p>无需本机连接工具。使用哪个 Agent、模型与账号由你决定；费用按你已有工具的使用方式确定。</p></div>
+    <div class="agent-save"><button id="saveAgent" class="primary">保存协作设置</button><span id="agentSummary" class="hint">尚未配置 Agent；本地识别与填写可用。</span></div>
+    <p class="hint section-note">直接核对只发送字段说明与候选资料键，具体填写值留在浏览器本地。连接检查只读取登录和模型目录，不发起生成。</p>
+    <details class="disclosure"><summary><span>首次连接 Codex</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><ol><li>运行浏览器工具包中的「TouDi 浏览器连接」安装程序一次。</li><li>安装官方 Codex 客户端，并使用自己的 ChatGPT 账号登录。</li><li>选择「本机 Codex」，检查连接，选择模型并保存协作设置。</li></ol><p>Chrome 按需启动连接工具，日常无需打开中控台或终端。不需要 API Key 或新增模型服务；模型核对使用现有 Codex 额度。</p></div></details>
+    <p class="section-note"><a href="https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/辅助填报.md" target="_blank" rel="noreferrer">辅助填报安装与使用</a> · <a href="https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/开始与初始化.md" target="_blank" rel="noreferrer">中控台开始指南</a></p>
   </section>
   <section id="panel-data" class="settings-panel" role="tabpanel" aria-labelledby="tab-data" hidden>
     <h2>资料管理</h2><p class="section-intro">资料保存在当前 Chrome 的扩展本地存储中。</p>
@@ -66,5 +73,6 @@
   </form>
 </dialog>
 <dialog id="rulesEditor" aria-labelledby="rulesTitle"><form id="rulesForm"><div class="dialog-head"><div class="section-title"><h2 id="rulesTitle">编辑填写规则</h2><button type="button" id="closeRules">取消</button></div></div><div class="dialog-body"><p>一行一条。程序检查之外的要求，需要在填写计划中人工核对。</p><label for="rulesText">填写规则</label><textarea id="rulesText" rows="12"></textarea></div><div class="dialog-actions"><button type="submit" class="primary">保存规则</button></div></form></dialog>
+<script src="agent-config.js"></script>
 <script src="options.js"></script>
 </body></html>

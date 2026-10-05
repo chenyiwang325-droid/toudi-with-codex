@@ -98,6 +98,9 @@ class Handler(SimpleHTTPRequestHandler):
                     self.send_response(200); self.send_header('Content-Type', 'application/zip')
                     self.send_header('Content-Disposition', 'attachment; filename="TouDi-filling-pilot.zip"')
                     self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
+                if route == '/api/filling/profile-export':
+                    from filling_profile import export_profile_pack
+                    return self._send_json(export_profile_pack(WORKSPACE))
                 return self._send_json({'error': 'not_found'}, 404)
             except (ValueError, OSError, KeyError) as exc:
                 return self._send_json({'error': str(exc)}, 400)

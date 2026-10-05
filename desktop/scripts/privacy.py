@@ -107,7 +107,7 @@ def audit_bundle(bundle, denied_roots):
                     inspect_bytes(data, label+'!'+name)
                     if name.endswith('.pyc'):
                         inspect_code(marshal.loads(data[16:]), label+'!'+name)
-        if path.name in {'toudi-runtime', 'toudi-runtime.exe'}:
+        if path.name in {'toudi-runtime', 'toudi-runtime.exe', 'toudi-browser-helper', 'toudi-browser-helper.exe'}:
             archive = CArchiveReader(str(path))
             for name, entry in archive.toc.items():
                 kind = entry[-1]

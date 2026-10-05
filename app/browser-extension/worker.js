@@ -1,5 +1,5 @@
 // Facts and plans live in this extension. The native host is only a Codex bridge.
-importScripts('filling-aliases.js','filling-core.js');
+importScripts('filling-aliases.js','filling-core.js','agent-config.js');
 const Core=globalThis.TouDiFillingCore;
 const KEY='toudiFillingSession', PACK='toudiPrivateProfile', PREF='toudiFillingPreferences', MAPS='toudiFieldMappings';
 const HOST='com.toudi.filling.codex';
@@ -10,7 +10,7 @@ const init=(async()=>{
 })();
 async function digest(value) {const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value)));return [...new Uint8Array(bytes)].map(n=>n.toString(16).padStart(2,'0')).join('');}
 async function pack() {const value=(await chrome.storage.local.get(PACK))[PACK];if(!value)throw Error('请先在「资料与设置」导入自己的填报资料包。');return value;}
-async function preferences() {return {profile:'general',autoLuna:false,...(await chrome.storage.local.get(PREF))[PREF]};}
+async function preferences() {return TouDiAgentConfig.normalize((await chrome.storage.local.get(PREF))[PREF]);}
 function summary(value) {return value?{name:value.name,revision:value.sourceVersion,savedAt:value.savedAt,importedAt:value.importedAt,editedAt:value.editedAt,count:value.facts.length,profiles:value.profiles.map(p=>({...p,count:value.facts.filter(f=>f.profiles.includes(p.id)).length})),rules:value.rules,warnings:value.warnings}:null;}
 async function loadState() {
   const state=(await chrome.storage.session.get(KEY))[KEY];
@@ -22,7 +22,7 @@ async function loadState() {
   }
   await chrome.storage.session.remove(KEY);return null;
 }
-const publicState=state=>state?{startedAt:state.startedAt,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,lunaError:state.lunaError}:null;
+const publicState=state=>state?{startedAt:state.startedAt,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,agentError:state.agentError || state.lunaError}:null;
 async function putState(state) {await chrome.storage.session.set({[KEY]:state});return publicState(state);}
 let nativePort, nativeTimer, nextId=0;
 const nativeRequests=new Map();
@@ -71,8 +71,10 @@ async function remap(state,message) {
   const p=Core.profile(await pack(),state.plan.profileId);
   let mappings=message.mappings || {}, provider={called:false};
   if(message.agent) {
-    if(message.model && message.model!=='gpt-6-luna')throw Error('本功能固定使用 GPT-6 Luna，不自动替换模型。');
-    const request=Core.agentRequest(p,state.scan,state.plan);
+    const pref=await preferences();
+    if(pref.agentMode!=='codex' || !pref.agentModel)throw Error('请先在「资料与设置 → Agent 协作」选择连接方式与模型。');
+    if(message.model && message.model!==pref.agentModel)throw Error('模型与已保存的配置不一致，请先更新 Agent 协作设置。');
+    const request=Core.agentRequest(p,state.scan,state.plan,pref.agentModel);
     if(!request.fields.length)return state;
     const result=await native(request);
     const safe=Core.safeAgentMappings(p,state.scan,result.mappings);
@@ -82,6 +84,7 @@ async function remap(state,message) {
   state.mappings={...state.mappings,...mappings};
   state.plan={...Core.plan(p,state.scan,state.mappings),provider};
   delete state.lunaError;
+  delete state.agentError;
   if(message.remember) {
     const saved=(await chrome.storage.local.get(MAPS))[MAPS] || {};
     const key=await scope(state);saved[key]={mappings:state.mappings,at:Date.now()};
@@ -109,10 +112,16 @@ async function operation(message) {
     case 'profile-delete':await chrome.storage.local.remove([PACK,MAPS,'toudiLastReport']);await chrome.storage.session.remove(KEY);return {deleted:true};
     case 'preferences': {
       const value={...await preferences(),...message.preferences};
-      if(!Core.profileIds.includes(value.profile) || typeof value.autoLuna!=='boolean')throw Error('偏好设置无效。');
-      await chrome.storage.local.set({[PREF]:{profile:value.profile,autoLuna:value.autoLuna}});await chrome.storage.session.remove(KEY);return value;
+      if(!Core.profileIds.includes(value.profile) || !['','codex','external'].includes(value.agentMode)
+        || typeof value.autoAgent!=='boolean' || (value.agentModel && !TouDiAgentConfig.validModel(value.agentModel)))throw Error('协作设置无效。');
+      if(value.autoAgent && (value.agentMode!=='codex' || !value.agentModel))throw Error('自动核对需要先选择 Codex 模型。');
+      const next=TouDiAgentConfig.normalize(value);
+      await chrome.storage.local.set({[PREF]:next});await chrome.storage.session.remove(KEY);return next;
     }
-    case 'settings':await chrome.runtime.openOptionsPage();return {opened:true};
+    case 'settings':
+      if(message.section==='agent')await chrome.tabs.create({url:chrome.runtime.getURL('options.html')+'#agent'});
+      else await chrome.runtime.openOptionsPage();return {opened:true};
+    case 'open-workbench':return native({op:'open-workbench',protocol:1});
     case 'clear-plan':await chrome.storage.session.remove(KEY);return {cleared:true};
     case 'codex-status':return native({op:'status',protocol:1});
     case 'scan': {
@@ -124,7 +133,7 @@ async function operation(message) {
       const saved=(await chrome.storage.local.get(MAPS))[MAPS]?.[await scope(state)]?.mappings || {};
       const allowed=new Set(p.facts.map(f=>f.key));state.mappings=Object.fromEntries(Object.entries(saved).filter(([id,key])=>scan.fields.some(f=>f.id===id) && allowed.has(key)));
       state.plan=Core.plan(p,scan,state.mappings);await putState(state);
-      if(pref.autoLuna && state.plan.rows.some(r=>['missing','ambiguous'].includes(r.status)))try{await remap(state,{agent:true,model:'gpt-6-luna'});}catch(e){state.lunaError=e.message;}
+      if(pref.autoAgent && state.plan.rows.some(r=>['missing','ambiguous'].includes(r.status)))try{await remap(state,{agent:true});}catch(e){state.agentError=e.message;}
       return putState(state);
     }
     case 'remap':return putState(await remap(await current(),message));
@@ -147,7 +156,7 @@ async function operation(message) {
 }
 let working=false;
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
-  if(sender.id!==chrome.runtime.id || !['popup.html','options.html'].some(name=>sender.url===chrome.runtime.getURL(name)))return false;
+  if(sender.id!==chrome.runtime.id || !['popup.html','options.html'].some(name=>sender.url?.split('#')[0]===chrome.runtime.getURL(name)))return false;
   if(working && !['state','profile-read'].includes(message.op)){respond({error:'上一步正在执行，请等待完成。'});return false;}
   const exclusive=!['state','profile-read'].includes(message.op);if(exclusive)working=true;
   operation(message).then(value=>respond({value})).catch(e=>respond({error:e.message})).finally(()=>{if(exclusive)working=false;});return true;

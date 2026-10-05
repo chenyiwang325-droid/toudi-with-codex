@@ -18,23 +18,29 @@ def main():
     parser.add_argument('--output',default=str(ROOT/'browser-tools/dist'))
     parser.add_argument('--skip-helper',action='store_true')
     options=parser.parse_args()
+    subprocess.run([sys.executable,str(ROOT/'tests/check_source.py')],check=True)
     output=Path(options.output).resolve();output.mkdir(parents=True,exist_ok=True)
     sys.path.insert(0,str(ROOT/'app'))
     from filling_service import extension_bundle
+    from browser_helper import VERSION
     extension=output/'TouDi-filling';extension.mkdir(exist_ok=True)
     archive=output/'TouDi-filling-extension.zip';archive.write_bytes(extension_bundle())
     with zipfile.ZipFile(archive) as bundle:bundle.extractall(output)
     if not options.skip_helper:
         build=ROOT/'browser-tools/build';build.mkdir(parents=True,exist_ok=True)
         env=dict(os.environ);env['PYINSTALLER_CONFIG_DIR']=str(build/'cache')
-        subprocess.run([options.python,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','toudi-browser-helper','--distpath',str(output/'native'),'--workpath',str(build/'pyinstaller'),'--specpath',str(build),'--paths',str(ROOT/'app'),str(ROOT/'app/browser_helper.py')],check=True,env=env)
+        hooks=build/'privacy-hooks';hooks.mkdir(exist_ok=True)
+        config_name=subprocess.check_output([options.python,'-c',"import sysconfig; print(sysconfig._get_sysconfigdata_name())"],text=True).strip()
+        shutil.copy2(ROOT/'desktop/scripts/sysconfig_hook.py',hooks/('hook-'+config_name+'.py'))
+        subprocess.run([options.python,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','toudi-browser-helper','--distpath',str(output/'native'),'--workpath',str(build/'pyinstaller'),'--specpath',str(build),'--paths',str(ROOT/'app'),'--additional-hooks-dir',str(hooks),str(ROOT/'app/browser_helper.py')],check=True,env=env)
+        subprocess.run([options.python,str(ROOT/'desktop/scripts/privacy.py'),'--deny-root',str(ROOT),'--deny-root',str(Path.home()),str(output/'native/toudi-browser-helper')],check=True)
         if sys.platform=='darwin':
             app=output/'TouDi 浏览器连接.app';contents=app/'Contents';mac=contents/'MacOS';mac.mkdir(parents=True,exist_ok=True)
             (contents/'Resources').mkdir(exist_ok=True)
             resources=output/'native/toudi-browser-helper'
             shutil.copytree(resources,contents/'Resources/helper',dirs_exist_ok=True)
             launcher=mac/'install';launcher.write_text('#!/bin/sh\nexec "$(dirname "$0")/../Resources/helper/toudi-browser-helper" "$@"\n');launcher.chmod(0o755)
-            plist={'CFBundleIdentifier':'app.toudi.browser-connector','CFBundleName':'TouDi 浏览器连接','CFBundleDisplayName':'TouDi 浏览器连接','CFBundleExecutable':'install','CFBundleVersion':'0.2.0','CFBundleShortVersionString':'0.2.0','CFBundlePackageType':'APPL','LSUIElement':True}
+            plist={'CFBundleIdentifier':'app.toudi.browser-connector','CFBundleName':'TouDi 浏览器连接','CFBundleDisplayName':'TouDi 浏览器连接','CFBundleExecutable':'install','CFBundleVersion':VERSION,'CFBundleShortVersionString':VERSION,'CFBundlePackageType':'APPL','LSUIElement':True}
             icon=ROOT/'desktop/src-tauri/icons/icon.icns'
             if icon.is_file():shutil.copy2(icon,contents/'Resources/icon.icns');plist['CFBundleIconFile']='icon.icns'
             (contents/'Info.plist').write_bytes(plistlib.dumps(plist))

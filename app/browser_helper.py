@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -13,17 +14,19 @@ HOST='com.toudi.filling.codex'
 EXTENSION_ID='edfgnahdkpobmkhckjhadadnlbhpbpmd'
 ORIGIN='chrome-extension://'+EXTENSION_ID+'/'
 MAX_MESSAGE=512*1024
-VERSION='0.2.0'
+VERSION='0.3.0'
 
 
 def validate_request(request):
     if not isinstance(request,dict) or request.get('protocol')!=1 or type(request.get('requestId')) is not int:
         raise ValueError('本机连接请求无效。')
-    if request.get('op')=='status':
+    if request.get('op') in {'status','open-workbench'}:
         if set(request)-{'protocol','requestId','op'}:raise ValueError('不支持的连接请求。')
         return request
-    if request.get('op')!='map' or set(request)-{'protocol','requestId','op','model','fields','allowedFacts'} or request.get('model')!='gpt-6-luna':
-        raise ValueError('本机工具只支持 GPT-6 Luna 字段核对，不执行其他操作。')
+    if request.get('op')!='map' or set(request)-{'protocol','requestId','op','model','fields','allowedFacts'}:
+        raise ValueError('不支持的本机连接请求。')
+    if not isinstance(request.get('model'),str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}',request['model']):
+        raise ValueError('请明确选择有效的 Codex 模型。')
     fields=request.get('fields');facts=request.get('allowedFacts')
     if not isinstance(fields,list) or len(fields)>500 or not isinstance(facts,list) or len(facts)>1500:raise ValueError('字段核对范围无效。')
     def checked(items,key,allowed):
@@ -52,11 +55,19 @@ def operation(request):
     if request['op']=='status':
         from codex_connection import codex_status
         return {**codex_status(refresh=True),'helperVersion':VERSION,'independent':True}
+    if request['op']=='open-workbench':
+        if sys.platform!='darwin':
+            raise ValueError('当前平台请从应用程序列表打开 TouDi；开始指南中提供安装入口。')
+        for app in (Path.home()/'Applications/TouDi.app',Path('/Applications/TouDi.app')):
+            if app.is_dir():
+                result=subprocess.run(['open',str(app)],capture_output=True,timeout=10)
+                if not result.returncode:return {'opened':True}
+        raise ValueError('未找到已安装的 TouDi App，请通过「中控台安装与使用」安装后打开。')
     from codex_mapping import map_with_codex
     profile={'facts':[dict(f,manual=False) for f in request['allowedFacts']]}
     scan={'fields':request['fields']}
     plan={'rows':[{'fieldId':f['id'],'status':'missing'} for f in request['fields']]}
-    mappings,provider=map_with_codex(profile,scan,plan,model='gpt-6-luna')
+    mappings,provider=map_with_codex(profile,scan,plan,model=request['model'])
     return {'mappings':mappings,'provider':provider,'helperVersion':VERSION}
 
 

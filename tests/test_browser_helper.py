@@ -16,17 +16,21 @@ class BrowserHelperTests(unittest.TestCase):
                 'allowedFacts':[{'key':'personal.city','label':'现居地','module':'personal','aliases':['居住地']}],**kw}
 
     def test_rejects_personal_values_commands_files_and_model_fallback(self):
-        for change in ({'model':'gpt-5.5'},{'model':'gpt-6-sol'},{'path':'a-file'}, {'op':'read'},
+        for change in ({'model':''},{'model':'--shell-command'},{'path':'a-file'}, {'op':'read'},
                        {'fields':[{'id':'f','label':'Email','type':'text','value':'private@example.invalid'}]},
                        {'allowedFacts':[{'key':'f','label':'姓名','module':'personal','value':'Private Person'}]}):
             with self.subTest(change=change),self.assertRaises(ValueError):helper.validate_request(self.request(**change))
 
-    def test_mapping_uses_only_fixed_luna_and_semantic_keys(self):
+    def test_mapping_uses_explicit_user_model_and_semantic_keys(self):
         with patch('codex_mapping.map_with_codex',return_value=({'f':'personal.city'},{'called':True,'model':'gpt-6-luna'})) as model:
-            answer=helper.operation(self.request())
-        self.assertEqual(model.call_args.kwargs,{'model':'gpt-6-luna'})
+            answer=helper.operation(self.request(model='fixture-user-model'))
+        self.assertEqual(model.call_args.kwargs,{'model':'fixture-user-model'})
         self.assertNotIn('value',model.call_args.args[0]['facts'][0])
         self.assertEqual(answer['mappings'],{'f':'personal.city'})
+
+    def test_open_workbench_never_accepts_a_caller_path(self):
+        with self.assertRaises(ValueError):helper.validate_request({'protocol':1,'requestId':1,'op':'open-workbench','path':'arbitrary'})
+        self.assertEqual(helper.validate_request({'protocol':1,'requestId':1,'op':'open-workbench'})['op'],'open-workbench')
 
     def test_port_accepts_multiple_frames_and_rejects_other_extensions(self):
         requests=[{'protocol':1,'requestId':i,'op':'status'} for i in (1,2)]

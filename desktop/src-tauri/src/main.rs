@@ -292,6 +292,33 @@ fn restart_runtime(state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_filling() -> Result<(), String> {
+    let url = "chrome-extension://edfgnahdkpobmkhckjhadadnlbhpbpmd/options.html";
+    #[cfg(target_os = "macos")]
+    {
+        let result = Command::new("open").args(["-a", "Google Chrome", url]).output()
+            .map_err(|_| "未能打开 Chrome，请通过安装指南安装扩展。".to_string())?;
+        if result.status.success() { return Ok(()); }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        for key in ["PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"] {
+            if let Some(base) = std::env::var_os(key) {
+                let chrome = PathBuf::from(base).join("Google/Chrome/Application/chrome.exe");
+                if chrome.is_file() && Command::new(chrome).arg(url).spawn().is_ok() { return Ok(()); }
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        for binary in ["google-chrome", "chromium", "chromium-browser"] {
+            if Command::new(binary).arg(url).spawn().is_ok() { return Ok(()); }
+        }
+    }
+    Err("未能打开浏览器。请通过辅助填报安装指南安装 Chrome 和扩展。".into())
+}
+
+#[tauri::command]
 fn open_external(url: String, app: tauri::AppHandle) -> Result<(), String> {
     if !(url.starts_with("https://") || url.starts_with("http://") || url.starts_with("mailto:")) {
         return Err("只支持网页或邮件链接".into());
@@ -486,6 +513,7 @@ fn main() {
             backend_request,
             restart_runtime,
             open_external,
+            open_filling,
             show_workspace,
             select_workspace,
             save_file,

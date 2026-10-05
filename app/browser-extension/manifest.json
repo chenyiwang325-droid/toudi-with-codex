@@ -1,15 +1,18 @@
 {
   "manifest_version": 3,
   "name": "TouDi 辅助填报",
-  "version": "0.2.0",
-  "description": "使用插件本地资料检查并填写当前网申页面，可通过现有 Codex 额度调用 Luna 核对歧义。",
+  "version": "0.3.0",
+  "description": "当前招聘网页的个人资料识别、核对与填写；可自行配置 Agent 协作。",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
     "nativeMessaging"
   ],
-  "options_ui": {"page": "options.html", "open_in_tab": true},
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "action": {
     "default_title": "TouDi 辅助填报",
     "default_popup": "popup.html"

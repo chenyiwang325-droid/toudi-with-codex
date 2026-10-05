@@ -9,12 +9,14 @@
     await window.__TOUDI_DESKTOP_READY__;
     await window.openFilling();
     const summary = await (await fetch('/api/filling')).json();
-    const code = JSON.parse((await (await fetch('/api/filling/connect', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})).json()).connection);
     const extension = await fetch('/api/filling/extension');
-    filling = {available:summary.available, sourceName:summary.sourceName, profiles:summary.profiles,
-      counts:summary.counts, codexAvailable:summary.codexAvailable, dialogOpen:document.querySelector('#fillingDialog')?.open,
-      connectionLoopback:new URL(code.url).hostname === '127.0.0.1', port:Number(new URL(code.url).port),
-      tokenLength:code.token.length, extensionStatus:extension.status, extensionBytes:(await extension.arrayBuffer()).byteLength};
+    filling = {available:summary.available, counts:summary.counts,
+      dialogOpen:document.querySelector('#fillingDialog')?.open,
+      sidebarEntry:document.querySelector('.filling-nav #fillingEntry')?.textContent,
+      extensionEntry:!!document.getElementById('fillingOpen'),
+      guide:document.querySelector('.filling-body a')?.href,
+      noLegacyConnection:!document.getElementById('fillingCopy'),
+      extensionSize:(await extension.arrayBuffer()).byteLength};
   } else if (target && typeof switchView === 'function') {
     const module = target === 'company' ? 'qbank' : ['agent-settings','data-settings','preference-settings','education-preferences','industry-preferences'].includes(target) ? 'settings' : target;
     if (typeof ensureViewData === 'function') await ensureViewData(module);

@@ -3,7 +3,7 @@ const escapeHtml = text => String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&
 const labels = {ready:'可填写',already:'已一致',conflict:'已有内容',manual:'人工核对',missing:'资料待补',ambiguous:'需选记录',unsupported:'需手动',verified:'核验通过',failed:'未通过'};
 const reasons = {'readback-matched':'写入后读回一致','value-not-retained':'网站未保留填写值，请手动检查','validation-failed':'网站字段校验未通过','field-disappeared':'字段已隐藏或移除，请重新识别','page-changed':'网页已切换，请重新识别','structure-changed':'表单结构已变化，请重新识别','value-changed':'你已修改此字段，保留当前值','existing-value':'已有内容未覆盖','field-changed':'字段内容或控件已变化','disabled-or-readonly':'字段只读或已停用','option-not-found':'页面没有该选项','option-disabled':'对应选项不可用','maxlength-exceeded':'内容超过网站长度限制','scan-required':'需要重新识别当前页面'};
 let state, busy = false, hasProfile = false, profileSummary;
-const MODEL = 'gpt-6-luna';
+let pref = TouDiAgentConfig.normalize();
 async function send(op, data = {}) {
   const result = await chrome.runtime.sendMessage({op,...data});
   if (result?.error) throw Error(result.error);
@@ -15,7 +15,7 @@ async function task(fn, text) {
   busy = true;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = true);notice(text);
   try { await fn(); }
   catch (e) { notice(e.message, true); }
-  finally {busy = false;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = false);el('agentCli').disabled=!(state?.plan?.rows.some(row=>['missing','ambiguous'].includes(row.status)));selection();}
+  finally {busy = false;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = false);updateAgentControls();selection();}
 }
 function sourceLabel(){if(profileSummary)el('sourceStatus').textContent=`资料更新 ${String(profileSummary.savedAt || '未注明').slice(0,10)} · 当前口径 ${profileSummary.profiles.find(p=>p.id===el('profile').value)?.count || 0} 项`;}
 function available(value) {hasProfile=!!value;el('empty').hidden=hasProfile;el('controls').hidden=!hasProfile;}
@@ -57,9 +57,21 @@ function render() {
 }
 el('settings').addEventListener('click',()=>send('settings'));
 el('importStart').addEventListener('click',()=>send('settings'));
-el('autoLuna').addEventListener('change',()=>task(async()=>{await send('preferences',{preferences:{autoLuna:el('autoLuna').checked}});state=null;render();notice(el('autoLuna').checked?'已启用自动核对；仅对歧义字段调用 Luna，消耗现有 Codex 额度。':'已关闭自动核对；本地识别和填写继续可用。');},'正在保存偏好…'));
-el('scan').addEventListener('click', () => task(async () => {state=await send('scan',{profile:el('profile').value});render();notice(state.lunaError || '计划已生成；勾选的字段会填写，已有内容默认保留。',!!state.lunaError);},'正在识别字段并核对资料…'));
-el('profile').addEventListener('change', () => task(async()=>{await send('preferences',{preferences:{profile:el('profile').value}});state=null;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
+function updateAgentControls(){
+  const direct=pref.agentMode==='codex' && !!pref.agentModel;
+  el('autoAgentRow').hidden=!direct;el('autoAgent').checked=pref.autoAgent;
+  el('agentCli').hidden=pref.agentMode==='external';
+  el('agentCli').textContent=direct?'用 '+pref.agentModel+' 核对':'配置 Agent 协作';
+  el('agentCli').disabled=busy || (direct && !state?.plan?.rows.some(row=>['missing','ambiguous'].includes(row.status)));
+  el('agentCheck').hidden=!direct;
+  el('agentTransfer').open=pref.agentMode==='external';
+  el('agentConnectionStatus').textContent=direct?'当前模型：'+pref.agentModel+' · 现有 Codex 额度。仅核对歧义，不自动替换模型。':pref.agentMode==='external'?'当前方式：自己的 Agent。复制任务后，导入返回的 JSON。':'尚未接入 Agent；明确字段和手动选择资料仍可使用。';
+}
+el('agentSettings').addEventListener('click',()=>send('settings',{section:'agent'}));
+el('openWorkbench').addEventListener('click',()=>task(async()=>{await send('open-workbench');notice('投递中控台已打开。');},'正在打开中控台…'));
+el('autoAgent').addEventListener('change',()=>task(async()=>{pref=await send('preferences',{preferences:{autoAgent:el('autoAgent').checked}});state=null;render();notice(pref.autoAgent?'自动核对已开启，使用你已选择的模型和 Codex 额度。':'自动核对已关闭。');},'正在保存偏好…'));
+el('scan').addEventListener('click', () => task(async () => {state=await send('scan',{profile:el('profile').value});render();notice(state.agentError || '计划已生成；勾选的字段会填写，已有内容默认保留。',!!state.agentError);},'正在识别字段并核对资料…'));
+el('profile').addEventListener('change', () => task(async()=>{pref=await send('preferences',{preferences:{profile:el('profile').value}});state=null;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
 el('review').addEventListener('change', selection);
 el('review').addEventListener('click', event => {
   const jump=event.target.closest('[data-jump]');
@@ -69,13 +81,17 @@ el('review').addEventListener('click', event => {
 el('agentCopy').addEventListener('click',()=>task(async()=>{const value=await send('agent-task');await navigator.clipboard.writeText(value.task);notice('匹配任务已复制；交给你正在使用的 Agent，再粘贴它返回的 JSON。');},'正在生成 Agent 匹配任务…'));
 el('agentImport').addEventListener('click',()=>task(async()=>{const mappings=JSON.parse(el('agentResult').value);state=await send('remap',{mappings,remember:el('remember').checked});render();notice('Agent 匹配已导入；约束和已有内容保护仍生效。');},'正在验证 Agent 匹配…'));
 async function checkCodex() {
+  const value=await send('state');pref=value.preferences;updateAgentControls();
+  if(pref.agentMode!=='codex' || !pref.agentModel)throw Error('请先打开协作设置，选择本机 Codex 与模型。');
   const provider=await send('codex-status');
-  if(!provider.available||provider.auth!=='chatgpt')throw Error(provider.message);
-  if(!provider.models.some(model=>model.id===MODEL))throw Error('当前 Codex 未提供 GPT-6 Luna；请更新 Codex 桌面端。原计划保留，不会换用其他模型。');
-  el('agentConnectionStatus').textContent='GPT-6 Luna 已连接 · 使用现有 Codex 额度。';
+  if(!provider.available || provider.auth!=='chatgpt')throw Error(provider.message);
+  if(!provider.models.some(model=>model.id===pref.agentModel))throw Error('当前 Codex 目录未提供 '+pref.agentModel+'；请在协作设置重新检查和选择。原计划保留，不自动替换模型。');
   return provider;
 }
-el('agentCheck').addEventListener('click',()=>task(async()=>{await checkCodex();notice('ChatGPT 登录与 Luna 目录已确认，检查没有发起模型生成。');},'正在检查 Codex 连接…'));
-el('agentCli').addEventListener('click',()=>task(async()=>{await checkCodex();state=await send('remap',{agent:true,model:MODEL});render();notice('Luna 已返回匹配，请核对计划后填写。');},'Luna 正在核对歧义字段；明确字段不会重复调用模型…'));
+el('agentCheck').addEventListener('click',()=>task(async()=>{await checkCodex();notice('登录与所选模型目录已确认，没有发起模型生成。');},'正在检查 Codex 连接…'));
+el('agentCli').addEventListener('click',()=>task(async()=>{
+  if(pref.agentMode!=='codex' || !pref.agentModel){await send('settings',{section:'agent'});return;}
+  await checkCodex();state=await send('remap',{agent:true});render();notice('所选模型已返回匹配，请核对计划后填写。');
+},'正在核对歧义字段…'));
 el('fill').addEventListener('click',()=>task(async()=>{const inputs=[...document.querySelectorAll('#review input[data-field]:checked')];state=await send('fill',{selected:inputs.map(input=>input.dataset.field),overwrite:inputs.filter(input=>input.dataset.overwrite==='true').map(input=>input.dataset.field)});render();notice('所选字段已执行并读回核验，请查看逐项结果。');},'正在填写所选字段并读回核验…'));
-task(async()=>{const value=await send('state');available(value.profile?.count);el('profile').value=value.preferences.profile;el('autoLuna').checked=value.preferences.autoLuna;profileSummary=value.profile;sourceLabel();state=value.state;render();notice(state?.lunaError || '',!!state?.lunaError);},'正在读取本地资料…');
+task(async()=>{const value=await send('state');available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');

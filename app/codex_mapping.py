@@ -33,9 +33,7 @@ def map_with_codex(profile, scan, plan, timeout=75, model=''):
         raise ValueError(provider['message'])
     models = {item['id']:item for item in provider['models']}
     if not model:
-        raise ValueError('请明确选择轻量模型；不会自动使用 CLI 的默认模型。')
-    if not re.search(r'luna|mini|nano', model, re.I):
-        raise ValueError('自动填报只允许明确选择的轻量模型；不会调用 GPT-5.5 或其他高消耗默认模型。')
+        raise ValueError('请先在 Agent 协作中选择模型；不会自动使用 CLI 的默认模型。')
     if model not in models:
         raise ValueError('当前 Codex CLI 未提供 ' + model + '；请选择检查连接后返回的模型，不会自动替换模型。')
     facts = [{k: fact.get(k) for k in ('key', 'label', 'module', 'recordId', 'recordLabel', 'recordHint', 'aliases')} for fact in profile['facts'] if not fact.get('manual')]
