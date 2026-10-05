@@ -738,14 +738,6 @@ async function recoveryPreview(id){
     catch(error){document.getElementById('managementStatus').textContent=error.message;this.disabled=false;}
   };
 }
-const basicAgentBootstrap = agentBootstrapText;
-function desktopAgentBootstrapText(includeLocalPaths = false) {
-  const desktop = window.__TOUDI_DESKTOP__;
-  if (!desktop) return basicAgentBootstrap();
-  const location = includeLocalPaths ? desktop : {workspace:'{用户指定的正式工作区}',agentTool:'{用户提供的资料工具}',guideRoot:'{随工具提供的通用流程文档目录}'};
-  return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + location.workspace + '\n资料工具：' + location.agentTool + '\n流程文档目录：' + location.guideRoot + '\n\n先读取正式工作区已有的 AGENTS.md、投递数据/AGENTS.md 或信源流程说明（如有），保留现有标准流程和命令入口。然后读取文档目录下的 AGENTS.md、docs/开始与初始化.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。首次使用或新增信源时，先用 preference-catalog 清点实际字段词条，确认分类、同义词、学历含义、字段与去重方式，建立工作区 settings.preferenceRules；保留已有设置与偏好，未知标签不作为排除条件。不要照搬作者的信源或预设资格。初始化完成后做一次更新、读回与页面核对，之后沿用更新、准备、探查和复盘流程。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
-}
-agentBootstrapText = function () { return desktopAgentBootstrapText(); };
 if (window.__TOUDI_DESKTOP_READY__) {
   window.__TOUDI_DESKTOP_READY__.then(managementInit).catch(() => {});
 } else {
@@ -759,11 +751,11 @@ async function startWorkspaceContent(module, importing = false) {
     document.querySelector('#managementTools input[type=file]')?.click();
   }
 }
-copyAgentBootstrap = async function (includeLocalPaths = false) {
-  const text = includeLocalPaths === true ? desktopAgentBootstrapText(true) : agentBootstrapText();
+copyAgentBootstrap = async function () {
+  const text = agentBootstrapText();
   try {
     await navigator.clipboard.writeText(text);
-    showToast(includeLocalPaths === true ? '本机接入说明已复制，包含当前目录' : '通用接入说明已复制');
+    showToast('启动消息已复制，请补充信源、材料与任务后发送');
   } catch (error) {
     const field = document.createElement('textarea');
     field.value = text;
@@ -771,7 +763,7 @@ copyAgentBootstrap = async function (includeLocalPaths = false) {
     field.select();
     const copied = document.execCommand('copy');
     field.remove();
-    showToast(copied ? '接入说明已复制' : '复制未完成，请在设置中选择接入说明');
+    showToast(copied ? '启动消息已复制，请补充后发送' : '复制未完成，请展开并选择启动消息');
   }
 };
 const workspaceRefreshSnapshots = new Map();

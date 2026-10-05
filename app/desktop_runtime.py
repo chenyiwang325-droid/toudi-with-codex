@@ -6,7 +6,7 @@ import sys
 import threading
 from pathlib import Path
 
-APP_VERSION = '0.3.3'
+APP_VERSION = '0.3.4'
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / '脚本')]
 

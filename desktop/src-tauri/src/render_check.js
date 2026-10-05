@@ -61,10 +61,10 @@
       const desktop = window.__TOUDI_DESKTOP__;
       const text = document.getElementById('agentBootstrap')?.value || '';
       const paths = desktop ? [desktop.workspace, desktop.agentTool, desktop.guideRoot].filter(Boolean) : [];
-      const local = typeof desktopAgentBootstrapText === 'function' ? desktopAgentBootstrapText(true) : '';
       return {textPresent:!!text, genericOmitsDirectories:paths.every(path => !text.includes(path)),
-        explicitLocalCopyAvailable:!!document.querySelector('[onclick="copyAgentBootstrap(true)"]'),
-        localContractIncludesDirectories:paths.length === 3 && paths.every(path => local.includes(path))};
+        singleCopyAction:document.querySelectorAll('#settings-panel-agent [onclick="copyAgentBootstrap()"]').length === 1,
+        noLocalCopyAction:!document.querySelector('[onclick="copyAgentBootstrap(true)"]'),
+        workflowPresent:['workspace status','preference-catalog','validate','commit','read','刷新资料'].every(step=>text.includes(step))};
     })(),
     rowCount: document.querySelectorAll('#tableBody tr').length,
     activeView: typeof view === 'string' ? view : null,
