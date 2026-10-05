@@ -1,0 +1,24 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const source=fs.readFileSync(path.join(__dirname,'../app/assets/workbench.js'),'utf8');
+const bootstrap=source.slice(source.indexOf('const basicAgentBootstrap = agentBootstrapText;'),source.indexOf('if (window.__TOUDI_DESKTOP_READY__)'));
+const copyStart=source.indexOf('copyAgentBootstrap = async function');
+const copy=source.slice(copyStart,source.indexOf('const workspaceRefreshSnapshots',copyStart));
+let copied='';
+const desktop={workspace:'/fixture/Private Workspace',agentTool:'/fixture/Private App/tool',guideRoot:'/fixture/Private App/guides'};
+const context={window:{__TOUDI_DESKTOP__:desktop},agentBootstrapText:()=> 'generic-browser-contract',navigator:{clipboard:{writeText:async text=>{copied=text}}},showToast:()=>{}};
+vm.createContext(context);vm.runInContext(bootstrap+copy,context);
+(async()=>{
+  const general=context.agentBootstrapText();
+  for(const value of Object.values(desktop))assert(!general.includes(value));
+  for(const step of ['--workspace','--help','read','validate','commit'])assert(general.includes(step));
+  await context.copyAgentBootstrap();assert.equal(copied,general);
+  await context.copyAgentBootstrap('true');assert.equal(copied,general);
+  await context.copyAgentBootstrap(true);for(const value of Object.values(desktop))assert(copied.includes(value));
+  assert.equal(context.agentBootstrapText(),general);
+  context.window.__TOUDI_DESKTOP__=null;assert.equal(context.agentBootstrapText(),'generic-browser-contract');
+  console.log('PASS Agent privacy: default text and clipboard use placeholders; explicit local copy preserves complete workflow');
+})().catch(e=>{console.error(e);process.exitCode=1});

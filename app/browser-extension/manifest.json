@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "TouDi 辅助填报",
+  "version": "0.2.0",
+  "description": "使用插件本地资料检查并填写当前网申页面，可通过现有 Codex 额度调用 Luna 核对歧义。",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "nativeMessaging"
+  ],
+  "options_ui": {"page": "options.html", "open_in_tab": true},
+  "action": {
+    "default_title": "TouDi 辅助填报",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "worker.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArlAqrh5RRbE1qshGnt2ePvjq3U3xZxhYx7rtS+bDFWEm5lgdXFvVYkgedS/1ZzbAwEWwhHRwGlvYeEjiJPtd0eck9/HxjrmL/MKeXGJzdpkS1hXwz8UlvfGCV5dAupl8wgdKUGW/SZT8+0p4QsTO8t/rB62Kauhr0qu6z0yAWuu7Pfg6eVWovlZAshv3HGzF67s1HDOz4Y5PyK2mxyogl0eW1pyTYK+OJvejdvTEd1Hrin6w9yZttI93sDJv4BUbDWrJVxS4eGkXA3KytxvMXKusq7o0I2A4ZpG7ihdDxFA7Wh2W9CPbUEO/NDuLLqPU3IahJtg8sUY1t14keam4MwIDAQAB"
+}

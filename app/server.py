@@ -65,6 +65,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.connection.settimeout(30)
 
     def end_headers(self):
+        if getattr(self, '_filling_origin', None):
+            self.send_header('Access-Control-Allow-Origin', self._filling_origin)
+            self.send_header('Vary', 'Origin')
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')
@@ -82,6 +85,22 @@ class Handler(SimpleHTTPRequestHandler):
         if any(part.startswith('.') for part in unquote(urlsplit(self.path).path).split('/') if part):
             return self._send_json({'error': 'private workspace file'}, 403)
         route = urlsplit(self.path).path
+        if route.startswith('/api/filling'):
+            if hosted.MODE == 'hosted':
+                return self._send_json({'error': '辅助填报仅连接本机工作区'}, 403)
+            try:
+                import filling_service
+                if route == '/api/filling':
+                    profile_id = parse_qs(urlsplit(self.path).query).get('profile', ['general'])[0]
+                    return self._send_json(filling_service.service(WORKSPACE, PORT).status(profile_id))
+                if route == '/api/filling/extension':
+                    body = filling_service.extension_bundle()
+                    self.send_response(200); self.send_header('Content-Type', 'application/zip')
+                    self.send_header('Content-Disposition', 'attachment; filename="TouDi-filling-pilot.zip"')
+                    self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
+                return self._send_json({'error': 'not_found'}, 404)
+            except (ValueError, OSError, KeyError) as exc:
+                return self._send_json({'error': str(exc)}, 400)
         if route == '/api/health': return self._send_json({'ok': True, 'mode': hosted.MODE})
         if route in ('/api/manage', '/api/backup'):
             try:
@@ -119,10 +138,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers(); self.wfile.write(body); return
-        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js'):
+        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js', '/assets/settings.css', '/assets/filling.js', '/assets/filling.css'):
             name = os.path.basename(urlsplit(self.path).path)
             body = open(os.path.join(CODE_DIR, 'assets', name), 'rb').read()
-            self.send_response(200); self.send_header('Content-Type', 'text/javascript; charset=utf-8' if name.endswith('.js') else 'image/svg+xml')
+            self.send_response(200); self.send_header('Content-Type', 'text/javascript; charset=utf-8' if name.endswith('.js') else 'text/css; charset=utf-8' if name.endswith('.css') else 'image/svg+xml')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers(); self.wfile.write(body); return
         if self.path in ('/api/workspace', '/api/agent'):
@@ -215,7 +234,22 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        route = urlsplit(self.path).path
+        if route == '/api/filling/bridge':
+            import filling_service
+            if hosted.MODE == 'hosted' or not filling_service.bridge_origin_allowed(self, PORT):
+                return self._send_json({'error': '只允许本机浏览器扩展连接'}, 403)
+            if not filling_service.service(WORKSPACE, PORT).authorized(self.headers.get('Authorization', '')):
+                return self._send_json({'error': '浏览器连接失效；请从中控台重新复制连接码'}, 401)
+            origin = self.headers.get('Origin')
+            if origin:
+                # Only the authenticated extension receives a cross-origin response.
+                self._filling_origin = origin
+            return self._filling_post()
         if not hosted.authorize(self, PORT): return
+        if route.startswith('/api/filling'):
+            if hosted.MODE == 'hosted': return self._send_json({'error': '辅助填报仅连接本机工作区'}, 403)
+            return self._filling_post()
         if urlsplit(self.path).path in ('/api/manage', '/api/backup'):
             try:
                 length = int(self.headers.get('Content-Length', 0))
@@ -401,9 +435,54 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_OPTIONS(self):
+        if urlsplit(self.path).path == '/api/filling/bridge':
+            import filling_service
+            if hosted.MODE == 'hosted' or not self.headers.get('Origin') or not filling_service.bridge_origin_allowed(self, PORT):
+                return self._send_json({'error': 'extension_origin_required'}, 403)
+            self.send_response(204)
+            self.send_header('Access-Control-Allow-Origin', self.headers['Origin'])
+            self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+            self.send_header('Access-Control-Allow-Methods', 'POST')
+            self.end_headers(); return
         if not hosted.authorize(self, PORT): return
         self.send_response(204)
         self.end_headers()
+
+    def _filling_post(self):
+        import filling_service
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+            if length <= 0 or length > 1024 * 1024 or self.headers.get('Transfer-Encoding'):
+                return self._send_json({'error': '填报请求超出限制'}, 413)
+            payload = json.loads(self.rfile.read(length))
+            if not isinstance(payload, dict): raise ValueError('填报请求必须为对象')
+            route = urlsplit(self.path).path
+            api = filling_service.service(WORKSPACE, PORT)
+            op = payload.get('op')
+            if route == '/api/filling/connect':
+                return self._send_json(api.connect(reset=payload.get('reset') is True))
+            if route == '/api/filling/chrome':
+                if hosted.MODE != 'desktop':
+                    raise ValueError('请在 TouDi 桌面 App 启用 Chrome 连接。')
+                import chrome_connection
+                result = chrome_connection.install()
+                api.token()
+                return self._send_json(result)
+            if route not in {'/api/filling/bridge', '/api/filling/plan'}:
+                return self._send_json({'error': 'not_found'}, 404)
+            if op == 'ping': result = api.status(payload.get('profile', 'general'))
+            elif op == 'codex-status': result = filling_service.codex_status(refresh=payload.get('refresh') is True)
+            elif op == 'plan': result = api.plan(payload['scan'], payload.get('profile', 'general'))
+            elif op == 'agent-task': result = api.agent_task(payload['planId'])
+            elif op == 'remap': result = api.remap(payload['planId'], payload.get('mappings'), agent=payload.get('agent') is True, remember=payload.get('remember') is True, model=payload.get('model', ''))
+            elif op == 'confirm': result = api.confirm(payload['planId'], payload.get('selected', []), payload.get('overwrite', []))
+            elif op == 'report': result = api.report(payload['planId'], payload['report'])
+            else: raise ValueError('不支持的填报操作')
+            return self._send_json(result)
+        except filling_service.FillingConflict as exc:
+            return self._send_json({'error': str(exc)}, 409)
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            return self._send_json({'error': str(exc)}, 400)
 
     def log_message(self, *args):  # 静默访问日志
         pass

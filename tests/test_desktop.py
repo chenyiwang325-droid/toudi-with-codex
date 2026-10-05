@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+import io
 import urllib.error
 import urllib.request
 from urllib.parse import quote
@@ -56,11 +57,32 @@ class DesktopRuntimeTests(unittest.TestCase):
                 self.assertIn('{隔离公司}', page)
                 self.assertIn('/assets/workbench.js', page)
                 self.assertEqual(request('/assets/workbench.js')[0], 200)
+                self.assertEqual(request('/assets/filling.js')[0], 200)
+                code=json.loads(json.loads(request('/api/filling/connect',{})[1])['connection'])
+                self.assertEqual(code['url'],f'http://127.0.0.1:{port}')
+                filling_token=code['token']
+                def bridge(token,origin='chrome-extension://'+'a'*32):
+                    req=urllib.request.Request(f'http://127.0.0.1:{port}/api/filling/bridge',data=b'{"op":"ping"}',
+                        headers={'Authorization':'Bearer '+token,'Origin':origin,'Content-Type':'application/json'})
+                    try:
+                        with urllib.request.urlopen(req,timeout=5) as response:return response.status,json.loads(response.read())
+                    except urllib.error.HTTPError as error:
+                        with error:return error.code,{}
+                self.assertEqual(bridge(filling_token)[0],200)
+                self.assertEqual(bridge(token)[0],401)
+                self.assertEqual(bridge(filling_token,'https://example.invalid')[0],403)
+                with zipfile.ZipFile(io.BytesIO(request('/api/filling/extension')[1])) as bundle:
+                    self.assertIn('TouDi-filling/worker.js',bundle.namelist())
+                    self.assertNotIn(filling_token.encode(),request('/api/filling/extension')[1])
                 cli = subprocess.run(COMMAND + ['--workspace', tmp, 'read', 'records'], env=env, encoding='utf-8', capture_output=True, check=True)
                 self.assertEqual(json.loads(cli.stdout)['data'][0]['名称'], '{隔离公司}')
             finally: stop(process)
+            previous_port=port
             process, port = start()
             try:
+                self.assertEqual(port,previous_port)
+                new_code=json.loads(json.loads(request('/api/filling/connect',{})[1])['connection'])
+                self.assertEqual(code,new_code)
                 self.assertEqual(json.loads(request('/api/manage?module=records')[1])['data'][0]['名称'], '{隔离公司}')
             finally: stop(process)
 

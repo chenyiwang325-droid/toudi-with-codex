@@ -33,3 +33,6 @@ node_modules/
 *.dmg
 *.app/
 # Alternate user data roots must remain outside this repository.
+
+/browser-tools/build/
+/browser-tools/dist/

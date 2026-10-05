@@ -1,10 +1,25 @@
 /* Read-only native rendering probe. Enabled only by the developer's launch environment. */
 (async () => {
+  await window.__TOUDI_DESKTOP_READY__;
+  // A background WKWebView can pause animations; capture the settled layout.
+  document.documentElement.dataset.renderDiagnostic = 'true';
   const target = window.__TOUDI_DIAG_VIEW__;
-  if (target && typeof switchView === 'function') {
-    const module = target === 'company' ? 'qbank' : target;
+  let filling = null;
+  if (target === 'filling' && typeof window.openFilling === 'function') {
+    await window.__TOUDI_DESKTOP_READY__;
+    await window.openFilling();
+    const summary = await (await fetch('/api/filling')).json();
+    const code = JSON.parse((await (await fetch('/api/filling/connect', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})).json()).connection);
+    const extension = await fetch('/api/filling/extension');
+    filling = {available:summary.available, sourceName:summary.sourceName, profiles:summary.profiles,
+      counts:summary.counts, codexAvailable:summary.codexAvailable, dialogOpen:document.querySelector('#fillingDialog')?.open,
+      connectionLoopback:new URL(code.url).hostname === '127.0.0.1', port:Number(new URL(code.url).port),
+      tokenLength:code.token.length, extensionStatus:extension.status, extensionBytes:(await extension.arrayBuffer()).byteLength};
+  } else if (target && typeof switchView === 'function') {
+    const module = target === 'company' ? 'qbank' : target === 'agent-settings' ? 'settings' : target;
     if (typeof ensureViewData === 'function') await ensureViewData(module);
     switchView(module);
+    if (target === 'agent-settings') switchSettingsTab('agent');
     if (target === 'company') switchPrepMode('company');
     await new Promise(resolve => setTimeout(resolve, 350));
   }
@@ -22,12 +37,29 @@
     scripting: typeof switchView === 'function',
     management: !!document.getElementById('managementEntry'),
     service: window.__TOUDI_SERVICE__?.mode || null,
+    filling, fillingDialog:box('#fillingDialog'), fillingBody:box('.filling-body'),
     sidebar: box('.sidebar'), main: box('.main'), topbar: box('.topbar'), table: box('#tableView'),
     managementLayout: box('.management-body'), settings: box('#settingsView'),
     theme: document.documentElement.dataset.theme,
     motion: document.documentElement.dataset.motion,
-    themeControl: document.querySelector('select[aria-label="主题"]')?.value || null,
-    motionControl: document.querySelector('select[aria-label="切换反馈"]')?.value || null,
+    themeControl: document.querySelector('#themeMenu [aria-checked="true"]')?.dataset.theme || null,
+    colorPalette: document.documentElement.dataset.palette,
+    paletteControl: document.querySelector('.settings-palettes button[aria-pressed="true"]')?.dataset.value || null,
+    settingsOpacity: getComputedStyle(document.querySelector('#settingsView')).opacity,
+    brandMatchesD: document.querySelector('.brand-symbol')?.src === "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgNjQgNjQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSI+PHRpdGxlIGlkPSJ0aXRsZSI+VG91RGkg5oqV6YCSPC90aXRsZT48cmVjdCB4PSI0IiB5PSI0IiB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHJ4PSIxNCIgZmlsbD0iIzMxNWY2NSIvPjxwYXRoIGQ9Ik0xNiAyMy41IDQ4IDE1IDM2LjUgNDggMjkgMzRaIiBmaWxsPSIjZjRmOGY2IiBzdHJva2U9IiNmNGY4ZjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yOSAzNCA0NyAxNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzE1ZjY1IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo=",
+    settingsStylesLoaded: !![...document.styleSheets].find(sheet => (sheet.href || '').endsWith('/assets/settings.css')),
+    motionControl: document.querySelector('.settings-segment[data-setting="motion"] button[aria-pressed="true"]')?.dataset.value || null,
+    settingsTabs: [...document.querySelectorAll('.settings-tabs [role="tab"]')].map(el => ({label:el.textContent, selected:el.getAttribute('aria-selected')})),
+    visibleSettingsPanels: [...document.querySelectorAll('.settings-panel')].filter(el => !el.hidden).map(el => el.id),
+    agentPrivacy: (() => {
+      const desktop = window.__TOUDI_DESKTOP__;
+      const text = document.getElementById('agentBootstrap')?.value || '';
+      const paths = desktop ? [desktop.workspace, desktop.agentTool, desktop.guideRoot].filter(Boolean) : [];
+      const local = typeof desktopAgentBootstrapText === 'function' ? desktopAgentBootstrapText(true) : '';
+      return {textPresent:!!text, genericOmitsDirectories:paths.every(path => !text.includes(path)),
+        explicitLocalCopyAvailable:!!document.querySelector('[onclick="copyAgentBootstrap(true)"]'),
+        localContractIncludesDirectories:paths.length === 3 && paths.every(path => local.includes(path))};
+    })(),
     rowCount: document.querySelectorAll('#tableBody tr').length,
     activeView: typeof view === 'string' ? view : null,
     counts: {

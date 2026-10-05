@@ -453,7 +453,7 @@ async function managementClearRemoteDraft() {
   await persistDrafts();
 }
 async function persistDrafts() {
-  if (!managementWritable()) return;
+  if (!managementWritable() || window.__TOUDI_DESKTOP__?.diagnostic) return;
   return enqueuePersist('drafts', () => ({
     legacyDrafts: listUnsavedDrafts(),
     management: JSON.parse(localStorage.getItem('toudiManagementDraft') || 'null'),
@@ -485,6 +485,7 @@ writeDraft = function (...args) {
 };
 const browserSaveWorkspace = saveWorkspace;
 saveWorkspace = async function () {
+  if (window.__TOUDI_DESKTOP__?.diagnostic) return;
   pageSize = Number(workspace.pageSize) || 50;
   localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
   applyWorkspace();
@@ -532,7 +533,7 @@ async function managementInit() {
       applyWorkspace();
       if (workspace.defaultView && workspace.defaultView !== view) switchView(workspace.defaultView);
       else if (view === 'settings') renderSettings();
-    } else if (localStorage.getItem(WORKSPACE_KEY)) {
+    } else if (!window.__TOUDI_DESKTOP__?.diagnostic && localStorage.getItem(WORKSPACE_KEY)) {
       await saveWorkspace();
     }
     const remote = await managementRequest('drafts');
@@ -563,11 +564,12 @@ const baseRenderSettings = renderSettings;
 renderSettings = function () {
   baseRenderSettings();
   document.querySelectorAll('#settingsView .settings-note').forEach(el => {
-    if (el.textContent.includes('仅保存在本浏览器')) el.textContent = managementWritable() ? '外观与阅读偏好保存到工作区；服务失败时保留本设备待提交草稿。' : '当前只读页面：显示偏好仅保存到本设备。';
+    if (el.textContent.includes('仅保存在本浏览器')) el.textContent = managementWritable() ? '外观与阅读偏好保存到工作区；保存失败时保留本设备草稿。' : '当前只读页面：显示偏好仅保存到本设备。';
   });
-  document.getElementById('settingsView').insertAdjacentHTML('beforeend', `<section class="settings-section"><h3>完整资料与恢复</h3><p class="settings-help">完整备份包含业务正文、配置和登记附件。恢复前先检查范围；服务会保留恢复前副本。</p><div class="settings-actions"><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="exportFullBackup()">下载完整备份</button><label class="btn">选择备份恢复<input type="file" accept=".zip" hidden ${managementWritable() ? '' : 'disabled'} onchange="previewBackup(event)"></label><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="openRecovery()">恢复删除与旧版本</button><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="resumeManagementDraft()">恢复管理草稿</button></div><div id="backupPreview"></div></section>`);
+  const dataPanel = document.getElementById('settings-panel-data');
+  dataPanel.querySelector('.settings-section').insertAdjacentHTML('beforeend', `<div class="setting-row"><div class="setting-label"><strong>完整工作区</strong><p>业务正文、配置及登记附件。恢复前先检查范围，并保留恢复前副本。</p></div><div class="setting-control"><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="exportFullBackup()">下载完整备份</button><label class="btn">选择备份恢复<input type="file" accept=".zip" hidden ${managementWritable() ? '' : 'disabled'} onchange="previewBackup(event)"></label></div></div><details class="settings-disclosure"><summary><span class="disclosure-title"><strong>恢复删除、旧版本与管理草稿</strong></span>${disclosureAction()}</summary><div class="settings-section"><p class="settings-help">先查看可恢复内容，再选择需要恢复的版本。</p><div class="settings-actions"><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="openRecovery()">恢复删除与旧版本</button><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="resumeManagementDraft()">恢复管理草稿</button></div></div></details><div id="backupPreview"></div>`);
   if (window.toudiDesktop) {
-    document.getElementById('settingsView').insertAdjacentHTML('beforeend', `<section class="settings-section"><h3>桌面资料与查阅</h3><p class="settings-help">资料保存在安装目录外。加密查阅版用于在其他设备阅读，导出后按部署文档发布。</p><div class="desktop-workspace-row"><p class="connection-path">当前工作区：${esc(window.__TOUDI_DESKTOP__.workspace)}</p><button class="btn" onclick="selectDesktopWorkspace()">使用已有工作区</button></div><div class="settings-actions"><button class="btn" onclick="openDesktopWorkspace()">打开资料目录</button><button class="btn" onclick="exportDesktopReading()">导出加密查阅版</button></div><div id="desktopReadingStatus" role="status"></div></section>`);
+    dataPanel.insertAdjacentHTML('afterbegin', `<section class="settings-section"><h3>桌面资料与查阅</h3><p class="settings-help">资料保存在安装目录外，加密查阅版用于其他设备阅读。</p><div class="setting-row"><div class="setting-label"><strong>当前工作区</strong><p>已连接个人资料目录。</p><details><summary>查看本机位置</summary><p class="connection-path">${esc(window.__TOUDI_DESKTOP__.workspace)}</p></details></div><div class="setting-control"><button class="btn" onclick="openDesktopWorkspace()">打开资料目录</button></div></div><div class="setting-row"><div class="setting-label"><strong>加密查阅版</strong><p>导出后按部署文档发布，在其他设备打开查阅。</p></div><div class="setting-control"><button class="btn" onclick="exportDesktopReading()">导出加密查阅版</button></div></div><details class="settings-disclosure"><summary><span class="disclosure-title"><strong>切换已有工作区</strong><small>使用另一份资料前先检查目录</small></span>${disclosureAction()}</summary><div class="settings-section"><p class="settings-help">选择已有资料目录，经过检查后重新绑定。</p><div class="settings-actions"><button class="btn" onclick="selectDesktopWorkspace()">使用已有工作区</button></div></div></details><div id="desktopReadingStatus" role="status"></div></section>`);
   }
 };
 async function openDesktopWorkspace() {
@@ -715,11 +717,13 @@ async function recoveryPreview(id) {
   };
 }
 const basicAgentBootstrap = agentBootstrapText;
-agentBootstrapText = function () {
+function desktopAgentBootstrapText(includeLocalPaths = false) {
   const desktop = window.__TOUDI_DESKTOP__;
   if (!desktop) return basicAgentBootstrap();
-  return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + desktop.workspace + '\n资料工具：' + desktop.agentTool + '\n流程文档目录：' + desktop.guideRoot + '\n\n先读取正式工作区已有的 AGENTS.md、投递数据/AGENTS.md 或信源流程说明（如有），保留现有标准流程和命令入口。然后读取文档目录下的 AGENTS.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
-};
+  const location = includeLocalPaths ? desktop : {workspace:'{用户指定的正式工作区}',agentTool:'{用户提供的资料工具}',guideRoot:'{随工具提供的通用流程文档目录}'};
+  return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + location.workspace + '\n资料工具：' + location.agentTool + '\n流程文档目录：' + location.guideRoot + '\n\n先读取正式工作区已有的 AGENTS.md、投递数据/AGENTS.md 或信源流程说明（如有），保留现有标准流程和命令入口。然后读取文档目录下的 AGENTS.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
+}
+agentBootstrapText = function () { return desktopAgentBootstrapText(); };
 if (window.__TOUDI_DESKTOP_READY__) {
   window.__TOUDI_DESKTOP_READY__.then(managementInit).catch(() => {});
 } else {
@@ -733,11 +737,11 @@ async function startWorkspaceContent(module, importing = false) {
     document.querySelector('#managementTools input[type=file]')?.click();
   }
 }
-copyAgentBootstrap = async function () {
-  const text = agentBootstrapText();
+copyAgentBootstrap = async function (includeLocalPaths = false) {
+  const text = includeLocalPaths === true ? desktopAgentBootstrapText(true) : agentBootstrapText();
   try {
     await navigator.clipboard.writeText(text);
-    showToast('接入说明已复制');
+    showToast(includeLocalPaths === true ? '本机接入说明已复制，包含当前目录' : '通用接入说明已复制');
   } catch (error) {
     const field = document.createElement('textarea');
     field.value = text;

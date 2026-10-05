@@ -31,6 +31,7 @@ struct Context {
     agent_tool: String,
     guide_root: String,
     version: String,
+    diagnostic: bool,
     error: Option<String>,
 }
 #[derive(Serialize)]
@@ -202,6 +203,7 @@ fn desktop_context(state: State<AppState>) -> Result<Context, String> {
         agent_tool: r.tool.to_string_lossy().into(),
         guide_root: guide_root.to_string_lossy().into(),
         version: env!("CARGO_PKG_VERSION").into(),
+        diagnostic: std::env::var_os("TOUDI_RENDER_REPORT").is_some(),
         error: r.error.clone(),
     })
 }
@@ -444,7 +446,7 @@ fn main() {
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_secs(2));
                     if let Ok(view) = std::env::var("TOUDI_RENDER_VIEW") {
-                        if ["table","kanban","charts","qbank","company","prospect","review","settings"].contains(&view.as_str()) {
+                        if ["table","kanban","charts","qbank","company","prospect","review","settings","agent-settings","filling"].contains(&view.as_str()) {
                             let _ = webview.eval(format!("window.__TOUDI_DIAG_VIEW__ = '{view}';"));
                         }
                     }

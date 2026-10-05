@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TouDi · 填报资料与设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+<header class="page-header">
+  <div class="brand"><img src="logo.svg" width="32" height="32" alt=""><div><strong>TouDi · 填报资料</strong><small>浏览器中的个人资料库</small></div></div>
+  <div class="buttons"><label class="button primary" for="importFile" tabindex="0" role="button">导入／更新资料包</label><input id="importFile" type="file" accept=".json,application/json" hidden><button id="export" disabled>导出备份</button></div>
+</header>
+<main>
+  <div class="intro"><h1>填报资料与设置</h1><p>核对资料口径，再回到招聘网页填写。</p></div>
+  <p id="notice" role="status" hidden></p>
+  <nav class="settings-tabs" role="tablist" aria-label="填报设置分类">
+    <button id="tab-profile" role="tab" aria-controls="panel-profile" aria-selected="true" tabindex="0" data-tab="profile">个人资料</button>
+    <button id="tab-rules" role="tab" aria-controls="panel-rules" aria-selected="false" tabindex="-1" data-tab="rules">填写要求</button>
+    <button id="tab-luna" role="tab" aria-controls="panel-luna" aria-selected="false" tabindex="-1" data-tab="luna">Luna 协作</button>
+    <button id="tab-data" role="tab" aria-controls="panel-data" aria-selected="false" tabindex="-1" data-tab="data">资料管理</button>
+  </nav>
+  <section id="panel-profile" class="settings-panel library" role="tabpanel" aria-labelledby="tab-profile">
+    <div class="section-title"><h2>已确认资料</h2><button id="addFact" class="primary" disabled>添加字段</button></div>
+    <div class="toolbar">
+      <div class="profile-control"><span id="profileLabel">查看口径</span><div class="profile-segment" role="group" aria-labelledby="profileLabel">
+        <button data-profile="general" aria-pressed="true">个人与教育通用</button><button data-profile="state" aria-pressed="false">央国企／专业口径</button><button data-profile="ai-product" aria-pressed="false">AI 产品口径</button>
+      </div></div>
+      <select id="profile" hidden aria-hidden="true" tabindex="-1"><option value="general">个人与教育通用</option><option value="state">央国企／专业口径</option><option value="ai-product">AI 产品口径</option></select>
+      <div class="search-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="搜索字段或经历" aria-label="搜索资料"></div>
+    </div>
+    <p id="factCount" class="result-count"></p>
+    <div id="facts"><div class="empty"><strong>尚未保存资料</strong><p>导入私人资料包，或点击「添加字段」手动建立资料。</p></div></div>
+  </section>
+  <section id="panel-rules" class="settings-panel" role="tabpanel" aria-labelledby="tab-rules" hidden>
+    <div class="section-title"><h2>填写要求</h2><button id="editRules" disabled>编辑填写规则</button></div>
+    <p class="section-intro">保留每次填报需要遵循的资料口径和个人要求。</p>
+    <div id="rules"><p>尚未保存额外填写要求。</p></div>
+    <p class="hint section-note">日期精度、经历归属、选项和长度由表单引擎检查；新增的自然语言规则需要在填写计划中人工核对。</p>
+  </section>
+  <section id="panel-luna" class="settings-panel" role="tabpanel" aria-labelledby="tab-luna" hidden>
+    <h2>Luna 协作</h2><p class="section-intro">用现有 Codex 额度核对有歧义的字段，明确字段继续由本地规则处理。</p>
+    <div class="setting-row"><div><strong>自动核对歧义</strong><p>识别网页后，自动检查需要进一步判断的字段。</p></div><label class="switch"><input id="autoLuna" type="checkbox" role="switch" aria-label="识别后自动核对歧义"><span aria-hidden="true"></span></label></div>
+    <div class="setting-row"><div><strong>本机 Codex 连接</strong><p id="codexStatus">基本识别与填写可独立使用。</p></div><button id="checkCodex">检查连接</button></div>
+    <p class="hint section-note">固定使用 GPT-6 Luna 和现有 ChatGPT 登录。仅发送字段说明与候选资料键，具体填写值留在本机。</p>
+    <details class="disclosure"><summary><span>首次启用与费用</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><ol><li>运行下载包中的「TouDi 浏览器连接」安装程序一次。</li><li>保持官方 Codex 客户端已安装，并使用 ChatGPT 登录。</li><li>点击上方「检查连接」。检查成功后即可在插件中核对。</li></ol><p>连接工具由 Chrome 按需启动，日常无需打开 TouDi App 或终端。本地功能不收费，不需要 API Key；模型核对消耗现有 Codex 额度。额度不足时保留本地计划，不替换模型。</p></div></details>
+  </section>
+  <section id="panel-data" class="settings-panel" role="tabpanel" aria-labelledby="tab-data" hidden>
+    <h2>资料管理</h2><p class="section-intro">资料保存在当前 Chrome 的扩展本地存储中。</p>
+    <div id="source"><p>尚未保存资料。</p></div>
+    <p class="hint section-note">Agent 更新原始资料后，再导入新版以更新插件副本。卸载插件前请导出备份。</p>
+    <div class="subsection"><h3>最近核验</h3><div id="lastReport"><p>尚无核验记录。</p></div></div>
+    <details class="disclosure"><summary><span>清除本地资料</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><p>先导出备份。清除只影响这个浏览器中的插件副本。</p><button id="deleteProfile" class="danger" disabled>清除资料、匹配和核验记录</button></div></details>
+  </section>
+</main>
+<dialog id="editor" aria-labelledby="editorTitle">
+  <form id="editForm">
+    <div class="dialog-head"><div class="section-title"><h2 id="editorTitle">编辑资料</h2><button type="button" id="closeEditor" aria-label="关闭资料编辑">关闭</button></div><p id="editorError" role="alert" hidden></p></div>
+    <div class="dialog-body">
+      <input id="factKey" type="hidden">
+      <div class="form-section"><h3>基本资料</h3><div class="pair"><div><label for="factLabel">字段名称</label><input id="factLabel" required maxlength="200"></div><div><label for="factModule">资料模块</label><select id="factModule"><option value="personal">个人信息</option><option value="education">教育经历</option><option value="internship">实习／工作</option><option value="project">项目经历</option><option value="language">语言能力</option></select></div></div><label for="factValue">已确认内容</label><textarea id="factValue" rows="4" required maxlength="24000"></textarea></div>
+      <div class="form-section"><h3>经历归属</h3><p class="hint">同一段经历使用相同标识。教育、实习与项目资料需填写标识和名称；个人资料可以留空。</p><div class="pair"><div><label for="recordId">经历标识</label><input id="recordId" placeholder="例如：education.master"></div><div><label for="recordLabel">经历名称</label><input id="recordLabel" placeholder="例如：硕士、某段实习"></div></div><label for="recordHint">经历区分提示</label><input id="recordHint" placeholder="教育层级、单位或项目名称"></div>
+      <details id="matchingOptions" class="disclosure"><summary><span>匹配与填写约束</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><label for="factAliases">字段别名（每行一个）</label><textarea id="factAliases" rows="3"></textarea><fieldset><legend>适用简历口径</legend><div class="profile-checks"><label class="check"><input type="checkbox" name="factProfiles" value="general">个人与教育通用</label><label class="check"><input type="checkbox" name="factProfiles" value="state">央国企／专业口径</label><label class="check"><input type="checkbox" name="factProfiles" value="ai-product">AI 产品口径</label></div></fieldset><div class="pair"><div><label for="factPrecision">日期精度</label><select id="factPrecision"><option value="">非日期／按内容识别</option><option value="month">精确到月</option><option value="day">精确到日</option></select></div><div><label for="gpaScale">GPA 满分（如适用）</label><select id="gpaScale"><option value="">未知／不适用</option><option value="4.0">4.0</option><option value="5.0">5.0</option></select></div></div><div class="constraint-checks"><input id="factSensitive" type="checkbox" hidden><label class="check"><input id="factManual" type="checkbox">仅供人工确认</label></div></div></details>
+    </div>
+    <div class="dialog-actions"><button type="button" id="removeFact" class="danger">删除此字段</button><button type="submit" class="primary">保存资料</button></div>
+  </form>
+</dialog>
+<dialog id="rulesEditor" aria-labelledby="rulesTitle"><form id="rulesForm"><div class="dialog-head"><div class="section-title"><h2 id="rulesTitle">编辑填写规则</h2><button type="button" id="closeRules">取消</button></div></div><div class="dialog-body"><p>一行一条。程序检查之外的要求，需要在填写计划中人工核对。</p><label for="rulesText">填写规则</label><textarea id="rulesText" rows="12"></textarea></div><div class="dialog-actions"><button type="submit" class="primary">保存规则</button></div></form></dialog>
+<script src="options.js"></script>
+</body></html>

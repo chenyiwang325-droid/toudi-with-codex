@@ -1,22 +1,24 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TouDi",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "identifier": "io.github.chenyiwang325-droid.toudi",
   "build": {
     "frontendDist": "../ui"
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [{
-      "label": "main",
-      "title": "TouDi · 投递中控台",
-      "width": 1360,
-      "height": 880,
-      "minWidth": 860,
-      "minHeight": 600,
-      "backgroundColor": "#f4f6f7"
-    }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "TouDi · 投递中控台",
+        "width": 1360,
+        "height": 880,
+        "minWidth": 860,
+        "minHeight": 600,
+        "backgroundColor": "#f4f6f7"
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; script-src-attr 'unsafe-inline'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob: ipc: http://ipc.localhost; frame-src 'self' blob:; object-src 'none'; base-uri 'self'"
     }
@@ -27,15 +29,27 @@
     "category": "Productivity",
     "shortDescription": "个人投递与 Agent 协作工作台",
     "longDescription": "投递记录、准备、探查和复盘，沿用同一份本机资料，支持手动维护与自己的 Agent 协作。",
-    "resources": ["runtime/"],
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "resources": [
+      "runtime/"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "macOS": {
       "minimumSystemVersion": "12.0",
       "signingIdentity": "-"
     },
     "windows": {
-      "nsis": {"installMode": "currentUser"},
-      "webviewInstallMode": {"type": "downloadBootstrapper"}
+      "nsis": {
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
     }
   }
 }

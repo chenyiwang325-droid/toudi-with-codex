@@ -62,6 +62,6 @@
       for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
       return invoke('save_file', {name, contentBase64: btoa(chunks.join(''))});
     },
-    get version() {return window.__TOUDI_DESKTOP__?.version || '0.3.0';}
+    get version() {return window.__TOUDI_DESKTOP__?.version || '0.3.1';}
   };
 })();

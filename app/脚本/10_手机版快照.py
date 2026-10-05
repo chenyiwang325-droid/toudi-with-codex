@@ -60,8 +60,12 @@ def read_json(path, default):
 def build_payload(resources=None):
     """中控台 HTML + 种子数据脚本 → 明文快照。"""
     html = open(HTML_FILE, encoding='utf-8').read()
+    settings_style = Path(HTML_FILE).parent / 'assets' / 'settings.css'
+    html = html.replace('<link rel="stylesheet" href="/assets/settings.css">', '<style>' + settings_style.read_text(encoding='utf-8') + '</style>')
     management = Path(HTML_FILE).parent / 'assets' / 'workbench.js'
     html = html.replace('<script src="/assets/workbench.js"></script>', '<script>' + management.read_text(encoding='utf-8').replace('</script', '<\\/script') + '</script>')
+    # Assisted filling uses the local fact source, never the encrypted reading snapshot.
+    html = html.replace('<link rel="stylesheet" href="/assets/filling.css">', '').replace('<script src="/assets/filling.js"></script>', '')
     icon = (Path(HTML_FILE).parent / 'assets' / 'favicon.svg').read_bytes()
     html = html.replace('href="/assets/favicon.svg"', 'href="data:image/svg+xml;base64,' + base64.b64encode(icon).decode() + '"')
     rows = read_json(os.path.join(DATA_DIR, '投递记录.json'), [])

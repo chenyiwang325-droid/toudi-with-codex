@@ -6,6 +6,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_JSON = {
+    'app/browser-extension/manifest.json',
     'desktop/package.json',
     'desktop/package-lock.json',
     'desktop/src-tauri/tauri.conf.json',
@@ -15,7 +16,7 @@ GENERATED_PARTS = {'runtime', '.venv', 'venv', '__pycache__', 'node_modules', '.
 GENERATED_ROOTS = ('desktop/build/', 'desktop/dist/', 'desktop/src-tauri/target/',
                    'desktop/src-tauri/icons/', 'desktop/src-tauri/gen/', 'desktop/ui/assets/',
                    'diagnostics/', 'backups/')
-TEXT_SUFFIXES = {'.py', '.html', '.md', '.svg', '.yml', '.yaml', '.txt', '.js', '.rs', '.toml', '.json'}
+TEXT_SUFFIXES = {'.py', '.html', '.md', '.svg', '.yml', '.yaml', '.txt', '.js', '.css', '.rs', '.toml', '.json'}
 errors = []
 # Union includes new source files awaiting staging and deduplicates staged files.
 result = subprocess.run(['git', '-C', str(ROOT), 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
@@ -44,7 +45,8 @@ for name in names:
     text = path.read_text(encoding='utf-8')
     if path.suffix == '.py':
         ast.parse(text, filename=name)
-    for pattern in [r'/' + r'Users/', r'https?://[^\s"<>]+\.' + r'feishu\.cn', r'toudi-' + r'zhongkong',
+    for pattern in [r'/' + r'(?:Users|home)/[^/\s"<>]+/', r'[A-Za-z]:[\\/]Users[\\/][^\\/\s"<>]+[\\/]',
+                    r'https?://[^\s"<>]+\.' + r'(?:feishu\.cn|larksuite\.com)', r'toudi-' + r'zhongkong',
                     r'(?i)(?:api_token|secret|password|agent_token|api_key)\s*[:=]\s*[\"\'][A-Za-z0-9_-]{20,}',
                     r'-----BEGIN ' + r'(?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
                     r'gh[pousr]_' + r'[A-Za-z0-9]{30,}']:
@@ -60,6 +62,11 @@ for name in names:
 html = (ROOT / 'app/投递管理.html').read_text(encoding='utf-8')
 if 'const RAW_DATA = [];' not in html:
     errors.append('template RAW_DATA not empty')
+pref = re.search(r'const DEFAULT_PREF\s*=\s*\{(.*?)\};', html, re.S)
+for field in ('natures', 'industries', 'education'):
+    selected = re.search(field+r'\s*:\s*\[([^\]]*)\]', pref.group(1)) if pref else None
+    if not selected or selected.group(1).strip():
+        errors.append('template must not preset personal preference: '+field)
 if errors:
     raise SystemExit('\n'.join(errors))
 print(f'PASS {len(names)} Git source files: structure, empty template, private-pattern scan and internal links')

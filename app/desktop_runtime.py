@@ -6,7 +6,7 @@ import sys
 import threading
 from pathlib import Path
 
-APP_VERSION = '0.3.0'
+APP_VERSION = '0.3.1'
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / '脚本')]
 
@@ -49,8 +49,26 @@ def serve():
     os.environ['TOUDI_PORT'] = '0'
     import server
     from http.server import ThreadingHTTPServer
-    listener = ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
+    # Reuse this workspace's last loopback port so a normal App restart keeps the
+    # extension connection. If another process owns it, choose a fresh free port.
+    from filling_service import _write_private
+    endpoint = Path(os.environ['TOUDI_WORKSPACE'])/'填报资料/.desktop-endpoint.json'
+    preferred = 0
+    try:
+        if not endpoint.is_symlink() and endpoint.is_file():
+            saved = json.loads(endpoint.read_text(encoding='utf-8'))
+            candidate = saved.get('port')
+            if type(candidate) is int and 1024 <= candidate <= 65535: preferred = candidate
+    except (OSError, ValueError, TypeError):
+        pass
+    try: listener = ThreadingHTTPServer(('127.0.0.1', preferred), server.Handler)
+    except OSError:
+        if not preferred: raise
+        listener = ThreadingHTTPServer(('127.0.0.1', 0), server.Handler)
     server.PORT = listener.server_address[1]
+    _write_private(endpoint, {'port':server.PORT})
+    from chrome_connection import refresh_registration
+    refresh_registration()
     listener.timeout = 1
     print(json.dumps({'event': 'ready', 'port': server.PORT, 'version': APP_VERSION}), flush=True)
     stopped = threading.Event()
@@ -123,6 +141,12 @@ def main(argv=None):
         if hasattr(stream, 'reconfigure'):
             stream.reconfigure(encoding='utf-8')
     args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0].startswith('chrome-extension://'):
+        from chrome_connection import serve as chrome_serve
+        return chrome_serve(args[0])
+    if args and args[0] == 'filling':
+        from filling_cli import main as filling_main
+        return filling_main(args[1:])
     if args and args[0] == 'workspace':
         from workspace_link import main as workspace_main
         return workspace_main(args[1:])

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TouDi · 投递中控台</title>
 <script>
-(function(){try{const w=JSON.parse(localStorage.getItem('toudiPublicWorkspace_v1')||'{}'),t=w.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;document.documentElement.dataset.motion=w.motion==='off'?'off':'on';}catch(e){document.documentElement.dataset.theme='light';}})();
+(function(){try{const w=JSON.parse(localStorage.getItem('toudiPublicWorkspace_v1')||'{}'),t=w.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;document.documentElement.dataset.motion=w.motion==='off'?'off':'on';document.documentElement.dataset.palette=['teal','ink','forest','clay','graphite'].includes(w.colorPalette)?w.colorPalette:'teal';}catch(e){document.documentElement.dataset.theme='light';document.documentElement.dataset.palette='teal';}})();
 </script>
 <style>:root { --primary: #386a70; --primary-hover: #2d565b; --primary-light: #e1eeec; --primary-faint: #f0f6f5; --success: #477a62; --success-light: #edf4ef; --danger: #a45750; --danger-light: #fbefed; --warning: #9a743d; --warning-light: #faf5e9; --info: #557a8d; --info-light: #edf3f6; --purple: #6b7586; --purple-light: #f0f2f6; --bg: #f4f6f7; --card: #ffffff; --border: #d5dfe2; --border-light: #eaf0f2; --text: #243338; --text2: #4a5c62; --text3: #62767c; --muted: var(--text3); --text-secondary: var(--text2); --sb-bg: var(--card); --sb-bg2: var(--bg); --sb-border: var(--border); --sb-text: var(--text2); --sb-text-hover: var(--text); --sb-active: var(--primary-faint); --sb-active-text: var(--primary); --st-0: var(--text2); --st-bg-0: var(--bg); --st-1: var(--text2); --st-bg-1: var(--bg); --st-2: var(--text2); --st-bg-2: var(--bg); --st-3: var(--text2); --st-bg-3: var(--bg); --st-4: var(--text2); --st-bg-4: var(--bg); --st-5: var(--text2); --st-bg-5: var(--bg); --st-6: var(--text2); --st-bg-6: var(--bg); --radius: 8px; --radius-sm: 5px; --shadow: none; --shadow-md: 0 3px 12px rgba(36,51,56,.07); --shadow-lg: 0 12px 32px rgba(36,51,56,.14); --sidebar-width: 236px; --row-alt: #f8fafb; --row-hover: #edf1f2; --row-star: #faf9f3; --on-primary: #ffffff; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -899,13 +899,14 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
  .reader-module .rv-tabs .rv-tab { flex:1 0 70px; }
 }
 </style>
+<link rel="stylesheet" href="/assets/settings.css">
 </head>
 <body>
 
 <div class="app">
   <div class="sidebar" id="sidebar">
     <div class="sb-header">
-      <h1><img class="brand-symbol" width="24" height="24" alt="TouDi" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzQxNmE3MCIvPjxnIGZpbGw9IiNmZmYiPjxyZWN0IHg9IjgiIHk9IjgiIHdpZHRoPSIxNiIgaGVpZ2h0PSIzIiByeD0iMSIvPjxyZWN0IHg9IjgiIHk9IjEzIiB3aWR0aD0iMyIgaGVpZ2h0PSIxMSIgcng9IjEiLz48cmVjdCB4PSIxNCIgeT0iMTQiIHdpZHRoPSIxMCIgaGVpZ2h0PSIzIiByeD0iMSIvPjxyZWN0IHg9IjE0IiB5PSIyMSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjMiIHJ4PSIxIi8+PC9nPjwvc3ZnPg=="> 投递中控台</h1>
+      <h1><img class="brand-symbol" width="24" height="24" alt="TouDi" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgNjQgNjQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSI+PHRpdGxlIGlkPSJ0aXRsZSI+VG91RGkg5oqV6YCSPC90aXRsZT48cmVjdCB4PSI0IiB5PSI0IiB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHJ4PSIxNCIgZmlsbD0iIzMxNWY2NSIvPjxwYXRoIGQ9Ik0xNiAyMy41IDQ4IDE1IDM2LjUgNDggMjkgMzRaIiBmaWxsPSIjZjRmOGY2IiBzdHJva2U9IiNmNGY4ZjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yOSAzNCA0NyAxNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzE1ZjY1IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo="> 投递中控台</h1>
       <div class="sub" id="dataDate">个人工作台</div>
       <button class="sb-fold" onclick="toggleSbCollapse()" title="收起侧栏">‹</button>
     </div>
@@ -1094,13 +1095,14 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
 
 <div id="prefModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePrefModal()">
   <div class="modal pref-dialog" role="dialog" aria-modal="true" aria-labelledby="prefDialogTitle">
-    <div class="pref-dialog-head"><h2 id="prefDialogTitle"><span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> "适合我"偏好设置</h2><button id="prefClose" class="btn btn-sm" aria-label="关闭偏好设置" onclick="closePrefModal()">关闭</button></div><div class="pref-tabs" role="tablist" aria-label="偏好分类"><button id="prefTab-natures" role="tab" aria-controls="prefPanel-natures" onclick="switchPrefTab('natures')">企业性质</button><button id="prefTab-industries" role="tab" aria-controls="prefPanel-industries" onclick="switchPrefTab('industries')">行业方向</button><button id="prefTab-education" role="tab" aria-controls="prefPanel-education" onclick="switchPrefTab('education')">学历要求</button></div><div class="pref-dialog-body">
+    <div class="pref-dialog-head"><div><h2 id="prefDialogTitle">求职偏好</h2><p>用于“符合偏好”快捷视图。</p></div><button id="prefClose" class="btn btn-sm" aria-label="关闭偏好设置" onclick="closePrefModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>关闭</button></div>
+    <div class="pref-tabs" role="tablist" aria-label="偏好分类"><button id="prefTab-natures" role="tab" aria-controls="prefPanel-natures" onclick="switchPrefTab('natures')">企业性质</button><button id="prefTab-industries" role="tab" aria-controls="prefPanel-industries" onclick="switchPrefTab('industries')">行业方向</button><button id="prefTab-education" role="tab" aria-controls="prefPanel-education" onclick="switchPrefTab('education')">学历要求</button></div><div class="pref-dialog-body">
     <section class="pref-section" id="prefPanel-natures" role="tabpanel" aria-labelledby="prefTab-natures"><h4>企业性质</h4><p class="pref-help">企业性质或行业方向满足一项，并符合学历要求，即可进入“适合我”。</p><div class="pref-options" id="prefNatures"></div></section>
-    <section class="pref-section" id="prefPanel-industries" role="tabpanel" aria-labelledby="prefTab-industries"><h4>行业方向</h4><p class="pref-help">先展开大类，再选择具体方向；可以搜索行业名称。</p><div class="pref-options" id="prefIndustries"></div></section>
+    <section class="pref-section" id="prefPanel-industries" role="tabpanel" aria-labelledby="prefTab-industries"><h4>行业方向</h4><p class="pref-help">先展开大类，再选择具体方向。</p><div class="pref-options" id="prefIndustries"></div></section>
     <section class="pref-section" id="prefPanel-education" role="tabpanel" aria-labelledby="prefTab-education"><h4>学历要求</h4><p class="pref-help">选择希望保留的招聘门槛。未注明学历的记录仍会保留；具体资格以招聘公告为准。</p><div class="pref-options" id="prefEducation"></div></section>
     </div><div class="modal-actions">
-      <span class="pref-save-hint">保存后应用于“适合我”</span><button class="btn" onclick="closePrefModal()">取消</button>
-      <button class="btn btn-primary" onclick="savePref()">保存</button>
+      <span class="pref-save-hint">保存后应用于“符合偏好”</span><button class="btn" onclick="closePrefModal()">取消</button>
+      <button class="btn btn-primary" onclick="savePref()">保存偏好</button>
     </div>
   </div>
 </div>
@@ -1159,6 +1161,7 @@ const DEFAULT_PREF = {
 
 // ============== STATE ==============
 let data = [], userEdits = {}, filters = {}, preferences = {...DEFAULT_PREF};
+const PAGE_SIZES = [20,25,50,100,200];
 let searchQuery = '', sortField = '', sortAsc = true, currentPage = 1, pageSize = 50;
 let currentNoteIdx = -1, view = 'table', currentQV = 'all';
 let selected = new Set();
@@ -1408,9 +1411,9 @@ function switchQV(id) {
 
 // ============== PREFERENCES ==============
 let prefReturnFocus=null;
-function openPrefModal() {
+function openPrefModal(tab='natures') {
   prefReturnFocus=document.activeElement;
-  renderNaturePreferences();renderIndustryPreferences();renderEducationPreferences();switchPrefTab('natures');
+  renderNaturePreferences();renderIndustryPreferences();renderEducationPreferences();switchPrefTab(['natures','industries','education'].includes(tab)?tab:'natures');
   document.getElementById('prefModal').style.display = 'flex';
   document.querySelector('#prefModal .pref-dialog-body').scrollTop=0;
   document.getElementById('prefClose').focus({preventScroll:true});
@@ -1693,7 +1696,7 @@ function renderPagination(total, totalPages) {
   pages.forEach(p=>{html+=`<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;});
   if(pages[pages.length-1]<totalPages){if(pages[pages.length-1]<totalPages-1)html+='<span class="page-info">…</span>';html+=`<button class="page-btn" onclick="goPage(${totalPages})">${totalPages}</button>`;}
   html+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${total===0||currentPage>=totalPages?'disabled':''}>›</button><button class="page-btn" onclick="goPage(${totalPages})" ${total===0||currentPage>=totalPages?'disabled':''}>»</button>`;
-  html+=`<span class="page-info">每页</span><select class="page-size-select" onchange="pageSize=+this.value;workspace.pageSize=pageSize;saveWorkspace();currentPage=1;render()">${[20,50,100,200].map(s=>`<option value="${s}" ${s===pageSize?'selected':''}>${s}</option>`).join('')}</select>`;
+  html+=`<span class="page-info">每页</span><select class="page-size-select" aria-label="每页记录数量" onchange="pageSize=+this.value;workspace.pageSize=pageSize;saveWorkspace();currentPage=1;render()">${PAGE_SIZES.map(s=>`<option value="${s}" ${s===pageSize?'selected':''}>${s}</option>`).join('')}</select>`;
   el.innerHTML = html;
 }
 
@@ -3025,7 +3028,8 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
 // 工作区配置独立于业务数据；仅本浏览器保存，可导出迁移。
 const WORKSPACE_KEY='toudiPublicWorkspace_v1';
-const WORKSPACE_DEFAULT={theme:'system',motion:'on',density:'standard',pageSize:50,defaultView:'table',columnSchema:2,columns:COLUMNS.map(c=>c.key),savedViews:[],agents:{}};
+const COLOR_PALETTES=[['teal','青灰','#386a70'],['ink','墨蓝','#3d5777'],['forest','松绿','#4b6859'],['clay','陶土','#965c47'],['graphite','石墨','#535d66']];
+const WORKSPACE_DEFAULT={theme:'system',colorPalette:'teal',motion:'on',density:'standard',pageSize:50,defaultView:'table',columnSchema:2,columns:COLUMNS.map(c=>c.key),savedViews:[],agents:{}};
 let workspace={...WORKSPACE_DEFAULT};
 try{const saved=JSON.parse(localStorage.getItem(WORKSPACE_KEY)||'{}');workspace={...WORKSPACE_DEFAULT,...saved};if(saved.columnSchema!==2){workspace.columns=COLUMNS.map(c=>c.key);workspace.columnSchema=2;delete workspace.hiddenColumns;localStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));}}catch(e){}
 const WORKFLOWS=[]; // Agent workflows are documented in docs/流程协作.md.
@@ -3054,7 +3058,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElement
 async function saveCurrentView(){const name=await requestTextInput('保存当前筛选视图','视图名称');if(!name)return;workspace.savedViews.push({id:Date.now().toString(),name:name.trim(),qv:currentQV,filters:JSON.parse(JSON.stringify(filters)),query:searchQuery,sortField,sortAsc});saveWorkspace();renderQuickViews();}
 function restoreSavedView(id){const s=workspace.savedViews.find(x=>x.id===id);if(!s)return;currentQV=s.qv;filters=JSON.parse(JSON.stringify(s.filters));searchQuery=s.query;sortField=s.sortField;sortAsc=s.sortAsc;document.getElementById('searchInput').value=searchQuery;currentPage=1;selected.clear();switchView('table');render();}
 function exportWorkspace(){downloadBlob(new Blob([JSON.stringify({format:'toudi-workspace',version:1,workspace},null,2)],{type:'application/json'}),'中控台工作区配置.json');}
-function importWorkspace(event){const f=event.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{const p=JSON.parse(reader.result);if(p.format!=='toudi-workspace'||p.version!==1||!isPlainObject(p.workspace))throw Error('配置格式不匹配');const w=p.workspace;if(!['standard','compact'].includes(w.density)||![20,25,50,100,200].includes(w.pageSize)||!['table','kanban','charts','qbank','prospect','review'].includes(w.defaultView)||!Array.isArray(w.columns)||w.columns.some(k=>!COLUMNS.some(c=>c.key===k))||!Array.isArray(w.savedViews)||!isPlainObject(w.agents))throw Error('配置字段无效');if(w.savedViews.some(s=>!isPlainObject(s)||typeof s.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(s.id)||typeof s.name!=='string'||!QUICK_VIEWS.some(q=>q.id===s.qv)||!isPlainObject(s.filters)||Object.values(s.filters).some(v=>!Array.isArray(v)||v.some(x=>typeof x!=='string'))||typeof s.query!=='string'))throw Error('保存视图无效');workspace={...WORKSPACE_DEFAULT,...w};saveWorkspace();renderSettings();render();}catch(e){showToast('导入失败：'+e.message);}};reader.readAsText(f);event.target.value='';}
+function importWorkspace(event){const f=event.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{const p=JSON.parse(reader.result);if(p.format!=='toudi-workspace'||p.version!==1||!isPlainObject(p.workspace))throw Error('配置格式不匹配');const w=p.workspace;if((w.colorPalette!==undefined&&!COLOR_PALETTES.some(([key])=>key===w.colorPalette))||!['standard','compact'].includes(w.density)||!PAGE_SIZES.includes(w.pageSize)||!['table','kanban','charts','qbank','prospect','review'].includes(w.defaultView)||!Array.isArray(w.columns)||w.columns.some(k=>!COLUMNS.some(c=>c.key===k))||!Array.isArray(w.savedViews)||!isPlainObject(w.agents))throw Error('配置字段无效');if(w.savedViews.some(s=>!isPlainObject(s)||typeof s.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(s.id)||typeof s.name!=='string'||!QUICK_VIEWS.some(q=>q.id===s.qv)||!isPlainObject(s.filters)||Object.values(s.filters).some(v=>!Array.isArray(v)||v.some(x=>typeof x!=='string'))||typeof s.query!=='string'))throw Error('保存视图无效');workspace={...WORKSPACE_DEFAULT,...w};saveWorkspace();renderSettings();render();}catch(e){showToast('导入失败：'+e.message);}};reader.readAsText(f);event.target.value='';}
 function handoffText(id){const f=WORKFLOWS.find(x=>x.id===id),a=workspace.agents[id]||{};return `请执行「${f.name}」。\n负责 Agent：${a.name||'由我指定'}\n入口：${a.entry||'当前协作环境'}\n本次对象与范围：${document.getElementById('handoffScope')?.value.trim()||'待填写'}\n输入：${f.input}\n先读取规则入口：${f.rule}\n输出：${f.output}\n验收：${f.check}\n失败恢复：${f.recover}\n工作约定：${a.notes||'按本次明确范围执行，保留用户修改和无关记录。'}\n不要自动扩展到其他流程；按当前项目规则判断已授权的连续收尾步骤。`;}
 let generatedHandoff=null;
 function handoffSignature(id){const scope=document.getElementById('handoffScope')?.value.trim()||'';const fields=['agent_','entry_','notes_'].map(prefix=>document.getElementById(prefix+id)?.value.trim()||'');return JSON.stringify([scope,...fields]);}
@@ -3094,6 +3098,7 @@ function initWorkspaceUI(){
  side.querySelector('.sb-footer .btn-group').remove();
  document.querySelector('.content').insertAdjacentHTML('beforeend','<div id="settingsView" style="display:none"></div>');
  document.body.insertAdjacentHTML('beforeend','<div id="filterModal" class="modal-overlay workspace-filter-modal" style="display:none" onclick="if(event.target===this)closeFilters()"><div class="filter-dialog"><div class="filter-dialog-head"><h2>筛选投递记录</h2><button class="btn" onclick="closeFilters()">完成</button></div><p>在当前快捷视图内筛选，勾选后立即生效。</p><div id="filterDialogBody"></div></div></div>');document.getElementById('filterDialogBody').append(search,document.getElementById('filterPanel'));document.querySelector('#filterModal .filter-dialog').insertAdjacentHTML('beforeend','<div class="filter-dialog-actions"><button class="btn btn-sm" onclick="clearAdditional()">清除附加条件</button><button class="btn btn-sm" onclick="resetFilters()">重置全部</button><button class="btn btn-sm" onclick="saveCurrentView()">保存视图</button></div>');
+ document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend',`<div class="theme-toolbar"><div class="theme-quick-control"><button id="themeQuickToggle" type="button" onclick="toggleThemeQuick()" aria-label="切换主题"></button><button id="themeMenuButton" type="button" aria-label="选择主题模式" aria-haspopup="menu" aria-controls="themeMenu" aria-expanded="false" onclick="toggleThemeMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></button></div><div id="themeMenu" role="menu" aria-label="主题模式" hidden>${[['system','跟随系统'],['light','浅色'],['dark','深色']].map(([key,label])=>`<button type="button" role="menuitemradio" data-theme="${key}" aria-checked="false" onclick="chooseTheme('${key}')"><span>${label}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button>`).join('')}</div></div>`);
  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend','<button id="settingsShortcut" class="btn btn-sm" onclick="switchView(\'settings\')">设置</button>');
  document.querySelector('.topbar-tools button[disabled]').remove();document.querySelector('.topbar-tools').style.display='none';
  QUICK_VIEWS.find(q=>q.id==='recommended').label='符合偏好';
@@ -3115,10 +3120,43 @@ function ensureViewData(target,force=false){
   if(!serverMode&&!window.__SNAPSHOT__){if(target==='qbank'){loadQbankCache();loadPrepsCache();}if(target==='review')loadReviewsCache();if(target==='prospect')loadProspectsCache();return Promise.resolve();}
   const task=load();moduleDataLoads.set(target,task);return task;
 }
-function applyTheme(){const chosen=['light','dark','system'].includes(workspace.theme)?workspace.theme:'system';document.documentElement.dataset.theme=chosen==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):chosen;document.documentElement.dataset.motion=workspace.motion==='off'?'off':'on';}
+function applyTheme(){
+  const chosen=['light','dark','system'].includes(workspace.theme)?workspace.theme:'system';
+  document.documentElement.dataset.theme=chosen==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):chosen;
+  document.documentElement.dataset.palette=COLOR_PALETTES.some(([key])=>key===workspace.colorPalette)?workspace.colorPalette:'teal';
+  document.documentElement.dataset.motion=workspace.motion==='off'?'off':'on';
+  updateThemeShortcut();
+}
+function updateThemeShortcut(){
+  const toggle=document.getElementById('themeQuickToggle');if(!toggle)return;
+  const dark=document.documentElement.dataset.theme==='dark',label=dark?'深色':'浅色';
+  const path=dark?'<path d="M20.9 13A9 9 0 0 1 11 3.1a9 9 0 1 0 9.9 9.9Z"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>';
+  toggle.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+path+'</svg><span>'+label+'</span>';
+  toggle.setAttribute('aria-label','切换为'+(dark?'浅色':'深色'));
+  toggle.title=(workspace.theme==='system'?'跟随系统 · ':'')+label+'；点击切换为'+(dark?'浅色':'深色');
+  document.querySelectorAll('#themeMenu [role=menuitemradio]').forEach(button=>button.setAttribute('aria-checked',String(button.dataset.theme===workspace.theme)));
+}
+function toggleThemeQuick(){setSettingsOption('theme',document.documentElement.dataset.theme==='dark'?'light':'dark');}
+function closeThemeMenu(){const menu=document.getElementById('themeMenu');if(menu)menu.hidden=true;document.getElementById('themeMenuButton')?.setAttribute('aria-expanded','false');}
+function toggleThemeMenu(){
+  const menu=document.getElementById('themeMenu'),open=menu.hidden;menu.hidden=!open;
+  document.getElementById('themeMenuButton').setAttribute('aria-expanded',String(open));
+  if(open)(menu.querySelector('[aria-checked="true"]')||menu.querySelector('button')).focus();
+}
+function chooseTheme(value){setSettingsOption('theme',value);closeThemeMenu();document.getElementById('themeMenuButton').focus();}
+document.addEventListener('click',event=>{if(!event.target.closest('.theme-toolbar'))closeThemeMenu();});
+document.addEventListener('keydown',event=>{
+  const menu=document.getElementById('themeMenu');if(!menu||menu.hidden)return;
+  if(event.key==='Escape'){event.preventDefault();closeThemeMenu();document.getElementById('themeMenuButton').focus();}
+  else if(event.target.closest('#themeMenu')&&['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+    event.preventDefault();const buttons=[...menu.querySelectorAll('button')],i=buttons.indexOf(document.activeElement),n=event.key==='Home'?0:event.key==='End'?buttons.length-1:(i+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[n].focus();
+  }else if(event.key==='Tab')closeThemeMenu();
+});
 function setAppearance(key,value){workspace[key]=value;saveWorkspace();applyTheme();}
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(workspace.theme==='system')applyTheme();});
 function updateDirectoryControls(){for(const id of ['qbSide','rvSide','prospectSide']){const side=document.getElementById(id);if(!side)continue;const collapsed=side.classList.contains('rv-collapsed');for(const button of side.querySelectorAll('.rv-collapse-btn,.rv-rail-btn:first-child')){button.textContent=button.classList.contains('rv-collapse-btn')?'收起目录':'展开目录';button.title=button.textContent;button.setAttribute('aria-label',button.textContent);button.setAttribute('aria-controls',id);button.setAttribute('aria-expanded',String(!collapsed));}}}
+// Shared, explicit disclosure controls; the summary alone expands the content.
+function disclosureAction(){return '<span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></span>';}
 // Canonical display labels retain source aliases. Opening/cancelling never migrates saved preferences.
 function normalizePreference(value,kind='industry'){
   let v=String(value||'').normalize('NFKC').replace(/[\u200b-\u200d\ufeff]/g,'').trim();
@@ -3155,7 +3193,7 @@ function renderEducationPreferences(){
   const simple=entries.filter(e=>order.includes(e.label)||e.label==='').sort((a,b)=>order.indexOf(a.label)-order.indexOf(b.label));
   const special=entries.filter(e=>!simple.includes(e));
   document.getElementById('prefEducation').classList.remove('pref-options');
-  document.getElementById('prefEducation').innerHTML=`<div class="pref-options">${simple.map(e=>preferenceChoice(e,e.aliases.length>1?'包含：'+e.aliases.join('、'):'')).join('')}</div>${special.length?`<details class="pref-special"><summary>分岗位、届别等特殊要求（${special.length} 项）</summary><p class="pref-help" style="margin-top:8px">这类说明无法等同于单一学历门槛，单独保留选择和原文。</p><div class="pref-options">${special.map((e,i)=>{const names=[...new Set(data.filter(d=>e.aliases.includes(d['学历要求'])).map(d=>d['名称']))];return preferenceChoice({...e,display:names.length?names.slice(0,2).join('、')+(names.length>2?'等':''):'已保存的特殊要求 '+(i+1)},e.label);}).join('')}</div></details>`:''}`;
+  document.getElementById('prefEducation').innerHTML=`<div class="pref-options">${simple.map(e=>preferenceChoice(e,e.aliases.length>1?'包含：'+e.aliases.join('、'):'')).join('')}</div>${special.length?`<details class="pref-special"><summary><span class="disclosure-title">分岗位、届别等特殊要求（${special.length} 项）</span>${disclosureAction()}</summary><div class="pref-special-content"><p class="pref-help">这类说明无法等同于单一学历门槛，单独保留选择和原文。</p><div class="pref-options">${special.map((e,i)=>{const names=[...new Set(data.filter(d=>e.aliases.includes(d['学历要求'])).map(d=>d['名称']))];return preferenceChoice({...e,display:names.length?names.slice(0,2).join('、')+(names.length>2?'等':''):'已保存的特殊要求 '+(i+1)},e.label);}).join('')}</div></div></details>`:''}`;
 }
 // Groups describe business domains, not qualifications or exclusion decisions.
 const INDUSTRY_DISPLAY_GROUPS=[
@@ -3192,7 +3230,7 @@ function industryPreferenceGroups(){
 let industryOnlySelected=false;
 function renderIndustryPreferences(){
   industryOnlySelected=false;const groups=industryPreferenceGroups();document.getElementById('prefIndustries').classList.remove('pref-options');
-  document.getElementById('prefIndustries').innerHTML=`<div class="industry-tools"><input id="industrySearch" type="search" placeholder="搜索行业或业务关键词" aria-label="搜索行业偏好" oninput="filterIndustryPreferences(this.value)"><button id="industrySelectedToggle" type="button" class="btn btn-sm" aria-pressed="false" onclick="showSelectedIndustries()">只看已选</button></div><div id="industrySelection" class="industry-selection" aria-live="polite"></div>${groups.map((g,i)=>`<details class="industry-group" data-industry-group="${i}"><summary>${esc(g.name)} <span class="industry-count"></span></summary>${g.name==='信源附带标签'?'<p class="pref-help">这些是信源中的性质或区域标签，不作为行业解释；保留已有选择。</p>':g.name==='跨行业与待核实'?'<p class="pref-help">尚不能明确归入单一行业的信源词条，保留原词供核对。</p>':''}<div class="industry-group-actions"><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},true)">选择本组可见项</button><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},false)">取消本组可见项</button></div><div class="pref-options">${g.values.map(e=>preferenceChoice(e)).join('')}</div></details>`).join('')}<p id="industryEmpty" class="pref-help" hidden>没有匹配的选项，请调整搜索词或返回全部。</p>`;updateIndustrySelection();
+  document.getElementById('prefIndustries').innerHTML=`<div class="industry-tools"><input id="industrySearch" type="search" placeholder="搜索行业或业务关键词" aria-label="搜索行业偏好" oninput="filterIndustryPreferences(this.value)"><button id="industrySelectedToggle" type="button" class="btn btn-sm" aria-pressed="false" onclick="showSelectedIndustries()">只看已选</button></div><div id="industrySelection" class="industry-selection" aria-live="polite"></div>${groups.map((g,i)=>`<details class="industry-group" data-industry-group="${i}"><summary><span class="disclosure-title">${esc(g.name)}</span><span class="industry-count"></span>${disclosureAction()}</summary><div class="industry-group-content">${g.name==='信源附带标签'?'<p class="pref-help">这些是信源中的性质或区域标签，不作为行业解释；保留已有选择。</p>':g.name==='跨行业与待核实'?'<p class="pref-help">尚不能明确归入单一行业的信源词条，保留原词供核对。</p>':''}<div class="industry-group-actions"><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},true)">选择本组可见项</button><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},false)">取消本组可见项</button></div><div class="pref-options">${g.values.map(e=>preferenceChoice(e)).join('')}</div></div></details>`).join('')}<p id="industryEmpty" class="pref-help" hidden>没有匹配的选项，请调整搜索词或返回全部。</p>`;updateIndustrySelection();
 }
 function updateIndustrySelection(){
   const summary=document.getElementById('industrySelection');if(!summary)return;
@@ -3206,12 +3244,81 @@ function showSelectedIndustries(){industryOnlySelected=!industryOnlySelected;con
 // One fixed entry point replaces repeated per-workflow Agent fields. Existing exports retain legacy settings.
 let workspaceConnection=null,workspaceConnectionError='',agentGuideText='',workspaceInfoPromise=null;
 const GENERIC_AGENT_BOOTSTRAP='请帮我使用 TouDi 管理求职资料。先读取仓库 AGENTS.md、docs/流程协作.md 和 docs/内容与渲染契约.md，向我确认招聘信源、个人材料和本次任务范围。按对应流程整理资料，保留无关内容及已有标记，核对页面结果。';
-function agentBootstrapText(){return GENERIC_AGENT_BOOTSTRAP+(window.__TOUDI_SERVICE__?.mode==='hosted'?`\n\n工作台网址：${location.origin}\n这是云端实例。请读取 docs/云端部署.md 的 Agent 协作部分，通过环境变量获得我授权的 TOUDI_AGENT_TOKEN，使用 remote_workspace.py 拉取最新资料副本，再运行原有准备、复盘、探查或记录更新流程；核对变更后只推送已修改的文件。发生版本冲突时保留草稿并重新对账。凭据不写入聊天、源码或资料。`:'\n\n本地模式：在用户指定的工作区运行原有资料流程。部署和接入说明见 docs/首次使用与部署.md。');}
+function agentBootstrapText(){return GENERIC_AGENT_BOOTSTRAP+(window.__TOUDI_SERVICE__?.mode==='hosted'?'\n\n云端模式：工作台网址由用户另行提供。请读取 docs/云端部署.md 的 Agent 协作部分，通过环境变量获得用户授权的 TOUDI_AGENT_TOKEN，使用 remote_workspace.py 拉取最新资料副本，再运行原有准备、复盘、探查或记录更新流程；核对变更后只推送已修改的文件。发生版本冲突时保留草稿并重新对账。凭据不写入聊天、源码或资料。':'\n\n本地模式：在用户指定的工作区运行原有资料流程。部署和接入说明见 docs/首次使用与部署.md。');}
 
 async function copyAgentBootstrap(){const text=agentBootstrapText();try{await navigator.clipboard.writeText(text);showToast('接入说明已复制');}catch(e){const el=document.getElementById('agentBootstrap');el.value=text;el.focus();el.select();if(document.execCommand('copy'))showToast('接入说明已复制');else showToast('请选择接入说明文本并复制');}}
 async function inspectWorkspace(force=false){if(window.__SNAPSHOT__||(!window.__TOUDI_SERVICE__&&!['127.0.0.1','localhost','[::1]'].includes(location.hostname))){workspaceConnection=null;workspaceConnectionError='当前为静态阅读页，不能凭路径连接本机文件。';return;}if(workspaceInfoPromise&&!force)return workspaceInfoPromise;workspaceInfoPromise=(async()=>{try{const response=await fetch('/api/workspace');if(!response.ok)throw Error('工作区服务暂不可用，请检查部署状态。');const info=await response.json();if(info.protocol!==1||!['local','hosted','desktop'].includes(info.mode)||!info.sameOriginOnly)throw Error('工作区状态接口不匹配');workspaceConnection=info;workspaceConnectionError='';if(view==='settings'){const box=document.getElementById('connectionStatus');if(box)box.innerHTML=workspaceConnectionMarkup();const text=document.getElementById('agentBootstrap');if(text)text.value=agentBootstrapText();}}catch(e){workspaceConnection=null;workspaceConnectionError=e.message;if(view==='settings'){const box=document.getElementById('connectionStatus');if(box)box.innerHTML=workspaceConnectionMarkup();}}})();return workspaceInfoPromise;}
-function workspaceConnectionMarkup(){if(window.__SNAPSHOT__)return '<p>加密只读快照：不连接本地API，个人记录在电脑工作区修改。</p>';if(workspaceConnection)return `<p>已连接当前本地工作区。业务保存到该目录，浏览器设置独立保存。</p><p class="connection-path">${esc(workspaceConnection.root)}</p><p>${esc(workspaceConnection.config.sourcePolicy)}</p>${workspaceConnection.missing.length?`<p class="error-text">工作区缺少：${esc(workspaceConnection.missing.join('、'))}</p>`:''}`;return `<p>${esc(workspaceConnectionError||'正在确认当前本地工作区…')}</p>`;}
-function renderSettings(){const options=(entries,value)=>entries.map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${label}</option>`).join('');const row=(title,note,control)=>`<div class="setting-row"><div class="setting-label"><strong>${title}</strong><p>${note}</p></div><div class="setting-control">${control}</div></div>`;document.getElementById('settingsView').innerHTML=`<section class="settings-section"><h3>外观与阅读</h3>${row('主题','选择浅色、深色或跟随系统。',`<select aria-label="主题" onchange="setAppearance('theme',this.value)">${options([['system','跟随系统'],['light','浅色'],['dark','深色']],workspace.theme||'system')}</select>`)}${row('切换反馈','开启模块与弹层的切换反馈；尊重系统减少动效设置。',`<select aria-label="切换反馈" onchange="setAppearance('motion',this.value)">${options([['on','简短动效'],['off','关闭动效']],workspace.motion||'on')}</select>`)}${row('默认页面','下次打开工作台时进入的模块。',`<select onchange="workspace.defaultView=this.value;saveWorkspace()">${options([['table','投递表格'],['kanban','投递看板'],['charts','投递统计'],['qbank','面试准备'],['prospect','岗位探查'],['review','面试复盘']],workspace.defaultView)}</select>`)}${row('信息密度','调整投递表格的行高。',`<select onchange="workspace.density=this.value;saveWorkspace()">${options([['standard','标准'],['compact','紧凑']],workspace.density)}</select>`)}${row('每页记录','每页显示的记录数量。',`<select onchange="workspace.pageSize=Number(this.value);saveWorkspace()">${[20,25,50,100,200].map(n=>`<option ${workspace.pageSize===n?'selected':''}>${n}</option>`).join('')}</select>`)}<p class="settings-note">外观与阅读偏好仅保存在本浏览器。</p></section><section class="settings-section"><h3>求职偏好</h3>${row('适合我的方向','按行业、企业性质和学历筛选；不改变投递标记。','<button class="btn" onclick="openPrefModal()">调整偏好</button>')}<p class="settings-note">求职偏好保存在当前工作区；加密快照仅供阅读。</p></section><section class="settings-section"><h3>备份与恢复</h3>${row('个人标记与求职偏好','只包含进度、收藏、不适合、备注、待探查及求职偏好，不包含准备、复盘或探查正文。','<div id="maintenanceActions"></div>')}${row('浏览器显示偏好','包含主题、密度、列选择与保存视图；不会迁移业务正文。','<button class="btn btn-sm" onclick="exportWorkspace()">导出显示偏好</button><label class="btn btn-sm">恢复显示偏好<input type="file" accept="application/json" hidden onchange="importWorkspace(event)"></label>')}</section><section class="settings-section"><h3>Agent 协作</h3><p>将下面的说明交给自己的投递 Agent，另行提供信源、个人材料和本次任务。</p><textarea id="agentBootstrap" class="agent-bootstrap" readonly aria-label="Agent 接入说明">${esc(agentBootstrapText())}</textarea><button class="btn btn-sm" style="margin-top:10px" onclick="copyAgentBootstrap()">复制接入说明</button></section>${window.__TOUDI_SERVICE__?.mode==='hosted'?'<section class="settings-section"><h3>访问</h3><form action="/auth/logout" method="post"><button class="btn">退出登录</button></form></section>':''}`;const host=document.getElementById('maintenanceActions');if(maintenanceTools){host.append(maintenanceTools);maintenanceTools.style.display='flex';maintenanceTools.querySelectorAll('.nav-text').forEach(e=>e.style.display='inline');}applyTheme();}
+function workspaceConnectionMarkup(){if(window.__SNAPSHOT__)return '<p>加密只读快照：不连接本地API，个人记录在电脑工作区修改。</p>';if(workspaceConnection)return `<p>已连接当前个人工作区，业务资料保存到该目录。</p><details><summary>查看本机位置</summary><p class="connection-path">${esc(workspaceConnection.root)}</p></details>${workspaceConnection.missing.length?`<p class="error-text">工作区缺少：${esc(workspaceConnection.missing.join('、'))}</p>`:''}`;return `<p>${esc(workspaceConnectionError||'正在确认当前本地工作区…')}</p>`;}
+let currentSettingsTab='appearance';
+const SETTINGS_TABS=[['appearance','外观与阅读'],['preferences','求职偏好'],['data','资料与备份'],['agent','Agent 协作']];
+function switchSettingsTab(key){
+  if(!SETTINGS_TABS.some(([id])=>id===key))return;
+  currentSettingsTab=key;
+  document.querySelectorAll('.settings-tabs [role=tab]').forEach(button=>{
+    const active=button.id==='settings-tab-'+key;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;
+  });
+  document.querySelectorAll('.settings-panel').forEach(panel=>panel.hidden=panel.id!=='settings-panel-'+key);
+}
+document.addEventListener('keydown',event=>{
+  if(!event.target.matches('.settings-tabs [role=tab]')||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+  event.preventDefault();const tabs=[...document.querySelectorAll('.settings-tabs [role=tab]')],index=tabs.indexOf(event.target);
+  const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+  switchSettingsTab(tabs[next].id.replace('settings-tab-',''));tabs[next].focus();
+});
+function setSettingsOption(key,value){
+  const allowed={theme:['system','light','dark'],colorPalette:COLOR_PALETTES.map(([key])=>key),motion:['on','off'],density:['standard','compact'],defaultView:['table','kanban','charts','qbank','prospect','review'],pageSize:PAGE_SIZES};
+  if(key==='pageSize')value=Number(value);
+  if(!allowed[key]?.includes(value))return;
+  workspace[key]=value;saveWorkspace();
+  document.querySelectorAll('[data-setting="'+key+'"] button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.value===String(value))));
+}
+function settingsRow(title,note,control){return `<div class="setting-row"><div class="setting-label"><strong>${title}</strong><p>${note}</p></div><div class="setting-control">${control}</div></div>`;}
+function settingsSegment(key,label,entries){return `<div class="settings-segment" role="group" aria-label="${label}" data-setting="${key}">${entries.map(([value,text])=>`<button type="button" data-value="${value}" aria-pressed="${workspace[key]===value}" onclick="setSettingsOption('${key}','${value}')">${text}</button>`).join('')}</div>`;}
+function settingsPalette(){return `<div class="settings-palettes" role="group" aria-label="界面配色" data-setting="colorPalette">${COLOR_PALETTES.map(([key,label,color])=>`<button type="button" data-value="${key}" aria-label="${label}配色" aria-pressed="${workspace.colorPalette===key}" onclick="setSettingsOption('colorPalette','${key}')"><span class="palette-swatch" style="--swatch:${color}" aria-hidden="true"></span><span>${label}</span></button>`).join('')}</div>`;}
+function settingsSelect(key,label,entries){return `<div class="settings-select"><select aria-label="${label}" onchange="setSettingsOption('${key}',this.value)">${entries.map(([value,text])=>`<option value="${value}" ${workspace[key]===value?'selected':''}>${text}</option>`).join('')}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></div>`;}
+function settingsPreferenceSummary(values,kind){
+  const names=[...new Set(values.map(value=>normalizePreference(value,kind)))].filter(Boolean);
+  return names.length?esc(names.slice(0,3).join('、')+(names.length>3?'等 '+names.length+' 项':'')):'尚未选择';
+}
+function renderSettings(){
+  const row=settingsRow;
+  document.getElementById('settingsView').innerHTML=`
+    <div class="settings-head"><h2>设置</h2><p>调整阅读方式、求职偏好与资料管理。</p></div>
+    <div class="settings-tabs" role="tablist" aria-label="设置分类">${SETTINGS_TABS.map(([key,title])=>`<button id="settings-tab-${key}" role="tab" aria-controls="settings-panel-${key}" onclick="switchSettingsTab('${key}')">${title}</button>`).join('')}</div>
+    <div class="settings-panel" id="settings-panel-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance">
+      <section class="settings-section"><h3>外观与阅读</h3>
+        ${row('界面配色','主题模式独立切换，配色应用于整个工作台。',settingsPalette())}
+        ${row('切换反馈','尊重系统减少动效设置。',settingsSegment('motion','切换反馈',[['on','简短动效'],['off','关闭动效']]))}
+        ${row('默认页面','下次打开时进入的模块。',settingsSelect('defaultView','默认页面',[['table','投递表格'],['kanban','投递看板'],['charts','投递统计'],['qbank','面试准备'],['prospect','岗位探查'],['review','面试复盘']]))}
+        ${row('信息密度','调整投递表格的行高。',settingsSegment('density','信息密度',[['standard','标准'],['compact','紧凑']]))}
+        ${row('每页记录','每页显示的记录数量。',settingsSelect('pageSize','每页记录',PAGE_SIZES.map(n=>[n,n+' 条'])))}
+        <p class="settings-note">外观与阅读偏好仅保存在本浏览器。</p>
+      </section>
+    </div>
+    <div class="settings-panel" id="settings-panel-preferences" role="tabpanel" aria-labelledby="settings-tab-preferences">
+      <section class="settings-section"><h3>求职偏好</h3><p class="settings-help">企业性质或行业满足一项，并符合学历要求，即可进入“符合偏好”。</p>
+        ${row('企业性质',settingsPreferenceSummary(preferences.natures,'nature'),'<button class="btn" onclick="openPrefModal(\'natures\')">调整企业性质</button>')}
+        ${row('行业方向',settingsPreferenceSummary(preferences.industries,'industry'),'<button class="btn" onclick="openPrefModal(\'industries\')">调整行业方向</button>')}
+        ${row('学历要求',settingsPreferenceSummary(preferences.education,'education'),'<button class="btn" onclick="openPrefModal(\'education\')">调整学历要求</button>')}
+        <p class="settings-note">求职偏好保存在当前工作区，不改变投递标记；加密快照仅供阅读。</p>
+      </section>
+    </div>
+    <div class="settings-panel" id="settings-panel-data" role="tabpanel" aria-labelledby="settings-tab-data">
+      <section class="settings-section"><h3>备份与恢复</h3><p class="settings-help">按所需范围导出；完整业务资料请使用工作区完整备份。</p></section>
+      <details class="settings-disclosure"><summary><span class="disclosure-title"><strong>个人标记与显示偏好</strong><small>分别迁移求职标记与界面设置</small></span>${disclosureAction()}</summary><section class="settings-section">
+        ${row('个人标记与求职偏好','进度、收藏、不适合、备注、待探查及求职偏好；不含准备、复盘或探查正文。','<div id="maintenanceActions"></div>')}
+        ${row('显示偏好','主题、密度、列选择与保存视图；不含业务正文。','<button class="btn btn-sm" onclick="exportWorkspace()">导出显示偏好</button><label class="btn btn-sm">恢复显示偏好<input type="file" accept="application/json" hidden onchange="importWorkspace(event)"></label>')}
+      </section></details>
+      ${window.__TOUDI_SERVICE__?.mode==='hosted'?'<section class="settings-section"><h3>访问</h3><form action="/auth/logout" method="post"><button class="btn">退出登录</button></form></section>':''}
+    </div>
+    <div class="settings-panel" id="settings-panel-agent" role="tabpanel" aria-labelledby="settings-tab-agent">
+      <section class="settings-section"><h3>Agent 协作</h3><p>通用说明不包含本机地址或个人资料。信源、个人材料和本次任务由你另行提供。</p><textarea id="agentBootstrap" class="agent-bootstrap" readonly aria-label="Agent 接入说明">${esc(agentBootstrapText())}</textarea><div class="settings-actions"><button class="btn btn-sm" onclick="copyAgentBootstrap()">复制通用说明</button>${window.__TOUDI_DESKTOP__?'<button class="btn btn-sm" onclick="copyAgentBootstrap(true)">复制本机接入说明</button>':''}</div>${window.__TOUDI_DESKTOP__?'<p class="settings-help">本机接入说明包含当前工作区与工具位置，仅交给你授权的本机 Agent。</p>':''}</section>
+    </div>`;
+  const host=document.getElementById('maintenanceActions');
+  if(maintenanceTools){host.append(maintenanceTools);maintenanceTools.style.display='flex';maintenanceTools.querySelectorAll('.nav-text').forEach(e=>e.style.display='inline');}
+  switchSettingsTab(currentSettingsTab);applyTheme();
+}
+
 
 
 const originalReviewDetail=renderReviewDetail;renderReviewDetail=function(){originalReviewDetail();if(window.__SNAPSHOT__)document.querySelectorAll('#reviewMain button,#reviewMain input,#reviewMain select').forEach(el=>el.remove());};
