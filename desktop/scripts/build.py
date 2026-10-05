@@ -48,17 +48,21 @@ def main():
     if not npx:
         raise SystemExit('Source builds require Node.js/npm')
     run([sys.executable, ROOT/'tests/check_source.py'])
-    # All visual and UI assets come from the current application, without a separate design.
+    # Stage publishable sources once; ignored development leftovers cannot enter UI assets.
+    stage = DESKTOP/'build/public-resources'
+    stage_resources(ROOT, stage)
     ui_assets = DESKTOP/'ui/assets'
-    shutil.copytree(ROOT/'app/assets', ui_assets, dirs_exist_ok=True)
+    if ui_assets.is_symlink():
+        raise ValueError('Generated UI assets must not be a symbolic link')
+    if ui_assets.exists():
+        shutil.rmtree(ui_assets)
+    shutil.copytree(stage/'app/assets', ui_assets)
     prepare_frontend(ROOT)
     run([npx, 'tauri', 'icon', ROOT/'app/assets/favicon.svg', '--output', DESKTOP/'src-tauri/icons'], env=env)
     if not args.skip_runtime:
         runtime = DESKTOP/'src-tauri/runtime'
         runtime.mkdir(parents=True, exist_ok=True)
         separator = ';' if os.name == 'nt' else ':'
-        stage = DESKTOP/'build/public-resources'
-        stage_resources(ROOT, stage)
         hooks = DESKTOP/'build/privacy-hooks'
         if hooks.exists():
             shutil.rmtree(hooks)

@@ -14,7 +14,7 @@ HOST='com.toudi.filling.codex'
 EXTENSION_ID='edfgnahdkpobmkhckjhadadnlbhpbpmd'
 ORIGIN='chrome-extension://'+EXTENSION_ID+'/'
 MAX_MESSAGE=512*1024
-VERSION='0.3.0'
+VERSION='0.3.1'
 
 
 def validate_request(request):
@@ -122,25 +122,46 @@ def install(home=None,manifest=None):
     home.mkdir(parents=True,exist_ok=True,mode=0o700)
     source=Path(sys.executable).resolve().parent
     target=home/('helper-'+VERSION)
+    if target.is_symlink():raise ValueError('连接工具安装位置不能为符号链接。')
     # Validate bundled resources before replacing an older installed copy.
     if not (source/'_internal').is_dir():raise ValueError('连接工具资源不完整，请重新解压完整下载包。')
     staging=Path(tempfile.mkdtemp(prefix='.install-',dir=home))
+    previous=staging/'previous'
+    temporary=None
+    replaced=False
+    registered=False
+    clean=False
     try:
         shutil.copytree(source,staging/'helper')
-        old=home/('helper-'+VERSION+'-previous')
-        if old.exists():shutil.rmtree(old)
-        if target.exists():target.rename(old)
-        (staging/'helper').rename(target)
         manifest.parent.mkdir(parents=True,exist_ok=True)
+        if manifest.exists():shutil.copy2(manifest,staging/'manifest-before')
         value={'name':HOST,'description':'TouDi browser Codex bridge','path':str(target/Path(sys.executable).name),'type':'stdio','allowed_origins':[ORIGIN]}
-        fd,temp=tempfile.mkstemp(prefix='.toudi-host-',dir=manifest.parent)
-        with os.fdopen(fd,'w',encoding='utf-8') as stream:json.dump(value,stream,indent=2)
-        os.chmod(temp,0o600);os.replace(temp,manifest)
+        fd,temporary=tempfile.mkstemp(prefix='.toudi-host-',dir=manifest.parent)
+        with os.fdopen(fd,'w',encoding='utf-8') as stream:
+            json.dump(value,stream,indent=2)
+            stream.flush();os.fsync(stream.fileno())
+        os.chmod(temporary,0o600)
+        if target.exists():target.rename(previous)
+        (staging/'helper').rename(target);replaced=True
+        os.replace(temporary,manifest);registered=True
         if os.name=='nt':
             import winreg
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER,'Software\\Google\\Chrome\\NativeMessagingHosts\\'+HOST) as key:winreg.SetValueEx(key,'',0,winreg.REG_SZ,str(manifest))
-        if old.exists():shutil.rmtree(old)
-    finally:shutil.rmtree(staging,ignore_errors=True)
+        clean=True
+    except BaseException:
+        # A failed reinstall must leave the previously registered executable usable.
+        if registered:
+            before=staging/'manifest-before'
+            if before.exists():os.replace(before,manifest)
+            else:manifest.unlink()
+        if replaced:shutil.rmtree(target)
+        if previous.exists():previous.rename(target)
+        clean=True
+        raise
+    finally:
+        if temporary and os.path.exists(temporary):os.unlink(temporary)
+        # Preserve rollback material only if restoration itself failed.
+        if clean:shutil.rmtree(staging,ignore_errors=True)
     return {'installed':True,'helperVersion':VERSION,'independent':True,'host':HOST}
 
 

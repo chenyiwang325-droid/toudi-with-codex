@@ -21,9 +21,11 @@ def main():
     subprocess.run([sys.executable,str(ROOT/'tests/check_source.py')],check=True)
     output=Path(options.output).resolve();output.mkdir(parents=True,exist_ok=True)
     sys.path.insert(0,str(ROOT/'app'))
-    from filling_service import extension_bundle
+    from filling_tools import extension_bundle
     from browser_helper import VERSION
-    extension=output/'TouDi-filling';extension.mkdir(exist_ok=True)
+    extension=output/'TouDi-filling'
+    if extension.is_symlink():raise ValueError('Generated extension must not be a symbolic link')
+    if extension.exists():shutil.rmtree(extension)
     archive=output/'TouDi-filling-extension.zip';archive.write_bytes(extension_bundle())
     with zipfile.ZipFile(archive) as bundle:bundle.extractall(output)
     if not options.skip_helper:
@@ -35,10 +37,13 @@ def main():
         subprocess.run([options.python,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','toudi-browser-helper','--distpath',str(output/'native'),'--workpath',str(build/'pyinstaller'),'--specpath',str(build),'--paths',str(ROOT/'app'),'--additional-hooks-dir',str(hooks),str(ROOT/'app/browser_helper.py')],check=True,env=env)
         subprocess.run([options.python,str(ROOT/'desktop/scripts/privacy.py'),'--deny-root',str(ROOT),'--deny-root',str(Path.home()),str(output/'native/toudi-browser-helper')],check=True)
         if sys.platform=='darwin':
-            app=output/'TouDi 浏览器连接.app';contents=app/'Contents';mac=contents/'MacOS';mac.mkdir(parents=True,exist_ok=True)
+            app=output/'TouDi 浏览器连接.app'
+            if app.is_symlink():raise ValueError('Generated connector must not be a symbolic link')
+            if app.exists():shutil.rmtree(app)
+            contents=app/'Contents';mac=contents/'MacOS';mac.mkdir(parents=True)
             (contents/'Resources').mkdir(exist_ok=True)
             resources=output/'native/toudi-browser-helper'
-            shutil.copytree(resources,contents/'Resources/helper',dirs_exist_ok=True)
+            shutil.copytree(resources,contents/'Resources/helper')
             launcher=mac/'install';launcher.write_text('#!/bin/sh\nexec "$(dirname "$0")/../Resources/helper/toudi-browser-helper" "$@"\n');launcher.chmod(0o755)
             plist={'CFBundleIdentifier':'app.toudi.browser-connector','CFBundleName':'TouDi 浏览器连接','CFBundleDisplayName':'TouDi 浏览器连接','CFBundleExecutable':'install','CFBundleVersion':VERSION,'CFBundleShortVersionString':VERSION,'CFBundlePackageType':'APPL','LSUIElement':True}
             icon=ROOT/'desktop/src-tauri/icons/icon.icns'

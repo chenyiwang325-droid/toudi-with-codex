@@ -38,6 +38,18 @@ class WorkspaceManagementTests(unittest.TestCase):
         workbench.atomic_write(tx/'manifest.json',workbench.encoded({'state':'pending','before':{relative:True}}))
         workbench.atomic_write(self.root/relative,workbench.encoded([{'名称':'Incomplete'}]))
         self.assertEqual(workbench.Workbench(self.root).get('records')['data'],[{'名称':'Fixture'}])
+    def test_failed_transaction_preparation_leaves_no_partial_history(self):
+        self.commit('records',data=[{'名称':'Fixture'}])
+        before=self.w.inventory();folder=self.root/'投递数据/.transactions';history={p.name for p in folder.iterdir()}
+        real=workbench.atomic_write
+        def fail(path,content):
+            if 'after' in Path(path).parts:raise OSError('synthetic staging failure')
+            return real(path,content)
+        with patch.object(workbench,'atomic_write',side_effect=fail):
+            with self.assertRaises(OSError):self.commit('records',data=[{'名称':'New fixture'}])
+        self.assertEqual(self.w.inventory(),before)
+        self.assertEqual({p.name for p in folder.iterdir()},history)
+        self.assertNotIn('_materials_override',self.w.__dict__)
     def test_actual_cross_file_failure(self):
         self.commit('records',data=[{'名称':'Fixture'}]); self.commit('edits',data={'edits':{'Fixture':{'note':'new-note'}},'pref':{}})
         before=self.w.inventory(); real=workbench.atomic_write

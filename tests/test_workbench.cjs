@@ -36,7 +36,7 @@ console.log('PASS workbench syntax and review form preserves stable identity, di
 
 const refreshContext = vm.createContext({
   document: {getElementById: () => ({style: {display: 'none'}})},
-  localStorage: {getItem: () => '{}'},
+  toudiWorkspaceStorage: {getItem: () => '{}'},
   listUnsavedDrafts: () => [],
   detailInputMemory: new Map(),
   byId: () => ({_researchNote: 'saved', 岗位: '岗位'}),
@@ -58,6 +58,6 @@ vm.runInContext("detailInputMemory.set(0,[{id:'researchNote',value:'unsaved'}])"
 assert.equal(vm.runInContext("workspaceHasDraft('records')", refreshContext), true);
 vm.runInContext('reviewDirty = true', refreshContext);
 assert.equal(vm.runInContext("workspaceHasDraft('reviews')", refreshContext), true);
-vm.runInContext("localStorage.getItem = () => JSON.stringify({preps:{base:'original'}})", refreshContext);
+vm.runInContext("toudiWorkspaceStorage.getItem = () => JSON.stringify({preps:{base:'original'}})", refreshContext);
 assert.equal(vm.runInContext("workspaceHasDraft('preps')", refreshContext), true);
 console.log('PASS refresh protects stored drafts, dirty reviews and unsaved detail fields');

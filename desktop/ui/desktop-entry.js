@@ -16,6 +16,8 @@ window.__TOUDI_DESKTOP_READY__ = (async () => {
   if (!response.ok) throw Error('投递资料暂时无法读取，请保留工作区并重开应用。');
   const result = await response.json();
   if (!Array.isArray(result.data)) throw Error('投递资料格式不匹配，请保留工作区并检查。');
+  if (!/^[a-f0-9]{64}$/.test(result.workspaceKey || '')) throw Error('工作区标识无效，请更新完整应用包。');
+  window.__TOUDI_WORKSPACE_KEY__ = result.workspaceKey;
   window.__TOUDI_INITIAL_RECORDS__ = result.data;
 })();
 window.toudiDesktopStartupError = error => {

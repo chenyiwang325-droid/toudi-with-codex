@@ -8,7 +8,7 @@ from pathlib import Path
 def main(argv=None):
     from workspace_link import resolve_workspace
     from filling_profile import load_profile, profile_summary, plan_fields, export_profile_pack
-    from filling_service import extension_bundle, _validate_scan, _write_private
+    from filling_tools import extension_bundle, _validate_scan, _write_private
     parser = argparse.ArgumentParser(description='TouDi 本地辅助填报资料工具（试用）')
     parser.add_argument('--workspace', default=str(resolve_workspace()))
     commands = parser.add_subparsers(dest='command', required=True)

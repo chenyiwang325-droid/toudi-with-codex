@@ -16,12 +16,11 @@
 - 运行仓库根的 python3 run.py；macOS/Linux 支持本地文件锁
 """
 import sys
-import glob
+import hashlib
 import json
 import os
 import threading
 import time
-from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 CODE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,6 +38,7 @@ from workbench import Workbench, Conflict
 import base64
 import zipfile
 WORKSPACE = os.path.abspath(os.environ.get('TOUDI_WORKSPACE', os.path.join(os.path.dirname(CODE_DIR), 'runtime')))
+WORKSPACE_KEY = hashlib.sha256(os.path.realpath(WORKSPACE).encode('utf-8')).hexdigest()
 BASE_DIR = os.path.join(WORKSPACE, '投递数据')
 os.makedirs(BASE_DIR, exist_ok=True)
 DATA_FILE = os.path.join(BASE_DIR, '用户编辑数据.json')
@@ -65,9 +65,6 @@ class Handler(SimpleHTTPRequestHandler):
         self.connection.settimeout(30)
 
     def end_headers(self):
-        if getattr(self, '_filling_origin', None):
-            self.send_header('Access-Control-Allow-Origin', self._filling_origin)
-            self.send_header('Vary', 'Origin')
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')
@@ -89,14 +86,14 @@ class Handler(SimpleHTTPRequestHandler):
             if hosted.MODE == 'hosted':
                 return self._send_json({'error': '辅助填报仅连接本机工作区'}, 403)
             try:
-                import filling_service
+                import filling_tools
                 if route == '/api/filling':
                     profile_id = parse_qs(urlsplit(self.path).query).get('profile', ['general'])[0]
-                    return self._send_json(filling_service.service(WORKSPACE, PORT).status(profile_id))
+                    return self._send_json(filling_tools.profile_status(WORKSPACE, profile_id))
                 if route == '/api/filling/extension':
-                    body = filling_service.extension_bundle()
+                    body = filling_tools.extension_bundle()
                     self.send_response(200); self.send_header('Content-Type', 'application/zip')
-                    self.send_header('Content-Disposition', 'attachment; filename="TouDi-filling-pilot.zip"')
+                    self.send_header('Content-Disposition', 'attachment; filename="TouDi-filling-extension.zip"')
                     self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
                 if route == '/api/filling/profile-export':
                     from filling_profile import export_profile_pack
@@ -104,13 +101,13 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send_json({'error': 'not_found'}, 404)
             except (ValueError, OSError, KeyError) as exc:
                 return self._send_json({'error': str(exc)}, 400)
-        if route == '/api/health': return self._send_json({'ok': True, 'mode': hosted.MODE})
+        if route == '/api/health': return self._send_json({'ok': True, 'mode': hosted.MODE, 'workspaceKey': WORKSPACE_KEY})
         if route in ('/api/manage', '/api/backup'):
             try:
                 workbench = Workbench(WORKSPACE)
                 if route == '/api/manage':
                     module = parse_qs(urlsplit(self.path).query).get('module', ['workspace'])[0]
-                    return self._send_json(workbench.get(module))
+                    return self._send_json({**workbench.get(module), 'workspaceKey': WORKSPACE_KEY})
                 body = workbench.backup()
                 self.send_response(200); self.send_header('Content-Type', 'application/zip')
                 self.send_header('Content-Disposition', 'attachment; filename="toudi-backup.zip"')
@@ -141,14 +138,15 @@ class Handler(SimpleHTTPRequestHandler):
                 body = template.replace('const RAW_DATA = [];', 'const RAW_DATA = ' + json.dumps(rows, ensure_ascii=False).replace('<', chr(92) + 'u003c') + ';', 1).encode()
             except (ValueError, OSError) as exc:
                 return self._send_json({'error': str(exc)}, 503)
-            if hosted.MODE == 'hosted':
-                body = body.replace(b'<head>', b'<head><script>window.__TOUDI_SERVICE__={mode:"hosted"};</script>', 1)
+            context = json.dumps({'mode': hosted.MODE, 'workspaceKey': WORKSPACE_KEY})
+            bootstrap = '<script>window.__TOUDI_SERVICE__=' + context + ';window.__TOUDI_WORKSPACE_KEY__=window.__TOUDI_SERVICE__.workspaceKey;</script>'
+            body = body.replace(b'<head>', b'<head>' + bootstrap.encode(), 1)
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Cache-Control', 'no-store')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers(); self.wfile.write(body); return
-        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js', '/assets/settings.css', '/assets/filling.js', '/assets/filling.css'):
+        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js', '/assets/workspace-storage.js', '/assets/settings.css', '/assets/filling.js', '/assets/filling.css'):
             name = os.path.basename(urlsplit(self.path).path)
             body = open(os.path.join(CODE_DIR, 'assets', name), 'rb').read()
             self.send_response(200); self.send_header('Content-Type', 'text/javascript; charset=utf-8' if name.endswith('.js') else 'text/css; charset=utf-8' if name.endswith('.css') else 'image/svg+xml')
@@ -231,41 +229,21 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Content-Length',str(len(body)))
             self.end_headers(); self.wfile.write(body)
             return
-        if self.path == '/__clean__':
-            # 一次性清理页：清除本来源下残留的浏览器缓存（调试用）
-            body = b'<meta charset="utf-8"><script>localStorage.removeItem("toudiEdits");localStorage.removeItem("toudiPref");document.write("\\u5df2\\u6e05\\u9664\\u6d4f\\u89c8\\u5668\\u7f13\\u5b58\\uff0c\\u53ef\\u5173\\u95ed\\u672c\\u9875")</script>'
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.send_header('Content-Length', str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
         if hosted.MODE == 'hosted': return self._send_json({'error': 'not_found'}, 404)
         return super().do_GET()
 
     def do_POST(self):
         route = urlsplit(self.path).path
-        if route == '/api/filling/bridge':
-            import filling_service
-            if hosted.MODE == 'hosted' or not filling_service.bridge_origin_allowed(self, PORT):
-                return self._send_json({'error': '只允许本机浏览器扩展连接'}, 403)
-            if not filling_service.service(WORKSPACE, PORT).authorized(self.headers.get('Authorization', '')):
-                return self._send_json({'error': '浏览器连接失效；请从中控台重新复制连接码'}, 401)
-            origin = self.headers.get('Origin')
-            if origin:
-                # Only the authenticated extension receives a cross-origin response.
-                self._filling_origin = origin
-            return self._filling_post()
         if not hosted.authorize(self, PORT): return
         if route.startswith('/api/filling'):
-            if hosted.MODE == 'hosted': return self._send_json({'error': '辅助填报仅连接本机工作区'}, 403)
-            return self._filling_post()
+            return self._send_json({'error': 'not_found'}, 404)
         if urlsplit(self.path).path in ('/api/manage', '/api/backup'):
             try:
                 length = int(self.headers.get('Content-Length', 0))
                 if length <= 0 or length > 210 * 1024 * 1024: raise ValueError('invalid payload size')
                 payload = json.loads(self.rfile.read(length))
                 if not isinstance(payload, dict): raise ValueError('payload must be an object')
+                if payload.get('workspaceKey', WORKSPACE_KEY) != WORKSPACE_KEY: raise Conflict('workspace_conflict')
                 workbench = Workbench(WORKSPACE)
                 if urlsplit(self.path).path == '/api/manage': result = workbench.mutate(payload)
                 else:
@@ -285,8 +263,10 @@ class Handler(SimpleHTTPRequestHandler):
                 payload = json.loads(self.rfile.read(length) or b'{}')
                 if not isinstance(payload, dict):
                     raise ValueError('payload must be a JSON object')
-                edits = payload.get('edits') or {}
-                if not isinstance(edits, dict) or any(not isinstance(v, dict) for v in edits.values()) or not isinstance(payload.get('pref') or {}, dict):
+                if payload.get('workspaceKey', WORKSPACE_KEY) != WORKSPACE_KEY:
+                    return self._send_json({'error': 'workspace_conflict'}, 409)
+                edits, pref = payload.get('edits', {}), payload.get('pref', {})
+                if not isinstance(edits, dict) or any(not isinstance(v, dict) for v in edits.values()) or not isinstance(pref, dict):
                     raise ValueError('edits and pref must be objects')
                 print(f'[保存] {len(edits)} 条 base={payload.get("base")} <- {self.headers.get("User-Agent","?")[:60]}')
                 with EDITS_LOCK, data_lock(BASE_DIR):
@@ -295,11 +275,11 @@ class Handler(SimpleHTTPRequestHandler):
                     base = payload.get('base')
                     base = str(base) if base is not None else None
                     if base != current:
-                        d = self._read_data() or {'edits': {}, 'pref': {}}
+                        d = self._read_data() or {'unreadable': True}
                         print(f'[409] 版本冲突 base={base} current={current}，拒绝覆盖')
                         return self._send_json({'ok': False, 'error': 'version_conflict',
                                                 'version': current, 'data': d}, 409)
-                    self._write_data({'edits': edits, 'pref': payload.get('pref') or {}})
+                    self._write_data({'edits': edits, 'pref': pref})
                     new_version = str(self._data_version())
                 return self._send_json({'ok': True, 'version': new_version})
             except Exception as e:
@@ -308,6 +288,9 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 length = int(self.headers.get('Content-Length') or 0)
                 payload = json.loads(self.rfile.read(length) or b'{}')
+                if not isinstance(payload, dict):raise ValueError('payload must be a JSON object')
+                if payload.get('workspaceKey', WORKSPACE_KEY) != WORKSPACE_KEY:
+                    return self._send_json({'error': 'workspace_conflict'}, 409)
                 sessions = payload.get('sessions')
                 if not isinstance(sessions, list):
                     raise ValueError('payload must contain a sessions array')
@@ -326,6 +309,9 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 length = int(self.headers.get('Content-Length') or 0)
                 payload = json.loads(self.rfile.read(length) or b'{}')
+                if not isinstance(payload, dict):raise ValueError('payload must be a JSON object')
+                if payload.get('workspaceKey', WORKSPACE_KEY) != WORKSPACE_KEY:
+                    return self._send_json({'error': 'workspace_conflict'}, 409)
                 categories = payload.get('categories')
                 if not isinstance(categories, list):
                     raise ValueError('payload must contain a categories array')
@@ -378,11 +364,12 @@ class Handler(SimpleHTTPRequestHandler):
                 with open(DATA_FILE, encoding='utf-8') as f:
                     d = json.load(f)
                 if isinstance(d, dict):
-                    return {'edits': d.get('edits') or {}, 'pref': d.get('pref') or {},
-                            'version': str(self._data_version())}
+                    edits, pref = d.get('edits', {}), d.get('pref', {})
+                    Workbench(WORKSPACE).validate('edits', {'edits': edits, 'pref': pref})
+                    return {'edits': edits, 'pref': pref, 'version': str(self._data_version()), 'workspaceKey': WORKSPACE_KEY}
                 raise ValueError('data file root must be an object')
             except FileNotFoundError:
-                return {'edits': {}, 'pref': {}, 'version': '0'}
+                return {'edits': {}, 'pref': {}, 'version': '0', 'workspaceKey': WORKSPACE_KEY}
             except Exception:
                 time.sleep(0.05)  # 写入窗口读到半截文件，稍候重试
         return None  # 持续不可读：503，绝不让页面误以为"磁盘为空"而反推旧缓存
@@ -411,29 +398,21 @@ class Handler(SimpleHTTPRequestHandler):
                 with open(path, encoding='utf-8') as f:
                     d = json.load(f)
                 if isinstance(d, dict) and isinstance(d.get(key), list):
-                    return {key: d[key], 'version': str(self._file_version(path))}
+                    Workbench(WORKSPACE).validate({'sessions':'reviews','categories':'qbank','preps':'preps'}[key], d)
+                    return {key: d[key], 'version': str(self._file_version(path)), 'workspaceKey': WORKSPACE_KEY}
                 raise ValueError(f'{os.path.basename(path)} must contain a {key} array')
             except FileNotFoundError:
-                return {key: [], 'version': '0'}
+                return {key: [], 'version': '0', 'workspaceKey': WORKSPACE_KEY}
             except Exception:
                 time.sleep(0.05)
         return None
 
     def _read_prospects(self):
-        edits = self._read_data().get('edits', {})
+        data = self._read_data()
+        if data is None:
+            raise ValueError('个人标记数据暂时无法读取')
+        edits = data['edits']
         return read_catalog(PROSPECTS_DIR, edits)
-
-    def _write_preps(self, d):
-        if os.path.exists(PREPS_FILE):  # 覆盖前自动备份
-            try:
-                import shutil
-                shutil.copy2(PREPS_FILE, PREPS_FILE + '.bak_auto')
-            except Exception:
-                pass
-        tmp = PREPS_FILE + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(d, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, PREPS_FILE)  # 原子写入
 
     def _send_json(self, obj, code=200):
         body = json.dumps(obj, ensure_ascii=False).encode('utf-8')
@@ -445,54 +424,11 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_OPTIONS(self):
-        if urlsplit(self.path).path == '/api/filling/bridge':
-            import filling_service
-            if hosted.MODE == 'hosted' or not self.headers.get('Origin') or not filling_service.bridge_origin_allowed(self, PORT):
-                return self._send_json({'error': 'extension_origin_required'}, 403)
-            self.send_response(204)
-            self.send_header('Access-Control-Allow-Origin', self.headers['Origin'])
-            self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-            self.send_header('Access-Control-Allow-Methods', 'POST')
-            self.end_headers(); return
         if not hosted.authorize(self, PORT): return
+        if urlsplit(self.path).path.startswith('/api/filling'):
+            return self._send_json({'error': 'not_found'}, 404)
         self.send_response(204)
         self.end_headers()
-
-    def _filling_post(self):
-        import filling_service
-        try:
-            length = int(self.headers.get('Content-Length', 0))
-            if length <= 0 or length > 1024 * 1024 or self.headers.get('Transfer-Encoding'):
-                return self._send_json({'error': '填报请求超出限制'}, 413)
-            payload = json.loads(self.rfile.read(length))
-            if not isinstance(payload, dict): raise ValueError('填报请求必须为对象')
-            route = urlsplit(self.path).path
-            api = filling_service.service(WORKSPACE, PORT)
-            op = payload.get('op')
-            if route == '/api/filling/connect':
-                return self._send_json(api.connect(reset=payload.get('reset') is True))
-            if route == '/api/filling/chrome':
-                if hosted.MODE != 'desktop':
-                    raise ValueError('请在 TouDi 桌面 App 启用 Chrome 连接。')
-                import chrome_connection
-                result = chrome_connection.install()
-                api.token()
-                return self._send_json(result)
-            if route not in {'/api/filling/bridge', '/api/filling/plan'}:
-                return self._send_json({'error': 'not_found'}, 404)
-            if op == 'ping': result = api.status(payload.get('profile', 'general'))
-            elif op == 'codex-status': result = filling_service.codex_status(refresh=payload.get('refresh') is True)
-            elif op == 'plan': result = api.plan(payload['scan'], payload.get('profile', 'general'))
-            elif op == 'agent-task': result = api.agent_task(payload['planId'])
-            elif op == 'remap': result = api.remap(payload['planId'], payload.get('mappings'), agent=payload.get('agent') is True, remember=payload.get('remember') is True, model=payload.get('model', ''))
-            elif op == 'confirm': result = api.confirm(payload['planId'], payload.get('selected', []), payload.get('overwrite', []))
-            elif op == 'report': result = api.report(payload['planId'], payload['report'])
-            else: raise ValueError('不支持的填报操作')
-            return self._send_json(result)
-        except filling_service.FillingConflict as exc:
-            return self._send_json({'error': str(exc)}, 409)
-        except (ValueError, KeyError, TypeError, OSError) as exc:
-            return self._send_json({'error': str(exc)}, 400)
 
     def log_message(self, *args):  # 静默访问日志
         pass

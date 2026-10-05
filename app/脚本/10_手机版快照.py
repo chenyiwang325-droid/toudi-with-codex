@@ -65,6 +65,8 @@ def build_payload(resources=None):
     settings = read_json(os.path.join(DATA_DIR, '工作区配置.json'), {})
     html = html.replace('<script src="/assets/preference-defaults.js"></script>',
                         '<script>' + bootstrap_script(settings.get('preferenceRules')) + '</script>')
+    storage = Path(HTML_FILE).parent / 'assets' / 'workspace-storage.js'
+    html = html.replace('<script src="/assets/workspace-storage.js"></script>', '<script>' + storage.read_text(encoding='utf-8') + '</script>')
     settings_style = Path(HTML_FILE).parent / 'assets' / 'settings.css'
     html = html.replace('<link rel="stylesheet" href="/assets/settings.css">', '<style>' + settings_style.read_text(encoding='utf-8') + '</style>')
     management = Path(HTML_FILE).parent / 'assets' / 'workbench.js'

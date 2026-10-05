@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script src="/assets/workspace-storage.js"></script>
 <script src="/assets/preference-defaults.js"></script>
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/filling.css">
@@ -1031,7 +1032,7 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
         <div class="qb-workbar">
           <button class="btn" id="qbGeneralTab" onclick="switchPrepMode('general')">通用准备</button>
           <button class="btn" id="qbCompanyTab" onclick="switchPrepMode('company')">公司准备</button>
-          
+
           <input id="qbSearchInput" aria-label="搜索准备内容" placeholder="搜索全部通用题目…" oninput="setPrepSearch(this.value)">
           <button class="btn qb-clear" onclick="setPrepSearch('')">清除</button>
           <button class="btn qb-back-results" id="qbBackResults" hidden onclick="returnPrepSearchResults()">返回搜索结果</button>
@@ -1188,14 +1189,14 @@ function editFor(idx){ const it=byId(idx); if(!it)return {}; return editForItem(
 function editForItem(it){ const k=it._key; if(!userEdits[k])userEdits[k]={}; return userEdits[k]; }
 function byId(idx){ return data.find(d=>d._idx===idx); }
 
-function cachedData(key){if(window.__SNAPSHOT_SEED__)return window.__SNAPSHOT_SEED__[key]||null;try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}}
+function cachedData(key){return window.__SNAPSHOT_SEED__?.[key]||null;}
 function loadEdits(){const d=cachedData('toudiEdits');if(d)userEdits=d;}
 function saveEdits() { savePersonalDraft(); }
 function loadPref(){const d=cachedData('toudiPref');if(d)preferences={...DEFAULT_PREF,...d};}
 function savePrefStorage() { savePersonalDraft(); }
 
-// 本地文件存储：通过「启动中控台.command」启动本地服务后启用，数据落盘到 用户编辑数据.json
-// 支持跨源：即使是从 file:// 直接打开的旧页面，也能连上本地服务并自动把浏览器缓存迁移落盘
+// Connected workspaces read confirmed data from the API; snapshots read their embedded seed.
+// Unverified browser data is retained for recovery, never applied as current disk data.
 let apiBase = null;
 const SAVE_DOMAINS={
   edits:{label:'个人数据',state:'idle',message:''},
@@ -1210,16 +1211,40 @@ const DRAFT_PREFIX={edits:'jobEditsDraft:',reviews:'jobReviewsDraft:',qbank:'job
 const LEGACY_DRAFT_KEY={edits:'jobEditsDraft',reviews:'jobReviewsDraft',qbank:'jobQbankDraft'};
 let draftSessionId='';
 try{draftSessionId=sessionStorage.getItem('toudiDraftSession_27')||'';if(!draftSessionId){draftSessionId=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));sessionStorage.setItem('toudiDraftSession_27',draftSessionId);}}catch(e){draftSessionId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);}
-function ownDraftKey(domain){return DRAFT_PREFIX[domain]+draftSessionId;}
-function parseDraft(raw){try{const d=JSON.parse(raw||'null');return d&&d.format==='toudi-unsaved-draft'&&d.version===2&&isPlainObject(d.data)&&typeof d.base==='string'&&typeof d.revision==='number'?d:null;}catch(e){return null;}}
-function readOwnDraft(domain){return parseDraft(localStorage.getItem(ownDraftKey(domain)));}
-function readLegacyDraft(domain){try{const d=JSON.parse(localStorage.getItem(LEGACY_DRAFT_KEY[domain])||'null');return d&&d.format==='toudi-unsaved-draft'&&isPlainObject(d.data)?{...d,version:2,base:String(d.base),revision:Number(d.revision)||1,sessionId:'legacy'}:null;}catch(e){return null;}}
-function writeDraft(domain,base,data){const old=readOwnDraft(domain),revision=(old?.revision||0)+1;const draft={format:'toudi-unsaved-draft',version:2,domain,sessionId:draftSessionId,revision,base:String(base),savedAt:new Date().toISOString(),data,...(old?.legacySource?{legacySource:old.legacySource}:{})};localStorage.setItem(ownDraftKey(domain),JSON.stringify(draft));return draft;}
-function migrateLegacyDraft(domain,draft,raw){const migrated={format:'toudi-unsaved-draft',version:2,domain,sessionId:draftSessionId,revision:1,base:String(draft.base),savedAt:new Date().toISOString(),data:draft.data,legacySource:{key:LEGACY_DRAFT_KEY[domain],raw}};localStorage.setItem(ownDraftKey(domain),JSON.stringify(migrated));return migrated;}
+function ownDraftKey(domain){return DRAFT_PREFIX[domain]+toudiWorkspaceStorage.id+':'+draftSessionId;}
+function parseDraft(raw){try{const d=JSON.parse(raw||'null');return d&&d.format==='toudi-unsaved-draft'&&d.version===3&&d.workspaceKey===toudiWorkspaceStorage.id&&!!d.workspaceKey&&isPlainObject(d.data)&&typeof d.base==='string'&&Number.isInteger(d.revision)&&d.revision>0&&typeof d.sessionId==='string'?d:null;}catch(e){return null;}}
+function readOwnDraft(domain){if(!toudiWorkspaceStorage.id)return null;const d=parseDraft(localStorage.getItem(ownDraftKey(domain)));return d?.domain===domain?d:null;}
+function writeDraft(domain,base,data){if(!toudiWorkspaceStorage.id)throw Error('工作区尚未确认，草稿未提交');const old=readOwnDraft(domain),revision=(old?.revision||0)+1;const draft={format:'toudi-unsaved-draft',version:3,workspaceKey:toudiWorkspaceStorage.id,domain,sessionId:draftSessionId,revision,base:String(base),savedAt:new Date().toISOString(),data};localStorage.setItem(ownDraftKey(domain),JSON.stringify(draft));return draft;}
 function clearOwnDraft(domain,revision){const current=readOwnDraft(domain);if(current&&current.sessionId===draftSessionId&&current.revision===revision)localStorage.removeItem(ownDraftKey(domain));}
-function clearLegacySourceAfterSave(draft){const source=draft?.legacySource;if(source&&typeof source.key==='string'&&typeof source.raw==='string'&&localStorage.getItem(source.key)===source.raw)localStorage.removeItem(source.key);}
 function advanceOwnDraftBase(domain,revision,newBase){const current=readOwnDraft(domain);if(current&&current.sessionId===draftSessionId&&current.revision>revision){current.base=String(newBase);localStorage.setItem(ownDraftKey(domain),JSON.stringify(current));return true;}return false;}
-function listUnsavedDrafts(){const found=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);for(const [domain,prefix] of Object.entries(DRAFT_PREFIX)){if(key&&key.startsWith(prefix)){const draft=parseDraft(localStorage.getItem(key));if(draft)found.push({domain,key,draft});}}}for(const domain of Object.keys(LEGACY_DRAFT_KEY)){const draft=readLegacyDraft(domain);if(draft)found.push({domain,key:LEGACY_DRAFT_KEY[domain],draft});}return found;}
+function canonicalJson(value){if(Array.isArray(value))return value.map(canonicalJson);if(isPlainObject(value))return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonicalJson(value[key])]));return value;}
+const confirmedDrafts=new Map();
+function discardConfirmedDrafts(domain,data){
+  const confirmed=JSON.stringify(canonicalJson(data));let changed=false;
+  for(const entry of listUnsavedDrafts()){
+    if(entry.domain===domain&&JSON.stringify(canonicalJson(entry.draft.data))===confirmed){confirmedDrafts.set(entry.key,JSON.stringify(canonicalJson(entry.draft)));localStorage.removeItem(entry.key);changed=true;}
+  }
+  if(changed&&typeof scheduleDraftMirror==='function')scheduleDraftMirror();
+}
+let unscopedRemoteDrafts=null;
+function listUnsavedDrafts(includeUnscoped=false){
+  const found=[];
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    for(const [domain,prefix] of Object.entries(DRAFT_PREFIX)){
+      if(key&&(key.startsWith(prefix)||key===LEGACY_DRAFT_KEY[domain])){
+        const raw=localStorage.getItem(key),draft=parseDraft(raw);
+        if(draft&&draft.domain===domain)found.push({domain,key,draft});
+        else if(includeUnscoped){try{const old=JSON.parse(raw);if(old?.format==='toudi-unsaved-draft'&&old.version!==3&&isPlainObject(old.data))found.push({domain,key,draft:old,unscoped:true});}catch(e){}}
+      }
+    }
+  }
+  if(includeUnscoped){
+    for(const key of ['toudiManagementDraft','toudiManagementDrafts','toudiPendingSettings']){const raw=localStorage.getItem(key);if(raw)found.push({key,raw,unscoped:true});}
+    if(unscopedRemoteDrafts)found.push({key:'workspace-recovery',draft:unscopedRemoteDrafts,unscoped:true});
+  }
+  return found;
+}
 function personalMutationAllowed(){if(window.__SNAPSHOT__){showToast('此快照仅供阅读，请在电脑端修改');return false;}if(personalReady)return true;showToast('正在确认本地数据版本，暂不能修改');return false;}
 function savePersonalDraft(){
   if(!personalMutationAllowed())return;
@@ -1227,7 +1252,9 @@ function savePersonalDraft(){
   if(editsDraftBase===null)editsDraftBase=String(editsVersion);
   writeDraft('edits',editsDraftBase,{edits:userEdits,pref:preferences});persistToServer();
 }
-async function initServerStorage() {
+let storageInitPromise=null;
+function initServerStorage(){if(storageInitPromise)return storageInitPromise;storageInitPromise=readServerStorage().finally(()=>{storageInitPromise=null;});return storageInitPromise;}
+async function readServerStorage() {
   personalReady=false;setSaveState('edits','saving','正在读取个人数据…');
   try {
     apiBase = await detectApiBase();
@@ -1239,14 +1266,17 @@ async function initServerStorage() {
     const diskEdits = payload.edits;
     editsVersion = payload.version;
     serverMode = true;
-    const ownDraft=readOwnDraft('edits'),legacyRaw=ownDraft?null:localStorage.getItem(LEGACY_DRAFT_KEY.edits),legacyDraft=ownDraft?null:readLegacyDraft('edits'),draft=ownDraft||(legacyDraft?migrateLegacyDraft('edits',legacyDraft,legacyRaw):null);
+    if(!/^[a-f0-9]{64}$/.test(payload.workspaceKey||'')||(toudiWorkspaceStorage.id&&payload.workspaceKey!==toudiWorkspaceStorage.id))throw Error('workspace mismatch');
+    window.__TOUDI_WORKSPACE_KEY__=payload.workspaceKey;
+    discardConfirmedDrafts('edits',{edits:payload.edits,pref:payload.pref});
+    const draft=readOwnDraft('edits');
     if(draft&&isPlainObject(draft.data.edits)&&isPlainObject(draft.data.pref)){
       userEdits=draft.data.edits;preferences={...DEFAULT_PREF,...draft.data.pref};editsDraftBase=String(draft.base);editsDirty=true;editsConflict=editsDraftBase!==String(payload.version);
       setSaveState('edits',editsConflict?'conflict':'error',editsConflict?'个人草稿基于旧版本，请先导出':'发现可重试的个人数据草稿');
     }else{
       userEdits = diskEdits;preferences = {...DEFAULT_PREF, ...payload.pref};editsDraftBase=null;
-      localStorage.setItem('toudiEdits', JSON.stringify(userEdits));
-      localStorage.setItem('toudiPref', JSON.stringify(preferences));
+
+
       setSaveState('edits','idle','');
     }
     reapplyEdits();
@@ -1292,13 +1322,13 @@ async function flushEdits(){
   const sentRevision=sentDraft.revision;
   try{
     const res=await fetch(apiBase+'/api/edits',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({edits:sentDraft.data.edits,pref:sentDraft.data.pref,base:sentDraft.base})});
+      body:JSON.stringify({workspaceKey:sentDraft.workspaceKey,edits:sentDraft.data.edits,pref:sentDraft.data.pref,base:sentDraft.base})});
     const body=await res.json().catch(()=>null);
     if(res.status===409){editsConflict=true;setSaveState('edits','conflict','个人数据冲突 · 草稿仍在本页');showToast('检测到其他页面或脚本已更新；点击保存状态可导出未提交草稿');return;}
     if(!res.ok)throw new Error((body&&body.error)||`HTTP ${res.status}`);
     if(!body||body.ok!==true||typeof body.version!=='string')throw new Error('invalid save acknowledgement');
     editsVersion=body.version;
-    if(editsSaveGeneration===sentGeneration){editsDirty=false;editsDraftBase=null;localStorage.setItem('toudiEdits',JSON.stringify(userEdits));localStorage.setItem('toudiPref',JSON.stringify(preferences));clearOwnDraft('edits',sentRevision);clearLegacySourceAfterSave(sentDraft);setSaveState('edits','saved','个人数据已保存');}
+    if(editsSaveGeneration===sentGeneration){editsDirty=false;editsDraftBase=null;clearOwnDraft('edits',sentRevision);setSaveState('edits','saved','个人数据已保存');}
     else{editsDraftBase=body.version;advanceOwnDraftBase('edits',sentRevision,body.version);setSaveState('edits','saving','个人数据仍在保存…');}
   }catch(e){setSaveState('edits','error','个人数据保存失败 · 草稿已保留');showToast('保存失败；点击保存状态可重试或导出草稿');}
   finally{
@@ -1307,7 +1337,7 @@ async function flushEdits(){
   }
 }
 function exportUnsavedDrafts(){
-  const drafts={format:'toudi-unsaved-drafts',version:2,exportedAt:new Date().toISOString(),drafts:listUnsavedDrafts()};
+  const drafts={format:'toudi-unsaved-drafts',version:3,exportedAt:new Date().toISOString(),drafts:listUnsavedDrafts(true)};
   downloadBlob(new Blob([JSON.stringify(drafts,null,2)],{type:'application/json'}),`投递未保存草稿_${today()}.json`);showToast('未保存草稿已导出');
 }
 async function retryFailedReads(){
@@ -1333,7 +1363,7 @@ function updateStorageBadge() {
   else if(error){el.className='storage-badge error';el.innerHTML='<span class="dot"></span>'+error.message;el.title=error.readFailed?'点击重新读取；不会写入数据':'点击重试保存；草稿仍保留在浏览器';el.onclick=error.readFailed?retryFailedReads:retryFailedSaves;el.style.cursor='pointer';}
   else if(saving){el.className='storage-badge warn';el.innerHTML='<span class="dot"></span>'+saving.message;el.title='等待最新一轮本地文件确认';}
   else if (serverMode) { const saved=domains.filter(d=>d.state==='saved');el.className='storage-badge ok';el.innerHTML='<span class="dot"></span>'+(saved.length?'全部改动已保存':(window.__TOUDI_SERVICE__?.mode==='hosted'?'云端工作区已连接':'本地文件已连接'));el.title='所有数据区均无待保存、失败或冲突'; }
-  else { el.className='storage-badge warn'; el.innerHTML='<span class="dot"></span>浏览器缓存模式 · 清缓存会丢失'; el.title='双击「启动中控台.command」启动本地服务后，数据将自动保存到本地文件'; }
+  else { el.className='storage-badge warn'; el.innerHTML='<span class="dot"></span>工作区未连接 · 只读'; el.title='请打开 TouDi App 或连接工作区服务，已保存资料以工作区文件为准'; }
 }
 
 // ============== DEADLINE PARSING ==============
@@ -1966,8 +1996,12 @@ const RV_STATUSES=['新增','复发','改善','已克服','未考察','待观察
 
 function loadReviewsCache(){const d=cachedData("toudiReviews");if(d&&Array.isArray(d.sessions))reviewData=d;}
 function reviewFormEditing(){return !!(rvEdit.q||rvEdit.meta||rvEdit.intel||rvEdit.summary);}
-function saveReviews(){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}
-  if(apiBase===null){localStorage.setItem('toudiReviews',JSON.stringify(reviewData));return;}
+function reviewMutationAllowed(){
+  if(window.__SNAPSHOT__){showToast('此快照仅供阅读，请在电脑端修改');return false;}
+  if(apiBase===null||SAVE_DOMAINS.reviews.readFailed){showToast('工作区未连接或复盘读取失败，暂不能修改');return false;}
+  return true;
+}
+function saveReviews(){if(!reviewMutationAllowed())return;
   if(reviewDraftBase===null)reviewDraftBase=String(reviewVersion);
   writeDraft('reviews',reviewDraftBase,{sessions:reviewData.sessions});persistReviews();
 }
@@ -1987,20 +2021,20 @@ async function flushReviews(){
   const sentRevision=sentDraft.revision;
   try{
     const res=await fetch(apiBase+'/api/reviews',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({sessions:sentDraft.data.sessions,base:sentDraft.base})});
+      body:JSON.stringify({workspaceKey:sentDraft.workspaceKey,sessions:sentDraft.data.sessions,base:sentDraft.base})});
     const body=await res.json().catch(()=>null);
     if(res.status===409){reviewConflict=true;setSaveState('reviews','conflict','复盘冲突 · 草稿仍在本页');showToast('复盘已在别处更新；点击保存状态可导出未提交草稿');return;}
     if(!res.ok)throw new Error((body&&body.error)||`HTTP ${res.status}`);
     if(!body||body.ok!==true||typeof body.version!=='string')throw new Error('invalid save acknowledgement');
     reviewVersion=body.version;
-    if(reviewSaveGeneration===sentGeneration){reviewDirty=false;reviewDraftBase=null;localStorage.setItem('toudiReviews',JSON.stringify(reviewData));clearOwnDraft('reviews',sentRevision);clearLegacySourceAfterSave(sentDraft);setSaveState('reviews','saved','复盘已保存');}
+    if(reviewSaveGeneration===sentGeneration){reviewDirty=false;reviewDraftBase=null;clearOwnDraft('reviews',sentRevision);setSaveState('reviews','saved','复盘已保存');}
     else{reviewDraftBase=body.version;advanceOwnDraftBase('reviews',sentRevision,body.version);setSaveState('reviews','saving','复盘仍在保存…');}
   }catch(e){setSaveState('reviews','error','复盘保存失败 · 草稿已保留');showToast('复盘保存失败；点击保存状态可重试');}
   finally{reviewSaveInFlight=false;if(reviewDirty&&reviewSaveGeneration>sentGeneration&&!reviewConflict)setTimeout(flushReviews,0);}
 }
 async function initReviewsStorage(){
   if(reviewDirty||reviewConflict||reviewFormEditing())return;
-  const ownDraft=readOwnDraft('reviews'),legacyRaw=ownDraft?null:localStorage.getItem(LEGACY_DRAFT_KEY.reviews),legacyDraft=ownDraft?null:readLegacyDraft('reviews'),draft=ownDraft||(legacyDraft?migrateLegacyDraft('reviews',legacyDraft,legacyRaw):null);
+  let draft=readOwnDraft('reviews');
   if(apiBase===null){if(draft&&Array.isArray(draft.data.sessions)){reviewData={sessions:draft.data.sessions};reviewDraftBase=String(draft.base);reviewDirty=true;setSaveState('reviews','error','发现未提交的复盘草稿');if(view==='review')renderReview();}else loadReviewsCache();return;}
   const startedGeneration=reviewSaveGeneration;
   try{
@@ -2009,12 +2043,14 @@ async function initReviewsStorage(){
     const payload=(await res.json())||{};
     if(reviewDirty||reviewConflict||reviewFormEditing()||reviewSaveGeneration!==startedGeneration)return;
     if(!Array.isArray(payload.sessions)||typeof payload.version!=='string')throw new Error('invalid payload');
+    if(payload.workspaceKey!==toudiWorkspaceStorage.id)throw Error('workspace mismatch');
+    discardConfirmedDrafts('reviews',{sessions:payload.sessions});draft=readOwnDraft('reviews');
     reviewVersion=payload.version;
     if(draft&&Array.isArray(draft.data.sessions)){
       reviewData={sessions:draft.data.sessions};reviewDraftBase=String(draft.base);reviewDirty=true;reviewConflict=reviewDraftBase!==String(payload.version);
       setSaveState('reviews',reviewConflict?'conflict':'error',reviewConflict?'复盘草稿基于旧版本，请先导出':'发现可重试的复盘草稿');
     }else{
-      reviewDraftBase=null;reviewData.sessions=payload.sessions;localStorage.setItem('toudiReviews',JSON.stringify(reviewData));setSaveState('reviews','idle','');
+      reviewDraftBase=null;reviewData.sessions=payload.sessions;setSaveState('reviews','idle','');
     }
   }catch(e){setReadError('reviews','复盘数据读取失败');}
   if(view==='review')renderReview();
@@ -2089,10 +2125,10 @@ function rvMetaPanel(s){
     <div><span class="k">投递进度</span>${link}</div>
   </div></div>`;
 }
-function rvSaveMeta(id){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}const s=sessionById(id);if(!s)return;
+function rvSaveMeta(id){if(!reviewMutationAllowed())return;const s=sessionById(id);if(!s)return;
   s.company=gv('rvf_m_company');s.position=gv('rvf_m_position');s.round=gv('rvf_m_round');s.date=gv('rvf_m_date');s.duration=gv('rvf_m_duration');s.interviewer=gv('rvf_m_interviewer');s.source=gv('rvf_m_source');s.companyKey=gv('rvf_m_key');
   rvEdit.meta=false;saveReviews();renderReview();showToast('场次信息已修改，正在保存…');}
-function rvDeleteSession(id){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}const s=sessionById(id);if(!s)return;
+function rvDeleteSession(id){if(!reviewMutationAllowed())return;const s=sessionById(id);if(!s)return;
   if(!confirm(`确定删除「${s.company} ${s.round||''}」这场复盘？不可恢复（md 原件保留）。`))return;
   reviewData.sessions=reviewData.sessions.filter(x=>x.id!==id);
   if(currentReviewId===id)currentReviewId=null;
@@ -2147,7 +2183,7 @@ function rvQuestionEdit(s,q){
       <button class="btn btn-sm btn-primary" onclick="rvSaveQuestion('${s.id}',${q.n})">保存</button>
     </div></div>`;
 }
-function rvSaveQuestion(id,n){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}const s=sessionById(id);if(!s)return;const q=(s.questions||[]).find(x=>x.n===n);if(!q)return;
+function rvSaveQuestion(id,n){if(!reviewMutationAllowed())return;const s=sessionById(id);if(!s)return;const q=(s.questions||[]).find(x=>x.n===n);if(!q)return;
   q.question=gv('rvf_q_question');q.timestamp=gv('rvf_q_timestamp');q.intent=gv('rvf_q_intent');q.originalAnswer=gv('rvf_q_orig');q.signals=gv('rvf_q_sig');q.improvedAnswer=gv('rvf_q_impr');
   q.followups=gv('rvf_q_follow').split('\n').map(x=>x.trim()).filter(Boolean);
   q.diagnosis={'结构化':gv('rvf_q_d1'),'完整性':gv('rvf_q_d2'),'匹配度':gv('rvf_q_d3'),'说服力':gv('rvf_q_d4')};
@@ -2160,7 +2196,7 @@ function rvIntelPanel(s){
     <div class="rv-edit-actions"><button class="btn btn-sm" onclick="rvEdit.intel=false;renderReviewDetail()">取消</button><button class="btn btn-sm btn-primary" onclick="rvSaveIntel('${s.id}')">保存</button></div></div>`;
   return `<div class="rv-panel">${head}<div class="rv-sec-body pp-md">${renderMd(s.counterIntel,{toc:false})||'—'}</div></div>`;
 }
-function rvSaveIntel(id){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}const s=sessionById(id);if(!s)return;s.counterIntel=gv('rvf_intel');rvEdit.intel=false;saveReviews();renderReviewDetail();showToast('反问情报已修改，正在保存…');}
+function rvSaveIntel(id){if(!reviewMutationAllowed())return;const s=sessionById(id);if(!s)return;s.counterIntel=gv('rvf_intel');rvEdit.intel=false;saveReviews();renderReviewDetail();showToast('反问情报已修改，正在保存…');}
 
 // ---- 全场分析 ----
 function rvSummaryPanel(s){
@@ -2186,7 +2222,7 @@ function rvSummaryPanel(s){
     ${ci&&!sum.raw?`<div class="rv-sec"><div class="rv-sec-label">本场共性问题</div>${ci}</div>`:''}
     ${!bars&&!sum.hotspots&&!ci?'<div class="rv-sec-body">—</div>':''}</div>`;
 }
-function rvSaveSummary(id){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}const s=sessionById(id);if(!s)return;const sum=s.summary=s.summary||{};
+function rvSaveSummary(id){if(!reviewMutationAllowed())return;const s=sessionById(id);if(!s)return;const sum=s.summary=s.summary||{};
   const td={};gv('rvf_s_typedist').split('\n').forEach(l=>{const m=l.trim().match(/(.+?)\s+(\d+)$/);if(m)td[m[1]]=+m[2];});
   sum.typeDist=td;sum.hotspots=gv('rvf_s_hot');sum.raw=gv('rvf_s_raw');
   sum.commonIssues=gv('rvf_s_common').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const ev=(l.match(/[Qq]\d+/g)||[]).join('、');return {name:l.replace(/[（(][^）)]*[)）]/g,'').trim(),evidence:ev};});
@@ -2205,10 +2241,10 @@ function rvTrackingPanel(s){
       <button class="btn btn-sm btn-primary" onclick="rvAddTrack('${s.id}')">添加</button>
     </div></div>`;
 }
-function rvAddTrack(id){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}const s=sessionById(id);if(!s)return;const name=gv('rvf_t_name');if(!name){showToast('请填写弱项名称');return;}
+function rvAddTrack(id){if(!reviewMutationAllowed())return;const s=sessionById(id);if(!s)return;const name=gv('rvf_t_name');if(!name){showToast('请填写弱项名称');return;}
   s.tracking=s.tracking||[];s.tracking.push({weakness:name,status:gv('rvf_t_status'),evidence:gv('rvf_t_ev')});
   saveReviews();renderReview();showToast('已添加弱项记录，正在保存…');}
-function rvDelTrack(id,i){if(window.__SNAPSHOT__){showToast("此快照仅供阅读，请在电脑端修改");return;}const s=sessionById(id);if(!s||!s.tracking)return;s.tracking.splice(i,1);saveReviews();renderReview();showToast('已删除，正在保存…');}
+function rvDelTrack(id,i){if(!reviewMutationAllowed())return;const s=sessionById(id);if(!s||!s.tracking)return;s.tracking.splice(i,1);saveReviews();renderReview();showToast('已删除，正在保存…');}
 
 // ---- 弱项追踪总表（跨场次聚合，只读；编辑请到对应场次的纵向追踪面板） ----
 function renderWeakness(){
@@ -2248,7 +2284,7 @@ async function initPrepsStorage(){
     const disk=((await res.json())||{}).preps;
     if(!Array.isArray(disk))throw new Error('invalid preps');
     workspaceReadStates.preps='ready';
-    prepData.preps=disk;localStorage.setItem('toudiPreps',JSON.stringify(prepData));
+    prepData.preps=disk;
   }catch(e){workspaceReadStates.preps='error';showToast('公司准备读取失败，请检查本地数据文件');}
   if(view==='qbank'&&!qbankFormEditing())renderQbank();
 }
@@ -2263,7 +2299,7 @@ async function initProspectsStorage(){
   try{
     const res=await fetch(apiBase+'/api/prospects');const disk=await res.json();
     if(!res.ok||disk.schemaVersion!==1||!Array.isArray(disk.prospects))throw new Error(disk.error||'探查目录加载失败');
-    prospectData=disk;prospectLoadError='';localStorage.setItem('toudiProspects',JSON.stringify(prospectData));
+    prospectData=disk;prospectLoadError='';
   }catch(e){prospectLoadError=e.message;}
   if(view==='prospect')renderProspect();
 }
@@ -2614,7 +2650,7 @@ function setPrepSearch(value){
 function choosePrepCat(id){rememberQbForm();saveViewScroll();currentQbCat=id;qbEdit={item:qbCategoryEditing.get(id)||null};qbSearchDocument=false;renderQbank();requestAnimationFrame(restoreViewScroll);}
 function qbankMutationAllowed(){
   if(window.__SNAPSHOT__){showToast('此页面仅供阅读');return false;}
-  if(apiBase!==null&&!qbankWritable){showToast('内容暂时只读，请重试加载');return false;}return true;
+  if(apiBase===null||!qbankWritable){showToast('内容暂时只读，请重试加载');return false;}return true;
 }
 function renderPrepToolbar(){
   const g=document.getElementById('qbGeneralTab'),c=document.getElementById('qbCompanyTab');
@@ -2674,7 +2710,7 @@ function loadQbankCache(){const d=cachedData("toudiQBank");if(d&&Array.isArray(d
 function qbankFormEditing(){return !!qbEdit.item;}
 function saveQbank(){
   if(!qbankMutationAllowed())return;
-  if(apiBase===null){localStorage.setItem('toudiQBank',JSON.stringify(qbData));return;}
+  if(apiBase===null)return;
   if(qbankDraftBase===null)qbankDraftBase=String(qbankVersion);
   writeDraft('qbank',qbankDraftBase,{categories:qbData.categories});persistQbank();
 }
@@ -2694,13 +2730,13 @@ async function flushQbank(){
   const sentRevision=sentDraft.revision;
   try{
     const res=await fetch(apiBase+'/api/questionbank',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({categories:sentDraft.data.categories,base:sentDraft.base})});
+      body:JSON.stringify({workspaceKey:sentDraft.workspaceKey,categories:sentDraft.data.categories,base:sentDraft.base})});
     const body=await res.json().catch(()=>null);
     if(res.status===409){qbankConflict=true;setSaveState('qbank','conflict','问答库冲突 · 草稿仍在本页');showToast('问答库已在别处更新；点击保存状态可导出未提交草稿');return;}
     if(!res.ok)throw new Error((body&&body.error)||`HTTP ${res.status}`);
     if(!body||body.ok!==true||typeof body.version!=='string')throw new Error('invalid save acknowledgement');
     qbankVersion=body.version;
-    if(qbankSaveGeneration===sentGeneration){qbankDirty=false;qbankDraftBase=null;localStorage.setItem('toudiQBank',JSON.stringify(qbData));clearOwnDraft('qbank',sentRevision);clearLegacySourceAfterSave(sentDraft);setSaveState('qbank','saved','问答库已保存');}
+    if(qbankSaveGeneration===sentGeneration){qbankDirty=false;qbankDraftBase=null;clearOwnDraft('qbank',sentRevision);setSaveState('qbank','saved','问答库已保存');}
     else{qbankDraftBase=body.version;advanceOwnDraftBase('qbank',sentRevision,body.version);setSaveState('qbank','saving','问答库仍在保存…');}
   }catch(e){setSaveState('qbank','error','问答库保存失败 · 草稿已保留');showToast('问答库保存失败；点击保存状态可重试');}
   finally{qbankSaveInFlight=false;if(qbankDirty&&qbankSaveGeneration>sentGeneration&&!qbankConflict)setTimeout(flushQbank,0);}
@@ -2709,8 +2745,8 @@ async function initQbankStorage(){
   if(qbankDirty||qbankConflict||qbankFormEditing())return;
   if(!qbData.categories.length)loadQbankCache();
   qbLoadState='loading';
-  const ownDraft=readOwnDraft('qbank'),legacyRaw=ownDraft?null:localStorage.getItem(LEGACY_DRAFT_KEY.qbank),legacyDraft=ownDraft?null:readLegacyDraft('qbank'),draft=ownDraft||(legacyDraft?migrateLegacyDraft('qbank',legacyDraft,legacyRaw):null);
-  if(apiBase===null){if(draft&&Array.isArray(draft.data.categories)){qbData={categories:draft.data.categories};qbankDraftBase=String(draft.base);qbankDirty=true;setSaveState('qbank','error','发现未提交的问答库草稿');if(view==='qbank')renderQbank();}else loadQbankCache();qbLoadState='ready';if(view==='qbank')renderQbank();return;}
+  let draft=readOwnDraft('qbank');
+  if(apiBase===null){loadQbankCache();qbankWritable=false;qbLoadState=window.__SNAPSHOT__?'ready':'error';if(view==='qbank')renderQbank();return;}
   const startedGeneration=qbankSaveGeneration;
   try{
     const res=await fetch(apiBase+'/api/questionbank');
@@ -2722,17 +2758,19 @@ async function initQbankStorage(){
       qbData={categories:draft&&Array.isArray(draft.data.categories)?draft.data.categories:payload.categories};qbankWritable=false;qbLoadState='legacy';
       setReadError('qbank','内容可阅读，编辑暂不可用');if(view==='qbank')renderQbank();return;
     }
+    if(payload.workspaceKey!==toudiWorkspaceStorage.id)throw Error('workspace mismatch');
+    discardConfirmedDrafts('qbank',{categories:payload.categories});draft=readOwnDraft('qbank');
     qbankWritable=true;qbLoadState='ready';qbankVersion=payload.version;
     if(draft&&Array.isArray(draft.data.categories)){
       qbData={categories:draft.data.categories};qbankDraftBase=String(draft.base);qbankDirty=true;qbankConflict=qbankDraftBase!==String(payload.version);
       setSaveState('qbank',qbankConflict?'conflict':'error',qbankConflict?'问答库草稿基于旧版本，请先导出':'发现可重试的问答库草稿');
     }else{
-      qbankDraftBase=null;qbData.categories=payload.categories;localStorage.setItem('toudiQBank',JSON.stringify(qbData));setSaveState('qbank','idle','');
+      qbankDraftBase=null;qbData.categories=payload.categories;setSaveState('qbank','idle','');
     }
   }catch(e){
     qbankWritable=false;qbLoadState='error';
     if(draft&&Array.isArray(draft.data.categories))qbData={categories:draft.data.categories};
-    if(!qbData.categories.length){try{const res=await fetch(new URL('逐字稿数据.json',location.href));if(res.ok){const fallback=await res.json();if(Array.isArray(fallback.categories))qbData={categories:fallback.categories};}}catch(_){} }
+
     setReadError('qbank','问答库读取失败');
   }
   if(view==='qbank')renderQbank();
@@ -3026,10 +3064,10 @@ const WORKSPACE_KEY='toudiPublicWorkspace_v1';
 const COLOR_PALETTES=[['teal','青灰','#386a70'],['ink','墨蓝','#3d5777'],['forest','松绿','#4b6859'],['clay','陶土','#965c47'],['graphite','石墨','#535d66']];
 const WORKSPACE_DEFAULT={theme:'system',colorPalette:'teal',motion:'on',density:'standard',pageSize:50,defaultView:'table',columnSchema:2,columns:COLUMNS.map(c=>c.key),savedViews:[],agents:{}};
 let workspace={...WORKSPACE_DEFAULT};
-try{const saved=JSON.parse(localStorage.getItem(WORKSPACE_KEY)||'{}');workspace={...WORKSPACE_DEFAULT,...saved};if(saved.columnSchema!==2){workspace.columns=COLUMNS.map(c=>c.key);workspace.columnSchema=2;delete workspace.hiddenColumns;localStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));}}catch(e){}
+try{const saved=JSON.parse(toudiWorkspaceStorage.getItem(WORKSPACE_KEY)||'{}');workspace={...WORKSPACE_DEFAULT,...saved};if(toudiWorkspaceStorage.id&&saved.columnSchema!==2){workspace.columns=COLUMNS.map(c=>c.key);workspace.columnSchema=2;delete workspace.hiddenColumns;toudiWorkspaceStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));}}catch(e){}
 const WORKFLOWS=[]; // Agent workflows are documented in docs/流程协作.md.
 
-function saveWorkspace(){pageSize=Number(workspace.pageSize)||50;localStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));applyWorkspace();showToast('已保存到本浏览器');}
+function saveWorkspace(){pageSize=Number(workspace.pageSize)||50;toudiWorkspaceStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));applyWorkspace();showToast('已保存到本浏览器');}
 function applyWorkspace(){applyTheme();document.body.classList.toggle('compact-density',workspace.density==='compact');applyColumns();}
 function applyColumns(){const wanted=new Set(workspace.columns);wanted.add('_check');const order=workspace.columns.filter(k=>COLUMNS.some(c=>c.key===k));if(!order.includes('_check'))order.unshift('_check');document.querySelectorAll('#tableHead,#tableBody tr').forEach(row=>{const cells=[...row.children];cells.forEach((cell,i)=>{cell.dataset.column=cell.dataset.column||COLUMNS[i]?.key||'';cell.hidden=!wanted.has(cell.dataset.column);});order.forEach(k=>{const cell=cells.find(c=>c.dataset.column===k);if(cell)row.append(cell);});});updateFrozenColumns();}
 const FROZEN_COLUMNS=['_check','_star','_exclude','_research','名称'];

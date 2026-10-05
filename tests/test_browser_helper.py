@@ -2,6 +2,7 @@ import io
 import json
 import struct
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -50,6 +51,47 @@ class BrowserHelperTests(unittest.TestCase):
             for raw in (struct.pack('=I',helper.MAX_MESSAGE+1),struct.pack('=I',10)+b'{}'):
                 self.assertEqual(helper.serve(helper.ORIGIN,io.BytesIO(raw),io.BytesIO()),1)
             op.assert_not_called()
+
+    def test_reinstall_is_clean_and_manifest_failure_restores_previous_helper(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);source=root/'source';home=root/'installed'
+            (source/'_internal').mkdir(parents=True)
+            executable=source/'toudi-browser-helper';executable.write_bytes(b'new executable')
+            (source/'_internal/current.py').write_text('current resource')
+            target=home/('helper-'+helper.VERSION);(target/'_internal').mkdir(parents=True)
+            (target/executable.name).write_bytes(b'old executable')
+            (target/'_internal/retired.py').write_text('old resource')
+            manifest=root/'hosts'/ (helper.HOST+'.json');manifest.parent.mkdir()
+            manifest.write_text(json.dumps({'path':str(target/executable.name),'before':True}))
+            before=manifest.read_bytes()
+            replace=helper.os.replace
+            def fail_registration(src,dst):
+                if Path(dst)==manifest:raise OSError('synthetic registration failure')
+                return replace(src,dst)
+            with patch.object(helper.sys,'frozen',True,create=True),patch.object(helper.sys,'executable',str(executable)):
+                with patch.object(helper.os,'replace',side_effect=fail_registration):
+                    with self.assertRaises(OSError):helper.install(home,manifest)
+                self.assertEqual((target/executable.name).read_bytes(),b'old executable')
+                self.assertTrue((target/'_internal/retired.py').is_file())
+                self.assertEqual(manifest.read_bytes(),before)
+                self.assertEqual(list(home.glob('.install-*')),[])
+                self.assertEqual(list(manifest.parent.glob('.toudi-host-*')),[])
+                helper.install(home,manifest)
+            self.assertEqual((target/executable.name).read_bytes(),b'new executable')
+            self.assertFalse((target/'_internal/retired.py').exists())
+            self.assertTrue((target/'_internal/current.py').is_file())
+            self.assertEqual(json.loads(manifest.read_text())['allowed_origins'],[helper.ORIGIN])
+            self.assertEqual(list(home.glob('.install-*')),[])
+
+    def test_failed_copy_does_not_replace_registration_or_leave_staging(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);source=root/'source';(source/'_internal').mkdir(parents=True)
+            executable=source/'toudi-browser-helper';executable.write_bytes(b'synthetic')
+            home=root/'installed';manifest=root/'host.json';manifest.write_bytes(b'previous registration')
+            with patch.object(helper.sys,'frozen',True,create=True),patch.object(helper.sys,'executable',str(executable)),patch.object(helper.shutil,'copytree',side_effect=OSError('synthetic copy failure')):
+                with self.assertRaises(OSError):helper.install(home,manifest)
+            self.assertEqual(manifest.read_bytes(),b'previous registration')
+            self.assertEqual(list(home.iterdir()),[])
 
 
 if __name__=='__main__':unittest.main()

@@ -62,32 +62,35 @@ class DesktopRuntimeTests(unittest.TestCase):
                 self.assertIn('window.__TOUDI_PREFERENCE_DEFAULTS__=', preferences.decode())
                 self.assertIn('硕士', preferences.decode())
                 self.assertEqual(request('/assets/filling.js')[0], 200)
-                code=json.loads(json.loads(request('/api/filling/connect',{})[1])['connection'])
-                self.assertEqual(code['url'],f'http://127.0.0.1:{port}')
-                filling_token=code['token']
-                def bridge(token,origin='chrome-extension://'+'a'*32):
-                    req=urllib.request.Request(f'http://127.0.0.1:{port}/api/filling/bridge',data=b'{"op":"ping"}',
-                        headers={'Authorization':'Bearer '+token,'Origin':origin,'Content-Type':'application/json'})
-                    try:
-                        with urllib.request.urlopen(req,timeout=5) as response:return response.status,json.loads(response.read())
-                    except urllib.error.HTTPError as error:
-                        with error:return error.code,{}
-                self.assertEqual(bridge(filling_token)[0],200)
-                self.assertEqual(bridge(token)[0],401)
-                self.assertEqual(bridge(filling_token,'https://example.invalid')[0],403)
+                scope=json.loads(request('/api/edits')[1])['workspaceKey']
+                self.assertEqual(len(scope),64)
+                self.assertIn(scope,page)
+                self.assertEqual(request('/assets/workspace-storage.js')[0],200)
+                for retired in ('connect','chrome','bridge','plan'):
+                    self.assertEqual(request('/api/filling/'+retired,{})[0],404)
+                    self.assertEqual(request('/api/filling/'+retired,{},origin='chrome-extension://'+'a'*32)[0],403)
+                status=json.loads(request('/api/filling')[1])
+                self.assertNotIn('chromeConnection',status)
+                self.assertNotIn('lastReport',status)
                 with zipfile.ZipFile(io.BytesIO(request('/api/filling/extension')[1])) as bundle:
                     self.assertIn('TouDi-filling/worker.js',bundle.namelist())
-                    self.assertNotIn(filling_token.encode(),request('/api/filling/extension')[1])
+                for name in ('.desktop-endpoint.json','.browser-token.json'):
+                    self.assertFalse((Path(tmp)/'填报资料'/name).exists())
                 cli = subprocess.run(COMMAND + ['--workspace', tmp, 'read', 'records'], env=env, encoding='utf-8', capture_output=True, check=True)
                 self.assertEqual(json.loads(cli.stdout)['data'][0]['名称'], '{隔离公司}')
             finally: stop(process)
-            previous_port=port
             process, port = start()
             try:
-                self.assertEqual(port,previous_port)
-                new_code=json.loads(json.loads(request('/api/filling/connect',{})[1])['connection'])
-                self.assertEqual(code,new_code)
+                self.assertEqual(json.loads(request('/api/edits')[1])['workspaceKey'],scope)
                 self.assertEqual(json.loads(request('/api/manage?module=records')[1])['data'][0]['名称'], '{隔离公司}')
+                path=Path(tmp)/'投递数据/用户编辑数据.json'
+                for bad in ({'edits':[],'pref':{}},{'edits':{},'pref':[]},{'edits':{'broken':None},'pref':{}},None):
+                    path.write_text(json.dumps(bad),encoding='utf-8')
+                    self.assertEqual(request('/api/edits')[0],503)
+                    self.assertEqual(request('/api/prospects')[0],503)
+                for route,name,key in [('questionbank','逐字稿数据.json','categories'),('reviews','面试复盘数据.json','sessions'),('preps','面试准备数据.json','preps')]:
+                    (Path(tmp)/'投递数据'/name).write_text(json.dumps({key:[None]}),encoding='utf-8')
+                    self.assertEqual(request('/api/'+route)[0],503)
             finally: stop(process)
 
     def test_desktop_without_session_token_fails_closed(self):

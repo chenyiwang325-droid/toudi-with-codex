@@ -8,6 +8,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import uuid
@@ -152,17 +153,24 @@ class Workbench:
         self.__dict__.pop('_materials_override',None)
     def transaction(self, changes):
         tx=self.data/'.transactions'/uuid.uuid4().hex; tx.mkdir(parents=True)
-        materials=remote_files.registered_materials(self.root)
-        settings=changes.get(MODULES['settings'][0])
-        if settings is not None: materials=list(dict.fromkeys([*materials,*json.loads(settings).get('materialFiles',[])]))
-        self._materials_override=materials
-        for entry in materials: remote_files.material_path(self.root,entry)
-        state={'state':'pending','createdAt':datetime.now(timezone.utc).isoformat(),'before':{},'materials':materials}
-        for relative,content in changes.items():
-            target=self.path(relative); state['before'][relative]=target.exists()
-            if target.exists(): atomic_write(tx/'before'/relative,target.read_bytes())
-            if content is not None: atomic_write(tx/'after'/relative,content)
-        atomic_write(tx/'manifest.json',encoded(state))
+        try:
+            materials=remote_files.registered_materials(self.root)
+            settings=changes.get(MODULES['settings'][0])
+            if settings is not None: materials=list(dict.fromkeys([*materials,*json.loads(settings).get('materialFiles',[])]))
+            self._materials_override=materials
+            for entry in materials: remote_files.material_path(self.root,entry)
+            state={'state':'pending','createdAt':datetime.now(timezone.utc).isoformat(),'before':{},'materials':materials}
+            for relative,content in changes.items():
+                target=self.path(relative); state['before'][relative]=target.exists()
+                if target.exists(): atomic_write(tx/'before'/relative,target.read_bytes())
+                if content is not None: atomic_write(tx/'after'/relative,content)
+            atomic_write(tx/'manifest.json',encoded(state))
+        except BaseException:
+            # No business file has been changed before the pending journal is prepared.
+            # A failed backup/staging step is not a recoverable user modification.
+            self.__dict__.pop('_materials_override',None)
+            shutil.rmtree(tx)
+            raise
         try:
             for relative,content in changes.items():
                 target=self.path(relative)

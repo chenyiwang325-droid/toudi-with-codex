@@ -9,7 +9,8 @@ const managementLabels = {
 let management = null,
   managementDraftTimer = null,
   settingsState = null,
-  persistQueue = Promise.resolve();
+  persistQueue = Promise.resolve(),
+  workspaceDraftsReady = false;
 function managementWritable() {
   return !window.__SNAPSHOT__ && serverMode;
 }
@@ -21,6 +22,7 @@ async function managementRequest(module, body) {
     },
     body: JSON.stringify({
       module,
+      workspaceKey: toudiWorkspaceStorage.id,
       ...body
     })
   } : {});
@@ -95,8 +97,8 @@ async function openManagement(module) {
 }
 function managementRender() {
   const m = management;
-  const legacyDraft=JSON.parse(localStorage.getItem('toudiManagementDraft') || 'null');
-  const draft = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}')[m.module] || (legacyDraft?.module === m.module ? legacyDraft : null);
+  const legacyDraft=JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDraft') || 'null');
+  const draft = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}')[m.module] || (legacyDraft?.module === m.module ? legacyDraft : null);
   document.getElementById('managementTools').innerHTML = (draft ? `<button class="btn" onclick="resumeManagementDraft('${m.module}')">继续未保存编辑</button>` : '') + `<button class="btn" onclick="managementSelect(-1)">新增</button><label class="btn">选择导入文件<input hidden type="file" accept=".json,.md,.markdown" onchange="managementImport(event)"></label><button class="btn" onclick="managementExport()">导出完整规范资料</button><button class="btn" onclick="managementExportDraft()">导出当前草稿</button>`;
   document.getElementById('managementBody').innerHTML = `<aside class="management-list">${managementItems().map((item, i) => `<button class="btn btn-sm" onclick="managementSelect(${i})">${esc(managementName(item))}</button>`).join('') || '<p class="management-message">尚无资料，可新增或导入。</p>'}</aside><div id="managementForm" class="management-form"></div>`;
   managementSelect(m.index);
@@ -303,10 +305,10 @@ async function managementCommit() {
     m.version = latest.version;
     m.data = latest.data;
     m.keys = latest.keys || m.keys;
-    localStorage.removeItem('toudiManagementDraft');
-    const remaining = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}');
+    toudiWorkspaceStorage.removeItem('toudiManagementDraft');
+    const remaining = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}');
     delete remaining[m.module];
-    localStorage.setItem('toudiManagementDrafts', JSON.stringify(remaining));
+    toudiWorkspaceStorage.setItem('toudiManagementDrafts', JSON.stringify(remaining));
     try {
       await managementClearRemoteDraft();
     } catch (e) {}
@@ -347,6 +349,7 @@ function managementExportDraft() {
     };
   }
   downloadBlob(new Blob([JSON.stringify({
+    workspaceKey: toudiWorkspaceStorage.id,
     module: management.module,
     base: management.version,
     ...payload
@@ -457,58 +460,74 @@ async function managementRemember() {
     };
   }
   const draft = {
+    workspaceKey: toudiWorkspaceStorage.id,
     module: management.module,
     base: management.version,
     candidate,
     savedAt: new Date().toISOString()
   };
-  localStorage.setItem('toudiManagementDraft', JSON.stringify(draft));
-  const all = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}');
+  toudiWorkspaceStorage.setItem('toudiManagementDraft', JSON.stringify(draft));
+  const all = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}');
   all[draft.module] = draft;
-  localStorage.setItem('toudiManagementDrafts', JSON.stringify(all));
-  clearTimeout(managementDraftTimer);
-  managementDraftTimer = setTimeout(() => persistDrafts().catch(() => {}), 350);
+  toudiWorkspaceStorage.setItem('toudiManagementDrafts', JSON.stringify(all));
+  scheduleDraftMirror();
 }
 async function managementClearRemoteDraft() {
   clearTimeout(managementDraftTimer);
   await persistDrafts();
 }
 async function persistDrafts() {
-  if (!managementWritable() || window.__TOUDI_DESKTOP__?.diagnostic) return;
-  return enqueuePersist('drafts', () => ({
-    legacyDrafts: listUnsavedDrafts(),
-    management: JSON.parse(localStorage.getItem('toudiManagementDraft') || 'null'),
-    managementDrafts: JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}')
+  if (!workspaceDraftsReady || !managementWritable() || window.__TOUDI_DESKTOP__?.diagnostic) return;
+  return enqueuePersist('drafts', latest => ({
+    legacyDrafts: [
+      ...(latest.legacyDrafts||[]).filter(entry=>{
+        const draft=parseDraft(JSON.stringify(entry.draft));
+        if(draft)return draft.sessionId!==draftSessionId&&confirmedDrafts.get(entry.key)!==JSON.stringify(canonicalJson(draft));
+        return !(unscopedRemoteDrafts?.legacyDrafts||[]).some(old=>JSON.stringify(canonicalJson(old))===JSON.stringify(canonicalJson(entry)));
+      }),
+      ...listUnsavedDrafts().filter(entry=>entry.draft.sessionId===draftSessionId)
+    ],
+    management: JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDraft') || 'null'),
+    managementDrafts: JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}'),
+    unscopedRecovery: unscopedRemoteDrafts
   }));
 }
 function enqueuePersist(module, dataFn) {
   const job = async () => {
     const latest = await managementRequest(module);
-    await managementRequest(module, {
-      base: latest.version,
-      action: 'replace',
-      data: {
-        ...latest.data,
-        ...dataFn()
-      }
-    });
+    const data={...latest.data,...dataFn(latest.data)};
+    if(JSON.stringify(canonicalJson(data))===JSON.stringify(canonicalJson(latest.data)))return latest;
+    return managementRequest(module, {base:latest.version,action:'replace',data});
   };
   const next = persistQueue.then(job, job);
   persistQueue = next.catch(() => {});
   return next;
 }
+function scheduleDraftMirror(){clearTimeout(managementDraftTimer);managementDraftTimer=setTimeout(()=>persistDrafts().catch(()=>{}),350);}
 const localWriteDraft = writeDraft;
 writeDraft = function (...args) {
   const result = localWriteDraft(...args);
-  clearTimeout(managementDraftTimer);
-  managementDraftTimer = setTimeout(() => persistDrafts().catch(() => {}), 350);
+  scheduleDraftMirror();
   return result;
 };
-const browserSaveWorkspace = saveWorkspace;
+// Acknowledged saves and rebased in-flight drafts must update the disk mirror too.
+const localClearOwnDraft = clearOwnDraft;
+clearOwnDraft = function (...args) {
+  localClearOwnDraft(...args);
+  scheduleDraftMirror();
+};
+const localAdvanceOwnDraftBase = advanceOwnDraftBase;
+advanceOwnDraftBase = function (...args) {
+  const changed = localAdvanceOwnDraftBase(...args);
+  if (changed) {
+    scheduleDraftMirror();
+  }
+  return changed;
+};
 saveWorkspace = async function () {
   if (window.__TOUDI_DESKTOP__?.diagnostic) return;
   pageSize = Number(workspace.pageSize) || 50;
-  localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
+  toudiWorkspaceStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
   applyWorkspace();
   if (!managementWritable()) {
     showToast('显示偏好已保存到本设备');
@@ -525,10 +544,10 @@ saveWorkspace = async function () {
       }
     });
     settingsState = result;
-    localStorage.removeItem('toudiPendingSettings');
+    toudiWorkspaceStorage.removeItem('toudiPendingSettings');
     showToast('显示偏好已保存到工作区');
   } catch (e) {
-    localStorage.setItem('toudiPendingSettings', JSON.stringify(workspace));
+    toudiWorkspaceStorage.setItem('toudiPendingSettings', JSON.stringify(workspace));
     showToast('配置未提交，已保留本设备草稿：' + e.message);
   }
 };
@@ -550,30 +569,41 @@ async function managementInit() {
     else if (['table','kanban','charts'].includes(view)) render();
     const saved = settingsState.data.display;
     if (saved) {
-      const pending = JSON.parse(localStorage.getItem('toudiPendingSettings') || 'null');
+      const pending = JSON.parse(toudiWorkspaceStorage.getItem('toudiPendingSettings') || 'null');
       workspace = {
         ...WORKSPACE_DEFAULT,
         ...(pending || saved)
       };
-      localStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
+      toudiWorkspaceStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
       applyWorkspace();
       if (workspace.defaultView && workspace.defaultView !== view) switchView(workspace.defaultView);
       else if (view === 'settings') renderSettings();
-    } else if (!window.__TOUDI_DESKTOP__?.diagnostic && localStorage.getItem(WORKSPACE_KEY)) {
+    } else if (!window.__TOUDI_DESKTOP__?.diagnostic && toudiWorkspaceStorage.getItem(WORKSPACE_KEY)) {
       await saveWorkspace();
     }
     const remote = await managementRequest('drafts');
-    for (const entry of remote.data.legacyDrafts || []) {
-      if (entry.key && !localStorage.getItem(entry.key)) localStorage.setItem(entry.key, JSON.stringify(entry.draft));
+    // Old drafts did not record a workspace. Preserve them for export, without auto-applying.
+    unscopedRemoteDrafts=remote.data.unscopedRecovery||null;
+    const unknown={};
+    for(const entry of remote.data.legacyDrafts||[]){
+      const draft=parseDraft(JSON.stringify(entry.draft));
+      if(draft&&DRAFT_PREFIX[draft.domain]){
+        const key=DRAFT_PREFIX[draft.domain]+draft.workspaceKey+':'+draft.sessionId;
+        if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(draft));
+      }else (unknown.legacyDrafts ||= []).push(entry);
     }
-    if (remote.data.managementDrafts) {
-      const current = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}');
-      localStorage.setItem('toudiManagementDrafts', JSON.stringify({
-        ...remote.data.managementDrafts,
-        ...current
-      }));
+    const current=JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts')||'{}');
+    for(const [module,draft] of Object.entries(remote.data.managementDrafts||{})){
+      if(draft?.workspaceKey===toudiWorkspaceStorage.id){if(!current[module])current[module]=draft;}
+      else (unknown.managementDrafts ||= {})[module]=draft;
     }
-    if (remote.data.management && !localStorage.getItem('toudiManagementDraft')) localStorage.setItem('toudiManagementDraft', JSON.stringify(remote.data.management));
+    toudiWorkspaceStorage.setItem('toudiManagementDrafts',JSON.stringify(current));
+    if(remote.data.management){
+      if(remote.data.management.workspaceKey===toudiWorkspaceStorage.id){if(!toudiWorkspaceStorage.getItem('toudiManagementDraft'))toudiWorkspaceStorage.setItem('toudiManagementDraft',JSON.stringify(remote.data.management));}
+      else unknown.management=remote.data.management;
+    }
+    if(Object.keys(unknown).length)unscopedRemoteDrafts={...(unscopedRemoteDrafts||{}),...unknown};
+    workspaceDraftsReady=true;
     await persistDrafts();
   } catch (e) {
     showToast('工作区配置读取失败：' + e.message);
@@ -670,7 +700,7 @@ async function commitBackup() {
   }
 }
 async function resumeManagementDraft(module) {
-  const all = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}');
+  const all = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}');
   if (!module && Object.keys(all).length > 1) {
     showManagementDialog();
     document.getElementById('managementTitle').textContent = '选择管理草稿';
@@ -679,7 +709,7 @@ async function resumeManagementDraft(module) {
     document.getElementById('managementBody').innerHTML = '<div>' + Object.keys(all).filter(k => managementLabels[k]).map(k => '<p><button class="btn" onclick="resumeManagementDraft(\'' + k + '\')">' + esc(managementLabels[k]) + '</button> ' + esc(all[k].savedAt) + '</p>').join('') + '</div>';
     return;
   }
-  const legacy=JSON.parse(localStorage.getItem('toudiManagementDraft') || 'null');
+  const legacy=JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDraft') || 'null');
   const draft = module ? all[module] || (legacy?.module === module ? legacy : null) : Object.values(all)[0] || legacy;
   if (!draft) {
     showToast('没有管理草稿');
@@ -781,7 +811,7 @@ function workspaceDetailDraftExists() {
 function workspaceHasDraft(module) {
   const domain = module === 'records' ? 'edits' : module;
   let stored;
-  try { stored = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}'); } catch (error) { return true; }
+  try { stored = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}'); } catch (error) { return true; }
   const managerOpen = document.getElementById('managementOverlay')?.style.display === 'flex';
   if (managerOpen || stored[module] || listUnsavedDrafts().some(item => item.domain === domain)) return true;
   if (module === 'records' || module === 'edits') {
@@ -833,7 +863,7 @@ async function refreshWorkspaceData(manual = false) {
       workspaceReadStates[module] = 'ready';
       const fingerprint = JSON.stringify(result.value.data);
       if (workspaceRefreshSnapshots.get(module) === fingerprint) continue;
-      if ((module === 'settings' && (workspaceSettingsSaving || localStorage.getItem('toudiPendingSettings'))) || workspaceHasDraft(module) || (module === 'records' && workspaceHasDraft('edits'))) {
+      if ((module === 'settings' && (workspaceSettingsSaving || toudiWorkspaceStorage.getItem('toudiPendingSettings'))) || workspaceHasDraft(module) || (module === 'records' && workspaceHasDraft('edits'))) {
         workspacePendingUpdates.add(module);
         continue;
       }
@@ -843,7 +873,7 @@ async function refreshWorkspaceData(manual = false) {
         sourcePreferenceRules = settingsState.data.preferenceRules || null;
         if (settingsState.data.display) {
           workspace = {...WORKSPACE_DEFAULT,...settingsState.data.display};
-          localStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));
+          toudiWorkspaceStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));
           applyWorkspace();
         }
         renderQuickViews();
@@ -923,7 +953,7 @@ render = function (...args) {
 installWorkspaceRefresh();
 
 async function selectDesktopWorkspace() {
-  if (['records','edits','qbank','preps','prospects','reviews'].some(workspaceHasDraft) || workspaceSettingsSaving || localStorage.getItem('toudiPendingSettings')) {
+  if (['records','edits','qbank','preps','prospects','reviews'].some(workspaceHasDraft) || workspaceSettingsSaving || toudiWorkspaceStorage.getItem('toudiPendingSettings')) {
     showToast('请先保存或导出未提交草稿，再切换工作区');
     return;
   }
