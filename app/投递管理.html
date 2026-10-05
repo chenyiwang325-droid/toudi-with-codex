@@ -36,9 +36,9 @@ a:hover { text-decoration: underline; }
 .sb-search input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(56,106,112,.15); }
 .sb-section { padding: 10px 10px; }
 .sb-section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; padding: 17px 14px 8px; }
-.sb-item { display: grid; align-items: center; gap: 8px; padding: 9px 8px; border-radius: var(--radius-sm); color: var(--text2); font-size: 13px; cursor: pointer; transition: all .15s; margin-bottom: 1px; border: 0; background: none; width: 100%; text-align: left; font: inherit; min-height: 40px; grid-template-columns: 18px minmax(0,1fr) auto; white-space: nowrap; height: 40px; line-height: 20px; border-left: 3px solid transparent; }
-.sb-item:hover { background: #f6f7fa; color: var(--sb-text-hover); }
-.sb-item.active { background: transparent; color: var(--primary); font-weight: 500; border-left: 3px solid var(--primary); }
+.sb-item { display: grid; align-items: center; gap: 8px; padding: 9px 8px; border-radius: var(--radius-sm); color: var(--text2); font-size: 13px; cursor: pointer; transition: all .15s; margin-bottom: 1px; border: 0; background: none; width: 100%; text-align: left; font: inherit; min-height: 40px; grid-template-columns: 18px minmax(0,1fr) auto; white-space: nowrap; height: 40px; line-height: 20px;  }
+.sb-item:hover { background: var(--bg); color: var(--sb-text-hover); }
+.sb-item.active { background: var(--primary-light); color: var(--text); font-weight: 600; }
 .sb-item .icon { width: 20px; }
 .sb-item .icon svg { width: 15px; height: 15px; }
 .sb-item .count { margin-left: auto; font-size: 11px; color: var(--text3); background: var(--bg); padding: 1px 5px; border-radius: 8px; min-width: 32px; font-variant-numeric: tabular-nums; text-align: right; }
@@ -494,7 +494,7 @@ details.qb-co-fold .qb-co-body .qb-group-fold:first-of-type { margin-top: 10px; 
 .qb-search-summary { font-size: 13px; color: var(--text2); padding: 6px 0; }
 .module-nav { display: grid; gap: 3px; padding: 0 12px 14px; border-bottom: 1px solid var(--border); }
 .module-nav button { border: 0; background: none; color: var(--text2); text-align: left; padding: 11px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; }
-.module-nav button.active { background:transparent; color:var(--text); font-weight:600; border-left:2px solid var(--primary); border-radius:0; }
+.module-nav button.active { background:var(--primary-light); color:var(--text); font-weight:600; border-radius:6px; }
 .module-nav button:hover { background: var(--bg); }
 .btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
@@ -1097,9 +1097,9 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
   <div class="modal pref-dialog" role="dialog" aria-modal="true" aria-labelledby="prefDialogTitle">
     <div class="pref-dialog-head"><div><h2 id="prefDialogTitle">求职偏好</h2><p>用于“符合偏好”快捷视图。</p></div><button id="prefClose" class="btn btn-sm" aria-label="关闭偏好设置" onclick="closePrefModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>关闭</button></div>
     <div class="pref-tabs" role="tablist" aria-label="偏好分类"><button id="prefTab-natures" role="tab" aria-controls="prefPanel-natures" onclick="switchPrefTab('natures')">企业性质</button><button id="prefTab-industries" role="tab" aria-controls="prefPanel-industries" onclick="switchPrefTab('industries')">行业方向</button><button id="prefTab-education" role="tab" aria-controls="prefPanel-education" onclick="switchPrefTab('education')">学历要求</button></div><div class="pref-dialog-body">
-    <section class="pref-section" id="prefPanel-natures" role="tabpanel" aria-labelledby="prefTab-natures"><h4>企业性质</h4><p class="pref-help">企业性质或行业方向满足一项，并符合学历要求，即可进入“适合我”。</p><div class="pref-options" id="prefNatures"></div></section>
-    <section class="pref-section" id="prefPanel-industries" role="tabpanel" aria-labelledby="prefTab-industries"><h4>行业方向</h4><p class="pref-help">先展开大类，再选择具体方向。</p><div class="pref-options" id="prefIndustries"></div></section>
-    <section class="pref-section" id="prefPanel-education" role="tabpanel" aria-labelledby="prefTab-education"><h4>学历要求</h4><p class="pref-help">选择希望保留的招聘门槛。未注明学历的记录仍会保留；具体资格以招聘公告为准。</p><div class="pref-options" id="prefEducation"></div></section>
+    <section class="pref-section" id="prefPanel-natures" role="tabpanel" aria-labelledby="prefTab-natures"><h4>企业性质</h4><p class="pref-help">选择已确认的信源词条。未知标签继续保留，不改变手动标记。</p><div class="pref-options" id="prefNatures"></div></section>
+    <section class="pref-section" id="prefPanel-industries" role="tabpanel" aria-labelledby="prefTab-industries"><h4>行业方向</h4><p class="pref-help">先展开自己的信源分类，再选择具体方向；未分类词条保留原文。</p><div class="pref-options" id="prefIndustries"></div></section>
+    <section class="pref-section" id="prefPanel-education" role="tabpanel" aria-labelledby="prefTab-education"><h4>学历要求</h4><p class="pref-help">只按已确认的学历词条筛选；未注明或无法判断的要求仍保留。</p><div class="pref-options" id="prefEducation"></div></section>
     </div><div class="modal-actions">
       <span class="pref-save-hint">保存后应用于“符合偏好”</span><button class="btn" onclick="closePrefModal()">取消</button>
       <button class="btn btn-primary" onclick="savePref()">保存偏好</button>
@@ -1373,13 +1373,7 @@ function matchQV(item, qvId) {
     case 'starred': return item._starred;
     case 'recommended': {
       if(item._research) return false;
-      const nature = item['性质']||'';
-      const industry = item['行业']||'';
-      const edu = item['学历要求']||'';
-      const natureMatch = preferences.natures.some(n => normalizePreference(nature,'nature').includes(normalizePreference(n,'nature')));
-      const industryMatch = preferences.industries.some(i => normalizePreference(industry).includes(normalizePreference(i)));
-      const eduMatch = !edu || preferences.education.some(e => normalizePreference(edu,'education').includes(normalizePreference(e,'education')) || e === '');
-      return (natureMatch || industryMatch) && eduMatch;
+      return matchesJobPreferences(item);
     }
     case 'inProgress': return ['已投递','笔试','面试'].includes(item._status);
     default: return true;
@@ -3084,7 +3078,7 @@ const originalBuildGroup=buildFilterGroup;buildFilterGroup=function(label,key,va
 const originalBuildPanel=buildFilterPanel;buildFilterPanel=function(){if(document.getElementById('filterModal')?.style.display!=='flex')return;const panel=document.getElementById('filterPanel'),saved=Object.fromEntries([...panel.querySelectorAll('.filter-group')].map(g=>[g.dataset.group,{search:g.querySelector('input[type=search]')?.value||'',zero:g.querySelector('.zero-options')?.open||false}]));originalBuildPanel();panel.querySelectorAll('.filter-group').forEach(g=>{const s=saved[g.dataset.group];if(!s)return;const inp=g.querySelector('input[type=search]');inp.value=s.search;searchFilterOptions(inp);if(g.querySelector('.zero-options'))g.querySelector('.zero-options').open=s.zero;});};
 const originalSwitch=switchView;switchView=function(v){ensureViewData(v);if(v==='settings'){if(view==='qbank')rememberQbForm();saveViewScroll();view=v;['tableView','kanbanView','chartsView','reviewView','qbView','prospectView'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('settingsView').style.display='';renderSettings();updateDashboardChrome();document.getElementById('topbarTitle').textContent='设置';}else{document.getElementById('settingsView').style.display='none';originalSwitch(v);}refreshWorkspaceChrome();revealModule();};
 function revealModule(){const id=({table:'tableView',kanban:'kanbanView',charts:'chartsView',qbank:'qbView',review:'reviewView',prospect:'prospectView',settings:'settingsView'})[view],el=document.getElementById(id);if(!el)return;el.classList.remove('module-enter');void el.offsetWidth;el.classList.add('module-enter');}
-function refreshWorkspaceChrome(){document.getElementById('settingsShortcut').hidden=view==='settings';updateDirectoryControls();applyTheme();const dashboard=['table','kanban','charts'].includes(view);document.body.classList.toggle('content-module',!dashboard);document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(view));document.getElementById('quickViews').style.display=dashboard?'':'none';document.getElementById('deliverySearchEntry').hidden=!dashboard;document.getElementById('columnMenuButton').hidden=view!=='table'||innerWidth<=900;document.querySelectorAll('.module-nav button').forEach(b=>b.classList.toggle('active',b.dataset.module===(dashboard?'delivery':view)));document.getElementById('deliveryModes').style.display=dashboard?'':'none';if(document.getElementById('sidebar').classList.contains('open'))toggleSidebar();}
+function refreshWorkspaceChrome(){const managementEntry=document.getElementById('managementEntry');if(managementEntry)managementEntry.hidden=view==='settings';document.getElementById('settingsShortcut').hidden=view==='settings';updateDirectoryControls();applyTheme();const dashboard=['table','kanban','charts'].includes(view);document.body.classList.toggle('content-module',!dashboard);document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(view));document.getElementById('quickViews').style.display=dashboard?'':'none';document.getElementById('deliverySearchEntry').hidden=!dashboard;document.getElementById('columnMenuButton').hidden=view!=='table'||innerWidth<=900;document.querySelectorAll('.module-nav button').forEach(b=>b.classList.toggle('active',b.dataset.module===(dashboard?'delivery':view)));document.getElementById('deliveryModes').style.display=dashboard?'':'none';if(document.getElementById('sidebar').classList.contains('open'))toggleSidebar();}
 function initWorkspaceUI(){
  if(window.__SNAPSHOT__){document.getElementById('storageBadge').textContent='只读快照 · 个人记录不可编辑';}
  pageSize=Number(workspace.pageSize)||50;
@@ -3157,100 +3151,105 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(wor
 function updateDirectoryControls(){for(const id of ['qbSide','rvSide','prospectSide']){const side=document.getElementById(id);if(!side)continue;const collapsed=side.classList.contains('rv-collapsed');for(const button of side.querySelectorAll('.rv-collapse-btn,.rv-rail-btn:first-child')){button.textContent=button.classList.contains('rv-collapse-btn')?'收起目录':'展开目录';button.title=button.textContent;button.setAttribute('aria-label',button.textContent);button.setAttribute('aria-controls',id);button.setAttribute('aria-expanded',String(!collapsed));}}}
 // Shared, explicit disclosure controls; the summary alone expands the content.
 function disclosureAction(){return '<span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></span>';}
-// Canonical display labels retain source aliases. Opening/cancelling never migrates saved preferences.
+// Canonical display labels are defined by the user's source initialization, never guessed.
+let sourcePreferenceRules=null;
+function preferenceDimension(kind){return ({nature:'natures',industry:'industries',education:'education'})[kind]||kind;}
+function cleanPreference(value){return String(value??'').normalize('NFKC').replace(/[\u200b-\u200d\ufeff]/g,'').trim();}
+function preferenceRule(kind){return sourcePreferenceRules?.dimensions?.[preferenceDimension(kind)]||{};}
 function normalizePreference(value,kind='industry'){
-  let v=String(value||'').normalize('NFKC').replace(/[\u200b-\u200d\ufeff]/g,'').trim();
-  if(kind==='nature')return ({'民企':'民营企业','民营':'民营企业','国有企业':'国企','中央企业':'央企','外资企业':'外企'})[v]||v;
-  if(kind==='education')return ({'大专及以上':'专科及以上','本科及研究生':'本科及以上','本科以上':'本科及以上','硕士研究生及以上':'硕士及以上','硕士以上':'硕士及以上','博士研究生':'博士'})[v]||v;
-  return v;
+  const raw=cleanPreference(value),aliases=preferenceRule(kind).aliases||{};
+  const match=Object.entries(aliases).find(([key])=>cleanPreference(key)===raw);
+  return match?cleanPreference(match[1]):raw;
+}
+function sourcePreferenceValues(value,kind){
+  const separator=preferenceRule(kind).separator||'';
+  return (separator?String(value||'').split(separator):[String(value||'')]).map(v=>normalizePreference(v,kind)).filter(Boolean);
 }
 function preferenceEntries(values,selected,kind){
   const entries=new Map();
-  [...values,...selected].filter(v=>v!==null&&v!==undefined).forEach(raw=>{const label=normalizePreference(raw,kind);if(!label&&raw!=='')return;if(!entries.has(label))entries.set(label,{label,aliases:[],original:[]});const e=entries.get(label);if(!e.aliases.includes(raw))e.aliases.push(raw);if(selected.includes(raw)&&!e.original.includes(raw))e.original.push(raw);});
-  return [...entries.values()];
+  // Saved spellings stay intact on open/cancel/save. A confirmed alias can share a display label.
+  [...values,...selected].filter(v=>v!==null&&v!==undefined).forEach(raw=>{
+    const label=normalizePreference(raw,kind);if(!label&&raw!=='')return;
+    if(!entries.has(label))entries.set(label,{label,aliases:[],original:[]});
+    const entry=entries.get(label);if(!entry.aliases.includes(raw))entry.aliases.push(raw);
+    if(selected.includes(raw)&&!entry.original.includes(raw))entry.original.push(raw);
+  });return [...entries.values()];
+}
+function preferenceSourceEntries(kind){
+  const dimension=preferenceDimension(kind),field={natures:'性质',industries:'行业',education:'学历要求'}[dimension];
+  const separator=preferenceRule(kind).separator||'';
+  const values=data.flatMap(row=>separator?String(row[field]||'').split(separator):[row[field]]).filter(Boolean);
+  return preferenceEntries(values,preferences[dimension]||[],kind);
+}
+function configuredPreferenceGroups(kind){
+  const entries=preferenceSourceEntries(kind),used=new Set();
+  const groups=(preferenceRule(kind).groups||[]).map(group=>{
+    const values=new Set(group.values.map(v=>normalizePreference(v,kind)));
+    const matched=entries.filter(entry=>values.has(entry.label)&&!used.has(entry.label));
+    matched.forEach(entry=>used.add(entry.label));return {name:group.name,values:matched};
+  }).filter(group=>group.values.length);
+  const remaining=entries.filter(entry=>!used.has(entry.label));
+  if(remaining.length)groups.push({name:'原始词条 · 待整理',values:remaining,unmapped:true});
+  return groups;
+}
+function preferenceMatch(value,selected,kind){
+  if(!selected.length||selected.includes(''))return null; // inactive dimension
+  const values=sourcePreferenceValues(value,kind);if(!values.length)return null;
+  const choices=new Set(selected.map(v=>normalizePreference(v,kind)));
+  if(values.some(v=>choices.has(v)))return true;
+  const rule=preferenceRule(kind),known=new Set([
+    ...Object.values(rule.aliases||{}).map(v=>cleanPreference(v)),
+    ...(rule.groups||[]).flatMap(g=>g.values.map(v=>normalizePreference(v,kind)))
+  ]);
+  // Uninitialized or newly encountered vocabulary is undecided, never a negative qualification.
+  if(values.some(v=>!known.has(v)))return null;
+  return false;
+}
+function matchesJobPreferences(item){
+  const active=[['性质',preferences.natures,'nature'],['行业',preferences.industries,'industry']].filter(([,selected])=>selected.length&&!selected.includes(''));
+  const values=active.map(([field,selected,kind])=>preferenceMatch(item[field],selected,kind));
+  const direction=!values.length||(sourcePreferenceRules?.directionMatch==='all'?values.every(v=>v!==false):values.some(v=>v!==false));
+  return direction&&preferenceMatch(item['学历要求'],preferences.education,'education')!==false;
 }
 function preferenceChoice(entry,description=''){
-  return `<label class="pref-option" data-industry-leaf="${esc(entry.label)}"><input type="checkbox" value="${esc(entry.label)}" data-aliases="${esc(JSON.stringify(entry.aliases))}" data-original="${esc(JSON.stringify(entry.original))}" ${entry.original.length?'checked':''} onchange="updateIndustrySelection()"><span>${esc(entry.display||entry.label||'所有学历要求')}${description?`<small>${esc(description)}</small>`:''}</span></label>`;
+  return `<label class="pref-option" data-industry-leaf="${esc(entry.label)}" title="${esc(entry.label+(description?' · '+description:''))}"><input type="checkbox" value="${esc(entry.label)}" data-aliases="${esc(JSON.stringify(entry.aliases))}" data-original="${esc(JSON.stringify(entry.original))}" ${entry.original.length?'checked':''} onchange="updateIndustrySelection()"><span>${esc(entry.label||'所有学历要求')}</span></label>`;
 }
-function readPreferenceChoices(id){
-  return [...new Set([...document.querySelectorAll('#'+id+' input[type=checkbox]:checked')].flatMap(el=>{const original=JSON.parse(el.dataset.original||'[]');return original.length?original:JSON.parse(el.dataset.aliases||'[]');}))];
-}
+function readPreferenceChoices(id){return [...new Set([...document.querySelectorAll('#'+id+' input[type=checkbox]:checked')].flatMap(el=>{const original=JSON.parse(el.dataset.original||'[]');return original.length?original:JSON.parse(el.dataset.aliases||'[]');}))];}
 function switchPrefTab(key){
   document.querySelectorAll('.pref-tabs [role=tab]').forEach(el=>{const active=el.id==='prefTab-'+key;el.setAttribute('aria-selected',String(active));el.tabIndex=active?0:-1;});
   document.querySelectorAll('.pref-section[role=tabpanel]').forEach(el=>el.hidden=el.id!=='prefPanel-'+key);
   document.querySelector('#prefModal .pref-dialog-body').scrollTop=0;
 }
 document.addEventListener('keydown',event=>{if(!event.target.matches('.pref-tabs [role=tab]')||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const tabs=[...document.querySelectorAll('.pref-tabs [role=tab]')],i=tabs.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(i+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;switchPrefTab(tabs[next].id.replace('prefTab-',''));tabs[next].focus();});
-function renderNaturePreferences(){
-  const entries=preferenceEntries(data.map(d=>d['性质']).filter(Boolean),preferences.natures,'nature');
-  const groups=[['国有与公共部门',/央|国企|事业|政府|国家实验室/],['民营与外资',/民营|外企|合资/],['其他组织形式',/.*/]];
-  document.getElementById('prefNatures').classList.remove('pref-options');
-  document.getElementById('prefNatures').innerHTML=groups.map(([name,pattern])=>{const matched=entries.filter(e=>!e.used&&pattern.test(e.label));matched.forEach(e=>e.used=true);return matched.length?`<div class="pref-subgroup"><h5>${name}</h5><div class="pref-options">${matched.map(e=>preferenceChoice(e,e.label==='央国企'?'信源未区分央企与地方国企':e.aliases.length>1?'合并同义名称：'+e.aliases.join('、'):'')).join('')}</div></div>`:'';}).join('');
+function preferenceGroupsMarkup(kind){
+  const groups=configuredPreferenceGroups(kind);
+  if(!groups.length)return '<p class="pref-help">还没有可选词条。先让 Agent 根据你的信源初始化，或手动添加招聘记录。</p>';
+  return groups.map(group=>`<details class="pref-special" ${groups.length===1?'open':''}><summary><span class="disclosure-title">${esc(group.name)}</span><span class="industry-count">${group.values.length} 项</span>${disclosureAction()}</summary><div class="pref-special-content">${group.unmapped?'<p class="pref-help">保留信源原文，等待确认归类。未选中这些词条也不会被当作不符合资格。</p>':''}<div class="pref-options">${group.values.map(entry=>preferenceChoice(entry,entry.aliases.length>1?'已确认同义词：'+entry.aliases.join('、'):'')).join('')}</div></div></details>`).join('');
 }
-function renderEducationPreferences(){
-  const entries=preferenceEntries(data.map(d=>d['学历要求']).filter(Boolean),preferences.education,'education');
-  const order=['不限','学历不限','高中及以上','中专及以上','专科','专科及以上','本科','本科及以上','硕士','硕士及以上','研究生','博士','博士及以上'];
-  const simple=entries.filter(e=>order.includes(e.label)||e.label==='').sort((a,b)=>order.indexOf(a.label)-order.indexOf(b.label));
-  const special=entries.filter(e=>!simple.includes(e));
-  document.getElementById('prefEducation').classList.remove('pref-options');
-  document.getElementById('prefEducation').innerHTML=`<div class="pref-options">${simple.map(e=>preferenceChoice(e,e.aliases.length>1?'包含：'+e.aliases.join('、'):'')).join('')}</div>${special.length?`<details class="pref-special"><summary><span class="disclosure-title">分岗位、届别等特殊要求（${special.length} 项）</span>${disclosureAction()}</summary><div class="pref-special-content"><p class="pref-help">这类说明无法等同于单一学历门槛，单独保留选择和原文。</p><div class="pref-options">${special.map((e,i)=>{const names=[...new Set(data.filter(d=>e.aliases.includes(d['学历要求'])).map(d=>d['名称']))];return preferenceChoice({...e,display:names.length?names.slice(0,2).join('、')+(names.length>2?'等':''):'已保存的特殊要求 '+(i+1)},e.label);}).join('')}</div></div></details>`:''}`;
-}
-// Groups describe business domains, not qualifications or exclusion decisions.
-const INDUSTRY_DISPLAY_GROUPS=[
- ['互联网、软件与人工智能','大模型|深度学习|数字孪生|云安全|终端安全|^AI$|IT解决|3D生成|3D视觉|并行计算|计算机系统|科学计算|企业信息化|图像处理|图形学|边缘计算|信息工程|信息科技|移动应用|音视频云|云平台|云桌面|云\\+AI|运维服务|智能决策|IT运维|量子科技|互联网|软件|人工智能|网络安全|信息安全|云计算|大数据|数据服务|数据中心|计算机视觉|自然语言|算法|SaaS|ERP|算力|数字科技|信息技术|数字化|智能语音|语音识别|智能交互|虚拟仿真|三维可视化|远程办公|计算平台|AI技术|心智技术|系统集成|量子计算|量子信息|网络维护|数字服务|反欺诈|空间智能|视频编辑工具|虚拟现实|AI产品|智能科技'],
- ['电子、半导体与通信','功率器件|手机|服务器|个人电脑|硬盘|光模块|视频监控|显示面板|显示器件|智能终端|磁性元件|电感器|射频|印制线路板|红外|接口IP|晶圆|微波光子|无线连接|智能卡|智能可穿戴|IC设计|功率放大|电磁屏蔽|数字机顶盒|测控技术|电子|芯片|半导体|集成电路|硬件|光电|光学|传感|通信|通讯|计算机硬件|光纤|物联网|安防|5G|微处理器|处理器|闪存|存储|连接器|液晶|MEMS|雷达|电路|PCB|LED|移动终端|微系统|宽带|交换机|路由器|无线设备|摄像头模组|数字电视|量子测控|测控系统'],
- ['汽车与出行','商用车|底盘|自行车|汽车|车企|驾驶|车载|整车|乘用车|新能源客车|车联网|电动大巴|座舱|座椅|内饰|发动机部件|动力总成|出行服务|摩托车|全地形车|校车|雨刮器|热管理系统'],
- ['航空航天与国防','空间技术|空间科学|低空经济|导航制导|海洋探测|深海技术|遥感导航|宇航|军用舰船|公务船|客舱设备|航电系统|航空|航天|国防|军工|卫星|无人机|飞行器|火箭|导弹|飞机|引信|电子对抗|水下技术|海洋工程|船舶|机载|飞行模拟器|惯性导航|火工品|军民融合|民机航电|轻武器|特种弹药|无人系统'],
- ['能源与电力','火电|氢能|风能|太阳能|电站|电表|电磁线|电线电缆|电缆|高压开关|配电设备|润滑油|炼化|核安全|浮式生产|聚变|能源|电力|石油|石化|燃气|核能|核电|核工业|核技术|核工程|核燃料|聚变|光伏|风电|储能|煤炭|电池|电网|电源|充电|水电|发电|输配电|输变电|变压器|售电|电气化|油气|油田|锂电|电能质量'],
- ['环境与水务','节能改造|节能设备|管网维护|环保|环境|水务|水处理|生态|污染|回收|固废|危废|供水|自来水|排水|过滤|水利|大气治理|循环经济|节能减排'],
- ['工业制造与装备','具身智能|机器视觉|智能视觉|三维视觉|大型铸锻|风机|驱动技术|机床|真空设备|薄膜生产线|封装设备|工程仿真|挤出设备|计量仪表|连铸设备|通风设备|压缩机|智能叉车|智能产线|智能清洁|AMR|打印设备|办公设备|创客工具|盾构机|机械|装备|制造|工业|自动化|仪器|机器人|电气|机电|精密|模具|电机|控制|动力系统|减速|压力容器|测量|增材|3D打印|零部件|阀门|齿轮|轴承|刀具|激光|热处理|锻压|输送|减振|降噪|振动|透平|发动机|检测设备|包装|印刷|造纸|纸制品|热交换|伺服|电动工具|动力产品|微型驱动|预测性维护|仿真系统|系统仿真'],
- ['材料、化工与矿产','铝业|特钢|表面活性|除草剂|树脂|固化剂|聚合物|聚烯烃|杀虫剂|杀菌剂|气体|涂层|稀土|稀有|制冷剂|助剂|植物生长调节|维生素与蛋氨酸|板材|卷板|型钢|矿|材料|金属|钢铁|钢材|冶炼|冶金|化工|化学|橡胶|塑料|玻璃|建材|陶瓷|有机硅|胶粘|聚氨酯|涂料|染料|中间体|纤维|石墨|合金|石英|钢结构|民爆器材'],
- ['建筑、地产与城市','水工工程|地质|住宅服务|小镇开发|工程监理|产业招商|设施维护|社区运营|建筑|地产|规划|城建|市政|城市|施工|设计院|园林|测绘|地理信息|房屋|房产|物业|产业园|公寓|住房|社区服务|勘察|基础设施|基建|土木|岩土|桥梁|隧道|工程承包|工程总承包|工程设计|工程咨询|工程服务|设计咨询|咨询设计|造价|商业租赁|商业运营|商业管理|土地开发|地下工程|空间信息|洁净室工程|社区管理'],
- ['交通运输与物流','多式联运|地铁建设|水运工程|疏浚工程|交通|运输|物流|快递|铁路|航运|港口|公路|仓储|邮政|供应链|货运|客运|公交|轨道|场站|游轮|动车|城轨|车辆|地面服务|国际航线|机场运营|航道'],
- ['银行、金融与投资','信贷|并购|企业年金|再担保|支付结算|信息披露|行情数据|机构销售|金融|银行|证券|保险|基金|投资|资产|量化|信托|融资|期货|财富|信用|资本|国有行|政策行|股份行|城商行|农商行|交易|贷款|租赁|收益|权益|养老金|风控|风险管理|债转股|车险|责任险|企财险|票据|资金管理|做市商|创投|移动支付'],
- ['消费、零售与贸易','工艺品|户外|护肤|无纺布|按摩|茶饮|购物中心|坚果|毛纺|屠宰|洗护|预制菜|印染|智能办公|文体用品|打印机耗材|大宗商品|薇诺娜|零售|消费|快消|食品|饮料|服装|服饰|纺织|日用|家居|家电|电器|家具|家装|百货|商贸|美容|品牌|美妆|化妆|护理|贸易|进出口|电商|批发|超市|连锁|酒|体育用品|玩具|潮玩|珠宝|奢侈|时尚|厨卫|餐具|厨房|母婴|家庭|烟草|雾化|宠物用品|家纺|面料|纱线|毛巾|空调|热泵|全屋定制|金属工艺|五金|二手|办公用品|轻工美学|体育健身|本地生活'],
- ['医药、医疗与健康','创新药|临床|生命支持|原料药|中成药|CRO服务|创新中药|手术|齿科|靶向药|血液净化|药效|医药|制药|生物|医疗|医用|健康|医院|药品|药物|试剂|制剂|疫苗|兽医|生命科学|基因|蛋白|培养基|外科|内窥镜|诊断|脑机|肿瘤|单抗|肝素|卫生材料|保健品|超声设备|药材'],
- ['教育、科研与出版','社会科学文献|在线学习|在线语言学习|重大科技任务|科技创新平台|教育|培训|学术|科研|研究所|研究院|研究机构|实验室|基础研究|高校|学校|知识服务|图书馆|学科|培优|辅导|留学|教材|科学研究|技术研究|科技研发|前沿技术|前沿科技|认知科学|成果转化|出版|产业研究|工程物理研究|技术创新|职业能力'],
- ['专业与企业服务','商务服务|商业服务|公司法务|商事诉讼|产业服务|科技服务|检修运维|会展服务|咨询|人力|企业服务|招聘|人才|猎头|法律|审计|会计|财务|财税|税务|检测|检验|认证|知识产权|翻译|技术服务|招标|招投标|招代理|科技推广|专业技术|项目管理|采购管理|运营优化|组织变革|市场服务|平台运营|综合服务|气象|质量监督|质量认证|标准研究|产业孵化|标准制定|技术测试|现代服务业'],
- ['文化、游戏与传媒','内容创作|IP运营|动画|集邮|漫画|内容制作|网络视频|语音社交|IP授权|桌游|文化|传媒|娱乐|影视|音乐|广告|动漫|传播|游戏|艺术|数字内容|数字媒体|直播|内容社区|影像|航拍|摄影|文创|IP衍生|收藏|新闻|二次元|数字人|弹幕网站|短视频|科技新媒体|社交媒体|视频分享|微博客'],
- ['旅游、酒店与餐饮','景区运营|旅游|酒店|餐饮|快餐|文旅'],
- ['农业、林业与公共服务','种子|种业|林草|作物保护|农业|农林|农副|农产品|林业|畜牧|养殖|渔业|水果|饲料|农药|化肥|植物保护|农资|动保|育种|公共服务|公用事业|政府|行政执法|行业监管|食品药品监管|市场监管|公共管理|基层社会治理'],
- ['综合集团与多元经营','综合集团|多元化|综合业务|综合性集团'],
- ['信源附带标签','地方国有企业|西北区域|管培生选聘|^(国企|外企|央企|央国企|民企|华南区域|西南区域)$|事业单位']
-];
-function industryPreferenceGroups(){
-  const entries=preferenceEntries(data.flatMap(row=>(row['行业']||'').split('/')).filter(Boolean),preferences.industries,'industry');
-  const groups=INDUSTRY_DISPLAY_GROUPS.map(([name,pattern])=>({name,pattern:new RegExp(pattern,'i'),values:[]}));
-  const other={name:'跨行业与待核实',values:[]};
-  const direct=value=>{const specific=[[/银行|金融|保险|信贷/,'银行、金融与投资'],[/升学|教育规划/,'教育、科研与出版'],[/企业战略规划/,'专业与企业服务'],[/园林工具/,'工业制造与装备'],[/电子商务/,'消费、零售与贸易'],[/AI药物|药品|医药|制药|宠物医疗|宠物医院|宠物健康/,'医药、医疗与健康'],[/数字营销/,'文化、游戏与传媒'],[/农业机械/,'工业制造与装备']].find(([pattern])=>pattern.test(value));return specific?groups.find(g=>g.name===specific[1]):groups.find(g=>g.pattern.test(value));};
-  const frequency=new Map();for(const row of data)for(const v of (row['行业']||'').split('/')){const n=normalizePreference(v);frequency.set(n,(frequency.get(n)||0)+1);}
-  for(const entry of entries){if(!entry.label)continue;const g=direct(entry.label)||other;g.values.push(entry);}
-  return [...groups,other].filter(g=>g.values.length).map(g=>({...g,values:g.values.sort((a,b)=>(frequency.get(b.label)||0)-(frequency.get(a.label)||0)||a.label.localeCompare(b.label,'zh-CN'))}));
-}
+function renderNaturePreferences(){const host=document.getElementById('prefNatures');host.classList.remove('pref-options');host.innerHTML=preferenceGroupsMarkup('nature');}
+function renderEducationPreferences(){const host=document.getElementById('prefEducation');host.classList.remove('pref-options');host.innerHTML=preferenceGroupsMarkup('education');}
 let industryOnlySelected=false;
+function industryPreferenceGroups(){return configuredPreferenceGroups('industry');}
 function renderIndustryPreferences(){
-  industryOnlySelected=false;const groups=industryPreferenceGroups();document.getElementById('prefIndustries').classList.remove('pref-options');
-  document.getElementById('prefIndustries').innerHTML=`<div class="industry-tools"><input id="industrySearch" type="search" placeholder="搜索行业或业务关键词" aria-label="搜索行业偏好" oninput="filterIndustryPreferences(this.value)"><button id="industrySelectedToggle" type="button" class="btn btn-sm" aria-pressed="false" onclick="showSelectedIndustries()">只看已选</button></div><div id="industrySelection" class="industry-selection" aria-live="polite"></div>${groups.map((g,i)=>`<details class="industry-group" data-industry-group="${i}"><summary><span class="disclosure-title">${esc(g.name)}</span><span class="industry-count"></span>${disclosureAction()}</summary><div class="industry-group-content">${g.name==='信源附带标签'?'<p class="pref-help">这些是信源中的性质或区域标签，不作为行业解释；保留已有选择。</p>':g.name==='跨行业与待核实'?'<p class="pref-help">尚不能明确归入单一行业的信源词条，保留原词供核对。</p>':''}<div class="industry-group-actions"><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},true)">选择本组可见项</button><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},false)">取消本组可见项</button></div><div class="pref-options">${g.values.map(e=>preferenceChoice(e)).join('')}</div></div></details>`).join('')}<p id="industryEmpty" class="pref-help" hidden>没有匹配的选项，请调整搜索词或返回全部。</p>`;updateIndustrySelection();
+  const groups=industryPreferenceGroups();industryOnlySelected=false;
+  document.getElementById('prefIndustries').classList.remove('pref-options');
+  document.getElementById('prefIndustries').innerHTML=`<div class="industry-tools"><input id="industrySearch" type="search" placeholder="查找信源词条" aria-label="查找行业选项" oninput="filterIndustryPreferences(this.value)"><button id="industrySelectedToggle" class="btn btn-sm" aria-pressed="false" onclick="showSelectedIndustries()">只看已选</button></div><div id="industrySelection" class="industry-selection" aria-live="polite"></div>${groups.map((group,i)=>`<details class="industry-group" data-industry-group="${i}" ${groups.length===1?'open':''}><summary><span class="disclosure-title">${esc(group.name)}</span><span class="industry-count"></span>${disclosureAction()}</summary><div class="industry-group-content">${group.unmapped?'<p class="pref-help">尚未归类的原始词条继续保留。让 Agent 按你的信源确认分组后，再选择具体方向。</p>':''}<div class="industry-group-actions"><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},true)">选择本组可见项</button><button type="button" class="btn btn-sm" onclick="selectIndustryGroup(${i},false)">取消本组可见项</button></div><div class="pref-options">${group.values.map(entry=>preferenceChoice(entry)).join('')}</div></div></details>`).join('')}<p id="industryEmpty" class="pref-help" ${groups.length?'hidden':''}>没有匹配的选项。可以先初始化信源，或调整搜索条件。</p>`;updateIndustrySelection();
 }
-function updateIndustrySelection(){
-  const summary=document.getElementById('industrySelection');if(!summary)return;
-  const groups=[...document.querySelectorAll('.industry-group')];let total=0,selectedGroups=0;
-  groups.forEach(g=>{const all=g.querySelectorAll('input[type=checkbox]').length,n=g.querySelectorAll('input[type=checkbox]:checked').length;total+=n;if(n)selectedGroups++;g.querySelector('.industry-count').textContent=n?`已选 ${n} / ${all}`:`${all} 项`;});summary.textContent=`已选 ${total} 项，分布于 ${selectedGroups} 个分类`;
-}
+function updateIndustrySelection(){const summary=document.getElementById('industrySelection');if(!summary)return;let total=0,selectedGroups=0;document.querySelectorAll('.industry-group').forEach(group=>{const all=group.querySelectorAll('input[type=checkbox]').length,n=group.querySelectorAll('input[type=checkbox]:checked').length;total+=n;if(n)selectedGroups++;group.querySelector('.industry-count').textContent=n?`已选 ${n} / ${all}`:`${all} 项`;});summary.textContent=`已选 ${total} 项，分布于 ${selectedGroups} 个分类`;}
 function selectIndustryGroup(index,checked){document.querySelectorAll(`[data-industry-group="${index}"] .pref-option:not([hidden]) input[type=checkbox]`).forEach(el=>el.checked=checked);updateIndustrySelection();}
-function filterIndustryPreferences(query){const needle=normalizePreference(query).toLowerCase();let shown=0;document.querySelectorAll('.industry-group').forEach(group=>{const groupMatch=group.querySelector('summary').textContent.toLowerCase().includes(needle);let visible=0;group.querySelectorAll('[data-industry-leaf]').forEach(label=>{const show=(!needle||groupMatch||label.dataset.industryLeaf.toLowerCase().includes(needle))&&(!industryOnlySelected||label.querySelector('input').checked);label.hidden=!show;visible+=show?1:0;});group.hidden=visible===0;shown+=visible;group.open=!!(visible&&(needle||industryOnlySelected));});document.getElementById('industryEmpty').hidden=shown>0;}
+function filterIndustryPreferences(query){const needle=cleanPreference(query).toLowerCase();let shown=0;document.querySelectorAll('.industry-group').forEach(group=>{const groupMatch=group.querySelector('summary').textContent.toLowerCase().includes(needle);let visible=0;group.querySelectorAll('[data-industry-leaf]').forEach(label=>{const show=(!needle||groupMatch||label.dataset.industryLeaf.toLowerCase().includes(needle))&&(!industryOnlySelected||label.querySelector('input').checked);label.hidden=!show;visible+=show?1:0;});group.hidden=visible===0;shown+=visible;group.open=!!(visible&&(needle||industryOnlySelected));});document.getElementById('industryEmpty').hidden=shown>0;}
 function showSelectedIndustries(){industryOnlySelected=!industryOnlySelected;const button=document.getElementById('industrySelectedToggle');button.textContent=industryOnlySelected?'返回全部':'只看已选';button.setAttribute('aria-pressed',String(industryOnlySelected));filterIndustryPreferences(document.getElementById('industrySearch').value);}
 
 // One fixed entry point replaces repeated per-workflow Agent fields. Existing exports retain legacy settings.
 let workspaceConnection=null,workspaceConnectionError='',agentGuideText='',workspaceInfoPromise=null;
-const GENERIC_AGENT_BOOTSTRAP='请帮我使用 TouDi 管理求职资料。先读取仓库 AGENTS.md、docs/流程协作.md 和 docs/内容与渲染契约.md，向我确认招聘信源、个人材料和本次任务范围。按对应流程整理资料，保留无关内容及已有标记，核对页面结果。';
+const GENERIC_AGENT_BOOTSTRAP='请协助我初始化并使用 TouDi。先读 AGENTS.md、docs/开始与初始化.md、docs/流程协作.md 和 docs/内容与渲染契约.md。确认我提供的招聘信源、个人材料与正式工作区；已有资料先读最新母本并保留现有流程。首次使用先清点信源字段、标签、学历原词、去重与更新方式，用 preference-catalog 读取实际词条，根据确认过的含义建立 preferenceRules 和分类；不套用作者信源，不猜测学历资格，不把不明词条当作不符合。将规则保存在当前工作区 settings，保留无关字段、既有偏好和标记。随后按我指定的更新、准备、探查或复盘任务执行，候选先 validate，再 commit，最后 read 并核对页面。版本冲突保留候选，缺少事实时报告缺口；未经相应任务授权不网申、不对外沟通、不发布个人资料。';
 function agentBootstrapText(){return GENERIC_AGENT_BOOTSTRAP+(window.__TOUDI_SERVICE__?.mode==='hosted'?'\n\n云端模式：工作台网址由用户另行提供。请读取 docs/云端部署.md 的 Agent 协作部分，通过环境变量获得用户授权的 TOUDI_AGENT_TOKEN，使用 remote_workspace.py 拉取最新资料副本，再运行原有准备、复盘、探查或记录更新流程；核对变更后只推送已修改的文件。发生版本冲突时保留草稿并重新对账。凭据不写入聊天、源码或资料。':'\n\n本地模式：在用户指定的工作区运行原有资料流程。部署和接入说明见 docs/首次使用与部署.md。');}
 
 async function copyAgentBootstrap(){const text=agentBootstrapText();try{await navigator.clipboard.writeText(text);showToast('接入说明已复制');}catch(e){const el=document.getElementById('agentBootstrap');el.value=text;el.focus();el.select();if(document.execCommand('copy'))showToast('接入说明已复制');else showToast('请选择接入说明文本并复制');}}
 async function inspectWorkspace(force=false){if(window.__SNAPSHOT__||(!window.__TOUDI_SERVICE__&&!['127.0.0.1','localhost','[::1]'].includes(location.hostname))){workspaceConnection=null;workspaceConnectionError='当前为静态阅读页，不能凭路径连接本机文件。';return;}if(workspaceInfoPromise&&!force)return workspaceInfoPromise;workspaceInfoPromise=(async()=>{try{const response=await fetch('/api/workspace');if(!response.ok)throw Error('工作区服务暂不可用，请检查部署状态。');const info=await response.json();if(info.protocol!==1||!['local','hosted','desktop'].includes(info.mode)||!info.sameOriginOnly)throw Error('工作区状态接口不匹配');workspaceConnection=info;workspaceConnectionError='';if(view==='settings'){const box=document.getElementById('connectionStatus');if(box)box.innerHTML=workspaceConnectionMarkup();const text=document.getElementById('agentBootstrap');if(text)text.value=agentBootstrapText();}}catch(e){workspaceConnection=null;workspaceConnectionError=e.message;if(view==='settings'){const box=document.getElementById('connectionStatus');if(box)box.innerHTML=workspaceConnectionMarkup();}}})();return workspaceInfoPromise;}
 function workspaceConnectionMarkup(){if(window.__SNAPSHOT__)return '<p>加密只读快照：不连接本地API，个人记录在电脑工作区修改。</p>';if(workspaceConnection)return `<p>已连接当前个人工作区，业务资料保存到该目录。</p><details><summary>查看本机位置</summary><p class="connection-path">${esc(workspaceConnection.root)}</p></details>${workspaceConnection.missing.length?`<p class="error-text">工作区缺少：${esc(workspaceConnection.missing.join('、'))}</p>`:''}`;return `<p>${esc(workspaceConnectionError||'正在确认当前本地工作区…')}</p>`;}
 let currentSettingsTab='appearance';
-const SETTINGS_TABS=[['appearance','外观与阅读'],['preferences','求职偏好'],['data','资料与备份'],['agent','Agent 协作']];
+const SETTINGS_TABS=[['appearance','外观与阅读'],['preferences','求职偏好'],['data','资料管理'],['agent','初始化与协作']];
 function switchSettingsTab(key){
   if(!SETTINGS_TABS.some(([id])=>id===key))return;
   currentSettingsTab=key;
@@ -3272,7 +3271,7 @@ function setSettingsOption(key,value){
   workspace[key]=value;saveWorkspace();
   document.querySelectorAll('[data-setting="'+key+'"] button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.value===String(value))));
 }
-function settingsRow(title,note,control){return `<div class="setting-row"><div class="setting-label"><strong>${title}</strong><p>${note}</p></div><div class="setting-control">${control}</div></div>`;}
+function settingsRow(title,note,control){return `<div class="setting-row"><div class="setting-label"><strong>${title}</strong><p title="${esc(note)}">${note}</p></div><div class="setting-control">${control}</div></div>`;}
 function settingsSegment(key,label,entries){return `<div class="settings-segment" role="group" aria-label="${label}" data-setting="${key}">${entries.map(([value,text])=>`<button type="button" data-value="${value}" aria-pressed="${workspace[key]===value}" onclick="setSettingsOption('${key}','${value}')">${text}</button>`).join('')}</div>`;}
 function settingsPalette(){return `<div class="settings-palettes" role="group" aria-label="界面配色" data-setting="colorPalette">${COLOR_PALETTES.map(([key,label,color])=>`<button type="button" data-value="${key}" aria-label="${label}配色" aria-pressed="${workspace.colorPalette===key}" onclick="setSettingsOption('colorPalette','${key}')"><span class="palette-swatch" style="--swatch:${color}" aria-hidden="true"></span><span>${label}</span></button>`).join('')}</div>`;}
 function settingsSelect(key,label,entries){return `<div class="settings-select"><select aria-label="${label}" onchange="setSettingsOption('${key}',this.value)">${entries.map(([value,text])=>`<option value="${value}" ${workspace[key]===value?'selected':''}>${text}</option>`).join('')}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></div>`;}
@@ -3280,42 +3279,53 @@ function settingsPreferenceSummary(values,kind){
   const names=[...new Set(values.map(value=>normalizePreference(value,kind)))].filter(Boolean);
   return names.length?esc(names.slice(0,3).join('、')+(names.length>3?'等 '+names.length+' 项':'')):'尚未选择';
 }
+document.addEventListener('keydown',event=>{const label=event.target.closest('.backup-file-control');if(label&&['Enter',' '].includes(event.key)&&label.getAttribute('aria-disabled')!=='true'){event.preventDefault();label.querySelector('input').click();}});
+function preferenceInitializationNote(){return sourcePreferenceRules?'分类与同义词来自当前工作区的初始化规则。未映射的新词条继续保留。':data.length?'已有资料；信源分类尚未初始化，筛选暂时保留未确认词条。':'先提供自己的信源，由 Agent 初始化分类、同义词和筛选口径。';}
+function openAgentInitialization(){switchView('settings');switchSettingsTab('agent');}
 function renderSettings(){
   const row=settingsRow;
   document.getElementById('settingsView').innerHTML=`
-    <div class="settings-head"><h2>设置</h2><p>调整阅读方式、求职偏好与资料管理。</p></div>
+    <div class="settings-head"><h2>设置</h2><p>管理外观、求职偏好与自己的资料。</p></div>
     <div class="settings-tabs" role="tablist" aria-label="设置分类">${SETTINGS_TABS.map(([key,title])=>`<button id="settings-tab-${key}" role="tab" aria-controls="settings-panel-${key}" onclick="switchSettingsTab('${key}')">${title}</button>`).join('')}</div>
     <div class="settings-panel" id="settings-panel-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance">
       <section class="settings-section"><h3>外观与阅读</h3>
-        ${row('界面配色','主题模式独立切换，配色应用于整个工作台。',settingsPalette())}
-        ${row('切换反馈','尊重系统减少动效设置。',settingsSegment('motion','切换反馈',[['on','简短动效'],['off','关闭动效']]))}
+        ${row('界面配色','浅色与深色模式可在主界面直接切换。',settingsPalette())}
+        ${row('切换反馈','为页面切换提供简短反馈，遵循系统减少动效设置。',settingsSegment('motion','切换反馈',[['on','简短动效'],['off','关闭动效']]))}
         ${row('默认页面','下次打开时进入的模块。',settingsSelect('defaultView','默认页面',[['table','投递表格'],['kanban','投递看板'],['charts','投递统计'],['qbank','面试准备'],['prospect','岗位探查'],['review','面试复盘']]))}
         ${row('信息密度','调整投递表格的行高。',settingsSegment('density','信息密度',[['standard','标准'],['compact','紧凑']]))}
-        ${row('每页记录','每页显示的记录数量。',settingsSelect('pageSize','每页记录',PAGE_SIZES.map(n=>[n,n+' 条'])))}
+        ${row('每页记录','投递表格每页显示的记录数量。',settingsSelect('pageSize','每页记录',PAGE_SIZES.map(n=>[n,n+' 条'])))}
         <p class="settings-note">外观与阅读偏好仅保存在本浏览器。</p>
       </section>
     </div>
     <div class="settings-panel" id="settings-panel-preferences" role="tabpanel" aria-labelledby="settings-tab-preferences">
-      <section class="settings-section"><h3>求职偏好</h3><p class="settings-help">企业性质或行业满足一项，并符合学历要求，即可进入“符合偏好”。</p>
+      <section class="settings-section"><h3>求职偏好</h3><p class="settings-help">用于“符合偏好”视图，不修改记录或投递状态。未选择的维度不限制结果。</p>
+        ${row('信源规则',sourcePreferenceRules?'已初始化；新增或无法判断的词条继续保留。':'尚未初始化；先根据自己的信源整理词条。','<button class="btn" onclick="openAgentInitialization()">查看初始化流程</button>')}
         ${row('企业性质',settingsPreferenceSummary(preferences.natures,'nature'),'<button class="btn" onclick="openPrefModal(\'natures\')">调整企业性质</button>')}
         ${row('行业方向',settingsPreferenceSummary(preferences.industries,'industry'),'<button class="btn" onclick="openPrefModal(\'industries\')">调整行业方向</button>')}
         ${row('学历要求',settingsPreferenceSummary(preferences.education,'education'),'<button class="btn" onclick="openPrefModal(\'education\')">调整学历要求</button>')}
-        <p class="settings-note">求职偏好保存在当前工作区，不改变投递标记；加密快照仅供阅读。</p>
+        <p class="settings-note">${esc(preferenceInitializationNote())}</p>
+        <p class="settings-note">${sourcePreferenceRules?.directionMatch==='all'?'已选企业性质与行业须同时满足':'已选企业性质或行业满足一项即可'}，并按已确认的学历词条筛选；这不等同于招聘资格审核。</p>
       </section>
     </div>
     <div class="settings-panel" id="settings-panel-data" role="tabpanel" aria-labelledby="settings-tab-data">
-      <section class="settings-section"><h3>备份与恢复</h3><p class="settings-help">按所需范围导出；完整业务资料请使用工作区完整备份。</p></section>
-      <details class="settings-disclosure"><summary><span class="disclosure-title"><strong>个人标记与显示偏好</strong><small>分别迁移求职标记与界面设置</small></span>${disclosureAction()}</summary><section class="settings-section">
-        ${row('个人标记与求职偏好','进度、收藏、不适合、备注、待探查及求职偏好；不含准备、复盘或探查正文。','<div id="maintenanceActions"></div>')}
-        ${row('显示偏好','主题、密度、列选择与保存视图；不含业务正文。','<button class="btn btn-sm" onclick="exportWorkspace()">导出显示偏好</button><label class="btn btn-sm">恢复显示偏好<input type="file" accept="application/json" hidden onchange="importWorkspace(event)"></label>')}
-      </section></details>
+      <section class="settings-section" id="workspaceDataSettings"><h3>资料管理</h3><p class="settings-help">资料自动保存。备份用于换机或回退，日常新增和编辑在对应模块完成。</p><div id="workspaceDataRows"></div></section>
       ${window.__TOUDI_SERVICE__?.mode==='hosted'?'<section class="settings-section"><h3>访问</h3><form action="/auth/logout" method="post"><button class="btn">退出登录</button></form></section>':''}
     </div>
     <div class="settings-panel" id="settings-panel-agent" role="tabpanel" aria-labelledby="settings-tab-agent">
-      <section class="settings-section"><h3>Agent 协作</h3><p>通用说明不包含本机地址或个人资料。信源、个人材料和本次任务由你另行提供。</p><textarea id="agentBootstrap" class="agent-bootstrap" readonly aria-label="Agent 接入说明">${esc(agentBootstrapText())}</textarea><div class="settings-actions"><button class="btn btn-sm" onclick="copyAgentBootstrap()">复制通用说明</button>${window.__TOUDI_DESKTOP__?'<button class="btn btn-sm" onclick="copyAgentBootstrap(true)">复制本机接入说明</button>':''}</div>${window.__TOUDI_DESKTOP__?'<p class="settings-help">本机接入说明包含当前工作区与工具位置，仅交给你授权的本机 Agent。</p>':''}</section>
+      <section class="settings-section"><h3>初始化与协作</h3><p class="settings-help">使用自己的 Agent。先让它了解信源、整理规则，再开始日常任务。</p>
+        <ol class="agent-setup-flow">
+          <li><span class="setup-number">1</span><div><strong>提供信源与材料</strong><p>说明招聘来源、个人材料和现有资料；已有工作区保留原流程。</p></div></li>
+          <li><span class="setup-number">2</span><div><strong>初始化自己的规则</strong><p>确认字段、分类、同义词及学历含义；无法判断的词条保留原文。</p></div></li>
+          <li><span class="setup-number">3</span><div><strong>验证后开始协作</strong><p>先完成一次更新并读回核对，随后按更新、准备、探查或复盘流程执行。</p></div></li>
+        </ol>
+        ${row('交给 Agent','提供自己的信源、材料与任务，按完整流程执行。','<button class="btn" onclick="copyAgentBootstrap()">复制通用流程</button>'+ (window.__TOUDI_DESKTOP__?'<button class="btn" onclick="copyAgentBootstrap(true)">复制本机流程</button>':''))}
+        <div class="settings-reading"><a href="https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/开始与初始化.md" target="_blank" rel="noopener noreferrer">阅读开始与初始化</a><span>完整步骤、保存规则与日常任务安排</span></div>
+        <details class="settings-disclosure agent-instruction"><summary><span class="disclosure-title">查看交给 Agent 的流程说明</span>${disclosureAction()}</summary><div class="setting-detail"><textarea id="agentBootstrap" class="agent-bootstrap" readonly aria-label="Agent 初始化与使用流程">${esc(agentBootstrapText())}</textarea></div></details>
+        ${window.__TOUDI_DESKTOP__?'<p class="settings-note">本机流程包含工具与工作区位置，仅交给已授权的本机 Agent；通用流程不包含个人目录。</p>':''}
+      </section>
     </div>`;
-  const host=document.getElementById('maintenanceActions');
-  if(maintenanceTools){host.append(maintenanceTools);maintenanceTools.style.display='flex';maintenanceTools.querySelectorAll('.nav-text').forEach(e=>e.style.display='inline');}
+  // Legacy partial exports remain available as code tools, outside normal settings.
+  if(maintenanceTools){maintenanceTools.hidden=true;maintenanceTools.style.display='none';}
   switchSettingsTab(currentSettingsTab);applyTheme();
 }
 

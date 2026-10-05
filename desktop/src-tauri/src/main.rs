@@ -446,7 +446,7 @@ fn main() {
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_secs(2));
                     if let Ok(view) = std::env::var("TOUDI_RENDER_VIEW") {
-                        if ["table","kanban","charts","qbank","company","prospect","review","settings","agent-settings","filling"].contains(&view.as_str()) {
+                        if ["table","kanban","charts","qbank","company","prospect","review","settings","agent-settings","data-settings","preference-settings","education-preferences","industry-preferences","filling"].contains(&view.as_str()) {
                             let _ = webview.eval(format!("window.__TOUDI_DIAG_VIEW__ = '{view}';"));
                         }
                     }

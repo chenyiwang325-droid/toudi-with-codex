@@ -11,6 +11,8 @@ import re
 import sys
 import tempfile
 import uuid
+from datetime import datetime, timezone
+import preference_rules
 import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit, unquote
@@ -95,6 +97,7 @@ class Workbench:
                     if not row.get('company') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',row.get('researchedAt','')): raise ValueError('company/date required')
                     self.path('岗位探查/'+row['file'])
         if module=='settings':
+            if 'preferenceRules' in value: preference_rules.validate_rules(value['preferenceRules'])
             authority=value.get('recordsAuthority')
             if authority is not None:
                 if not isinstance(authority,dict) or authority.get('schemaVersion')!=1 or authority.get('source')!=MODULES['records'][0] or not isinstance(authority.get('legacyHtml'),dict): raise ValueError('invalid recordsAuthority')
@@ -154,7 +157,7 @@ class Workbench:
         if settings is not None: materials=list(dict.fromkeys([*materials,*json.loads(settings).get('materialFiles',[])]))
         self._materials_override=materials
         for entry in materials: remote_files.material_path(self.root,entry)
-        state={'state':'pending','before':{},'materials':materials}
+        state={'state':'pending','createdAt':datetime.now(timezone.utc).isoformat(),'before':{},'materials':materials}
         for relative,content in changes.items():
             target=self.path(relative); state['before'][relative]=target.exists()
             if target.exists(): atomic_write(tx/'before'/relative,target.read_bytes())
@@ -180,8 +183,10 @@ class Workbench:
                 for tx in txs.iterdir() if txs.exists() else []:
                     state=json.loads((tx/'manifest.json').read_text()) if (tx/'manifest.json').exists() else {}
                     if state.get('state')=='committed' and set(state['before']) - {MODULES['settings'][0],MODULES['drafts'][0]}:
-                        rows.append({'id':tx.name,'files':list(state['before'])})
-                return {'version':self.version(),'data':{'transactions':rows}}
+                        rows.append({'id':tx.name,'files':list(state['before']),
+                            'createdAt':state.get('createdAt') or datetime.fromtimestamp((tx/'manifest.json').stat().st_mtime,timezone.utc).isoformat(),
+                            'modules':[name for name,(relative,_) in MODULES.items() if relative in state['before']]})
+                return {'version':self.version(),'data':{'transactions':sorted(rows,key=lambda row:row['createdAt'])}}
             value=self.view(module)
             return {'version':self.version(module),'data':value,**({'keys':runtime_keys(value)} if module=='records' else {})}
     def view(self,module):
@@ -435,6 +440,7 @@ def main(argv=None):
     ap=argparse.ArgumentParser(description='TouDi bounded Agent workspace CLI')
     ap.add_argument('--workspace',default=os.environ.get('TOUDI_WORKSPACE'),type=Path)
     sub=ap.add_subparsers(dest='command',required=True)
+    sub.add_parser('preference-catalog',help='inspect raw source labels before Agent initialization')
     read=sub.add_parser('read'); read.add_argument('module',choices=[*MODULES,'workspace','trash'])
     commit=sub.add_parser('commit'); commit.add_argument('payload',type=Path)
     check=sub.add_parser('validate'); check.add_argument('module',choices=MODULES); check.add_argument('file',type=Path)
@@ -446,7 +452,11 @@ def main(argv=None):
     if args.workspace is None: ap.error('--workspace or TOUDI_WORKSPACE is required')
     workbench=Workbench(args.workspace)
     try:
-        if args.command=='read': result=workbench.get(args.module)
+        if args.command=='preference-catalog':
+            with data_lock(workbench.data):
+                workbench.recover_pending()
+                result=preference_rules.catalog(workbench.read('records'),workbench.read('settings'))
+        elif args.command=='read': result=workbench.get(args.module)
         elif args.command=='commit': result=workbench.mutate(json.loads(args.payload.read_text()))
         elif args.command=='validate': workbench.validate(args.module,json.loads(args.file.read_text())); result={'ok':True}
         elif args.command=='import': result=workbench.mutate({'module':args.module,'action':'import','base':args.base,'data':json.loads(args.file.read_text())})

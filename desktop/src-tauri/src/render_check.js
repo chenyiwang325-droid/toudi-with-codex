@@ -16,10 +16,14 @@
       connectionLoopback:new URL(code.url).hostname === '127.0.0.1', port:Number(new URL(code.url).port),
       tokenLength:code.token.length, extensionStatus:extension.status, extensionBytes:(await extension.arrayBuffer()).byteLength};
   } else if (target && typeof switchView === 'function') {
-    const module = target === 'company' ? 'qbank' : target === 'agent-settings' ? 'settings' : target;
+    const module = target === 'company' ? 'qbank' : ['agent-settings','data-settings','preference-settings','education-preferences','industry-preferences'].includes(target) ? 'settings' : target;
     if (typeof ensureViewData === 'function') await ensureViewData(module);
     switchView(module);
     if (target === 'agent-settings') switchSettingsTab('agent');
+    if (target === 'data-settings') switchSettingsTab('data');
+    if (['preference-settings','education-preferences','industry-preferences'].includes(target)) switchSettingsTab('preferences');
+    if (target === 'education-preferences') openPrefModal('education');
+    if (target === 'industry-preferences') openPrefModal('industries');
     if (target === 'company') switchPrepMode('company');
     await new Promise(resolve => setTimeout(resolve, 350));
   }
@@ -49,6 +53,8 @@
     brandMatchesD: document.querySelector('.brand-symbol')?.src === "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgNjQgNjQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSI+PHRpdGxlIGlkPSJ0aXRsZSI+VG91RGkg5oqV6YCSPC90aXRsZT48cmVjdCB4PSI0IiB5PSI0IiB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHJ4PSIxNCIgZmlsbD0iIzMxNWY2NSIvPjxwYXRoIGQ9Ik0xNiAyMy41IDQ4IDE1IDM2LjUgNDggMjkgMzRaIiBmaWxsPSIjZjRmOGY2IiBzdHJva2U9IiNmNGY4ZjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yOSAzNCA0NyAxNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzE1ZjY1IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo=",
     settingsStylesLoaded: !![...document.styleSheets].find(sheet => (sheet.href || '').endsWith('/assets/settings.css')),
     motionControl: document.querySelector('.settings-segment[data-setting="motion"] button[aria-pressed="true"]')?.dataset.value || null,
+    settingsGeometry: [...document.querySelectorAll('.settings-panel:not([hidden]) .setting-row')].map(el=>({height:el.getBoundingClientRect().height,controlHeight:el.querySelector('.setting-control').getBoundingClientRect().height})),
+    sidebarSelection: (()=>{const el=document.querySelector('.module-nav button.active');return el?{leftBorder:getComputedStyle(el).borderLeftWidth,background:getComputedStyle(el).backgroundColor}:null})(),
     settingsTabs: [...document.querySelectorAll('.settings-tabs [role="tab"]')].map(el => ({label:el.textContent, selected:el.getAttribute('aria-selected')})),
     visibleSettingsPanels: [...document.querySelectorAll('.settings-panel')].filter(el => !el.hidden).map(el => el.id),
     agentPrivacy: (() => {

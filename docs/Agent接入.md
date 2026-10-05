@@ -2,9 +2,11 @@
 
 **TouDi 使用你自己的 Agent，资料命令随桌面运行组件提供。** 通用接入说明使用占位符，不包含本机目录、招聘信源或个人资料。具备本机文件和命令权限的 Agent 才能直接处理资料；仅粘贴说明不会连接模型、授予电脑权限或自动调度任务。
 
-## 首次接入
+## 初始化与首次接入
 
-**从 App 复制通用说明，再补充你的材料与任务。** 交给已授权的本机 Agent 时，可点击“复制本机接入说明”，取得当前工作区与工具位置；这些地址只在本机生成，不用于公开展示或 GitHub 文档。可使用以下任务模板：
+**先按[开始与初始化](开始与初始化.md)确认自己的信源与规则，再开始日常任务。** 行业分组、同义标签和学历要求只来自当前工作区的 `preferenceRules`，不套用作者来源；未初始化或无法判断的词条保留原文。
+
+**从 App 复制通用流程，再补充你的材料与任务。** 交给已授权的本机 Agent 时，可点击“复制本机流程”，取得当前工作区与工具位置；这些地址只在本机生成，不用于公开展示或 GitHub 文档。可使用以下任务模板：
 
 ```text
 请协助我使用 TouDi 管理求职资料。
@@ -13,7 +15,8 @@
 个人材料：{我的简历、JD、项目资料或面试记录}
 本次任务：{模块、公司、岗位或场次，以及所需结果}
 
-先读 AGENTS.md、docs/流程协作.md 和 docs/内容与渲染契约.md。
+首次使用先清点来源与 preference-catalog，建立自己的 settings.preferenceRules；保留既有偏好、标记及无法判断的原词。
+先读 AGENTS.md、docs/开始与初始化.md、docs/流程协作.md 和 docs/内容与渲染契约.md。
 读取最新正式资料及版本，只改本次目标，保留已有标记和无关内容。
 使用资料工具校验、提交和读回；冲突保留候选，不强行覆盖。
 核对 App 的正文、关联和附件。缺少事实时明确报告，不编经历或日期。
@@ -46,6 +49,7 @@ python3 app/desktop_runtime.py workspace unbind
 **以下参数由打包资料工具和源码 CLI 共用。** 桌面使用 App 给出的 `agentTool` 可执行文件与命令前缀，不手抄应用包内路径；源码可用 `python3 app/desktop_runtime.py` 或 `python3 app/workbench.py`。以下示例使用源码形式说明参数，不要求安装包用户另装 Python：
 
 ```sh
+python3 app/workbench.py --workspace /path/to/workspace preference-catalog
 python3 app/workbench.py --workspace /path/to/workspace read records
 python3 app/workbench.py --workspace /path/to/workspace validate records candidate.json
 python3 app/workbench.py --workspace /path/to/workspace commit payload.json

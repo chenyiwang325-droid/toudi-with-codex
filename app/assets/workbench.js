@@ -38,9 +38,27 @@ function managementStyle() {
   document.head.insertAdjacentHTML('beforeend', `<style${nonce ? ' nonce="' + nonce + '"' : ''}>.management-dialog{width:min(1060px,94vw);max-height:90vh;display:flex;flex-direction:column;background:var(--card);border-radius:10px;padding:22px;gap:14px}.management-body{overflow:auto;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px}.management-list{border-right:1px solid var(--border);padding-right:14px;overflow:auto}.management-list button{width:100%;text-align:left;margin-bottom:5px;white-space:normal}.management-form label{display:grid;gap:6px;font-size:12px;color:var(--text2);margin-bottom:12px}.management-form input,.management-form textarea,.management-form select{width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:10px;border-radius:5px;font:inherit}.management-form textarea{min-height:220px;resize:vertical;line-height:1.65}.management-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start}.management-fields textarea{height:90px;min-height:90px}.management-form details{margin:12px 0}.management-form details>summary{cursor:pointer;margin-bottom:10px}.management-preview{padding:15px;background:var(--bg);border:1px solid var(--border);max-height:360px;overflow:auto}.management-actions{display:flex;gap:8px;flex-wrap:wrap}.management-message{color:var(--text3);font-size:12px;line-height:1.6;white-space:pre-wrap}.management-status{min-height:20px;color:var(--text2);font-size:13px}.management-dialog h2{margin:0;font-size:19px}@media(max-width:700px){.management-body{grid-template-columns:1fr}.management-list{max-height:130px;border-right:0;border-bottom:1px solid var(--border)}.management-fields{grid-template-columns:1fr}.management-dialog{padding:14px}}</style>`);
   document.body.insertAdjacentHTML('beforeend', `<div id="managementOverlay" class="modal-overlay" style="display:none"><section class="management-dialog" role="dialog" aria-modal="true" aria-labelledby="managementTitle"><div class="filter-dialog-head"><h2 id="managementTitle">管理资料</h2><button class="btn" onclick="closeManagement()">关闭</button></div><div id="managementTools" class="management-actions"></div><div id="managementBody" class="management-body"></div><div id="managementStatus" class="management-status" role="status"></div><div id="managementActions" class="management-actions"></div></section></div>`);
 }
+let managementPreviousFocus = null;
+function showManagementDialog() {
+  const overlay=document.getElementById('managementOverlay');
+  if(overlay.style.display!=='flex')managementPreviousFocus=document.activeElement;
+  overlay.style.display='flex';
+  overlay.querySelector('.filter-dialog-head .btn').focus();
+}
 function closeManagement() {
   document.getElementById('managementOverlay').style.display = 'none';
+  if(managementPreviousFocus?.isConnected)managementPreviousFocus.focus();
 }
+document.addEventListener('keydown',event=>{
+  const overlay=document.getElementById('managementOverlay');
+  if(!overlay||overlay.style.display!=='flex')return;
+  if(event.key==='Escape'){event.preventDefault();closeManagement();return;}
+  if(event.key!=='Tab')return;
+  const elements=[...overlay.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')].filter(el=>!el.disabled&&el.getClientRects().length);
+  const first=elements[0],last=elements.at(-1);
+  if(event.shiftKey&&(document.activeElement===first||!overlay.contains(document.activeElement))){event.preventDefault();last?.focus();}
+  else if(!event.shiftKey&&(document.activeElement===last||!overlay.contains(document.activeElement))){event.preventDefault();first?.focus();}
+});
 function managementItems() {
   const d = management.data;
   if (management.module === 'records') return Array.isArray(d) ? d : d.records || [];
@@ -59,6 +77,7 @@ async function openManagement(module) {
   }
   try {
     const result = await managementRequest(module);
+    document.getElementById('managementBody').classList.remove('recovery-body');
     management = {
       module,
       version: result.version,
@@ -68,7 +87,7 @@ async function openManagement(module) {
       importing: false
     };
     document.getElementById('managementTitle').textContent = '管理' + managementLabels[module];
-    document.getElementById('managementOverlay').style.display = 'flex';
+    showManagementDialog();
     managementRender();
   } catch (e) {
     showToast(e.message);
@@ -76,7 +95,9 @@ async function openManagement(module) {
 }
 function managementRender() {
   const m = management;
-  document.getElementById('managementTools').innerHTML = `<button class="btn" onclick="managementSelect(-1)">新增</button><label class="btn">选择导入文件<input hidden type="file" accept=".json,.md,.markdown" onchange="managementImport(event)"></label><button class="btn" onclick="managementExport()">导出完整规范资料</button><button class="btn" onclick="managementExportDraft()">导出当前草稿</button>`;
+  const legacyDraft=JSON.parse(localStorage.getItem('toudiManagementDraft') || 'null');
+  const draft = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}')[m.module] || (legacyDraft?.module === m.module ? legacyDraft : null);
+  document.getElementById('managementTools').innerHTML = (draft ? `<button class="btn" onclick="resumeManagementDraft('${m.module}')">继续未保存编辑</button>` : '') + `<button class="btn" onclick="managementSelect(-1)">新增</button><label class="btn">选择导入文件<input hidden type="file" accept=".json,.md,.markdown" onchange="managementImport(event)"></label><button class="btn" onclick="managementExport()">导出完整规范资料</button><button class="btn" onclick="managementExportDraft()">导出当前草稿</button>`;
   document.getElementById('managementBody').innerHTML = `<aside class="management-list">${managementItems().map((item, i) => `<button class="btn btn-sm" onclick="managementSelect(${i})">${esc(managementName(item))}</button>`).join('') || '<p class="management-message">尚无资料，可新增或导入。</p>'}</aside><div id="managementForm" class="management-form"></div>`;
   managementSelect(m.index);
 }
@@ -514,6 +535,7 @@ saveWorkspace = async function () {
 async function managementInit() {
   managementStyle();
   document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<button id="managementEntry" class="btn btn-sm" onclick="managementForView()">管理资料</button>');
+  document.getElementById('managementEntry').hidden = view === 'settings';
   if (window.__SNAPSHOT__) {
     document.getElementById('managementEntry').disabled = true;
     return;
@@ -522,6 +544,10 @@ async function managementInit() {
   if (!serverMode) return;
   try {
     settingsState = await managementRequest('settings');
+    sourcePreferenceRules = settingsState.data.preferenceRules || null;
+    renderQuickViews();
+    if (view === 'settings') renderSettings();
+    else if (['table','kanban','charts'].includes(view)) render();
     const saved = settingsState.data.display;
     if (saved) {
       const pending = JSON.parse(localStorage.getItem('toudiPendingSettings') || 'null');
@@ -554,10 +580,7 @@ async function managementInit() {
   }
 }
 function managementForView() {
-  if (view === 'settings') {
-    openRecovery();
-    return;
-  }
+  if (view === 'settings') return;
   openManagement(view === 'qbank' ? qbMode === 'company' ? 'preps' : 'qbank' : view === 'review' ? 'reviews' : view === 'prospect' ? 'prospects' : 'records');
 }
 const baseRenderSettings = renderSettings;
@@ -566,24 +589,19 @@ renderSettings = function () {
   document.querySelectorAll('#settingsView .settings-note').forEach(el => {
     if (el.textContent.includes('仅保存在本浏览器')) el.textContent = managementWritable() ? '外观与阅读偏好保存到工作区；保存失败时保留本设备草稿。' : '当前只读页面：显示偏好仅保存到本设备。';
   });
-  const dataPanel = document.getElementById('settings-panel-data');
-  dataPanel.querySelector('.settings-section').insertAdjacentHTML('beforeend', `<div class="setting-row"><div class="setting-label"><strong>完整工作区</strong><p>业务正文、配置及登记附件。恢复前先检查范围，并保留恢复前副本。</p></div><div class="setting-control"><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="exportFullBackup()">下载完整备份</button><label class="btn">选择备份恢复<input type="file" accept=".zip" hidden ${managementWritable() ? '' : 'disabled'} onchange="previewBackup(event)"></label></div></div><details class="settings-disclosure"><summary><span class="disclosure-title"><strong>恢复删除、旧版本与管理草稿</strong></span>${disclosureAction()}</summary><div class="settings-section"><p class="settings-help">先查看可恢复内容，再选择需要恢复的版本。</p><div class="settings-actions"><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="openRecovery()">恢复删除与旧版本</button><button class="btn" ${managementWritable() ? '' : 'disabled'} onclick="resumeManagementDraft()">恢复管理草稿</button></div></div></details><div id="backupPreview"></div>`);
-  if (window.toudiDesktop) {
-    dataPanel.insertAdjacentHTML('afterbegin', `<section class="settings-section"><h3>桌面资料与查阅</h3><p class="settings-help">资料保存在安装目录外，加密查阅版用于其他设备阅读。</p><div class="setting-row"><div class="setting-label"><strong>当前工作区</strong><p>已连接个人资料目录。</p><details><summary>查看本机位置</summary><p class="connection-path">${esc(window.__TOUDI_DESKTOP__.workspace)}</p></details></div><div class="setting-control"><button class="btn" onclick="openDesktopWorkspace()">打开资料目录</button></div></div><div class="setting-row"><div class="setting-label"><strong>加密查阅版</strong><p>导出后按部署文档发布，在其他设备打开查阅。</p></div><div class="setting-control"><button class="btn" onclick="exportDesktopReading()">导出加密查阅版</button></div></div><details class="settings-disclosure"><summary><span class="disclosure-title"><strong>切换已有工作区</strong><small>使用另一份资料前先检查目录</small></span>${disclosureAction()}</summary><div class="settings-section"><p class="settings-help">选择已有资料目录，经过检查后重新绑定。</p><div class="settings-actions"><button class="btn" onclick="selectDesktopWorkspace()">使用已有工作区</button></div></div></details><div id="desktopReadingStatus" role="status"></div></section>`);
-  }
+  const host = document.getElementById('workspaceDataRows');
+  const writable = managementWritable(), disabled = writable ? '' : 'disabled';
+  host.innerHTML = (window.toudiDesktop ? settingsRow('当前资料','App 和 Agent 共用当前工作区，更新 App 不会更换资料。','<button class="btn" onclick="openDesktopWorkspace()">打开资料目录</button>') +
+    settingsRow('切换资料','使用另一份已有工作区，先检查，再切换。','<button class="btn" onclick="selectDesktopWorkspace()">选择已有工作区</button>') : '') +
+    settingsRow('备份全部资料','换机或重要改动前保存，包含记录、正文、附件与设置。',`<button class="btn" ${disabled} onclick="exportFullBackup()">保存备份文件</button>`) +
+    settingsRow('从备份恢复','用于换机迁移或整体回退；先核对范围，再确认替换。',`<label class="btn backup-file-control" role="button" tabindex="${writable?0:-1}" ${writable?'':'aria-disabled="true"'}>选择备份文件<input type="file" accept=".zip" hidden ${disabled} onchange="previewBackup(event)"></label>`) +
+    settingsRow('恢复历史修改','误删或改错时，选择一次修改并还原它涉及的资料。',`<button class="btn" ${disabled} onclick="openRecovery()">查看历史修改</button>`) +
+    '<p class="settings-note">备份文件用于 TouDi 恢复，不能作为部署网站直接打开。日常保存与更新不需要导出。</p>';
+  if(window.toudiDesktop) host.insertAdjacentHTML('beforeend', `<details class="settings-disclosure"><summary><span class="disclosure-title">查看本机资料位置</span>${disclosureAction()}</summary><div class="setting-detail"><p class="connection-path">${esc(window.__TOUDI_DESKTOP__.workspace)}</p></div></details>`);
 };
 async function openDesktopWorkspace() {
   try { await window.toudiDesktop.showWorkspace(); }
   catch (e) { showToast('资料目录未能打开：' + e); }
-}
-async function exportDesktopReading() {
-  const status = document.getElementById('desktopReadingStatus');
-  status.textContent = '正在生成加密查阅版…';
-  try {
-    const result = await window.toudiDesktop.exportReading();
-    if (result.cancelled) { status.textContent = '已取消导出'; return; }
-    status.innerHTML = '<p>加密查阅版已导出；解压后的文件可按部署文档上传。口令保存在本机，请另行妥善保管。</p><p class="connection-path">导出：' + esc(result.output) + '</p><p class="connection-path">口令文件：' + esc(result.passcodeFile) + '</p>';
-  } catch (e) { status.textContent = '导出未完成：' + e; }
 }
 async function exportFullBackup() {
   try {
@@ -602,6 +620,7 @@ let backupCandidate = null;
 async function previewBackup(event) {
   const file = event.target.files[0];
   if (!file) return;
+  backupCandidate = null;
   try {
     const state = await managementRequest('workspace');
     backupCandidate = {
@@ -621,13 +640,18 @@ async function previewBackup(event) {
     const preview = await response.json();
     if (!response.ok) throw Error(preview.error || '备份检查失败');
     backupCandidate.base = preview.base;
-    document.getElementById('backupPreview').innerHTML = '<pre class="management-message">' + esc((preview.files || []).map(f => f.path + ' · ' + f.size + ' 字节').join('\n')) + '</pre>' + '<p class="management-message">已选择 ' + esc(file.name) + '，' + file.size + ' 字节。恢复范围：完整业务资料、配置与附件；当前工作区版本 ' + esc(state.version) + '。提交后由服务校验 ZIP 与关联，提交前保留恢复副本。</p><button class="btn" onclick="commitBackup()">确认恢复此完整备份</button>';
+    prepareRecoveryDialog('从备份恢复');
+    const files = preview.files || [];
+    document.getElementById('managementBody').innerHTML = `<div class="recovery-summary"><strong>${esc(file.name)}</strong><p>备份包含 ${files.length} 个文件：${esc(backupScopeLabel(files))}。</p><p>确认后将完整业务资料与设置恢复到这份备份；备份中没有的现有业务文件也会移除。当前内容会自动保留为恢复副本；如只需撤销一次改动，请使用“恢复历史修改”。</p><details class="settings-disclosure"><summary><span class="disclosure-title">查看备份中的文件</span>${disclosureAction()}</summary><ul class="recovery-files">${files.map(entry=>'<li>'+esc(entry.path)+'</li>').join('')}</ul></details></div>`;
+    document.getElementById('managementActions').innerHTML='<button class="btn" onclick="closeManagement()">取消</button><button class="btn btn-primary" id="backupCommit" onclick="commitBackup()">确认恢复全部资料</button>';
   } catch (e) {
     showToast(e.message);
   }
   event.target.value = '';
 }
 async function commitBackup() {
+  if (!backupCandidate) return;
+  const button=document.getElementById('backupCommit');if(button)button.disabled=true;
   try {
     const response = await fetch((apiBase || '') + '/api/backup', {
       method: 'POST',
@@ -641,20 +665,22 @@ async function commitBackup() {
     showToast('完整备份已恢复，重新读取资料');
     location.reload();
   } catch (e) {
-    showToast(e.message + '，备份候选仍保留');
+    if(button)button.disabled=false;
+    document.getElementById('managementStatus').textContent=e.message + '，备份候选仍保留；版本冲突时请重新选择文件并检查范围。';
   }
 }
 async function resumeManagementDraft(module) {
   const all = JSON.parse(localStorage.getItem('toudiManagementDrafts') || '{}');
   if (!module && Object.keys(all).length > 1) {
-    document.getElementById('managementOverlay').style.display = 'flex';
+    showManagementDialog();
     document.getElementById('managementTitle').textContent = '选择管理草稿';
     document.getElementById('managementTools').innerHTML = '';
     document.getElementById('managementActions').innerHTML = '';
     document.getElementById('managementBody').innerHTML = '<div>' + Object.keys(all).filter(k => managementLabels[k]).map(k => '<p><button class="btn" onclick="resumeManagementDraft(\'' + k + '\')">' + esc(managementLabels[k]) + '</button> ' + esc(all[k].savedAt) + '</p>').join('') + '</div>';
     return;
   }
-  const draft = module ? all[module] : Object.values(all)[0] || JSON.parse(localStorage.getItem('toudiManagementDraft') || 'null');
+  const legacy=JSON.parse(localStorage.getItem('toudiManagementDraft') || 'null');
+  const draft = module ? all[module] || (legacy?.module === module ? legacy : null) : Object.values(all)[0] || legacy;
   if (!draft) {
     showToast('没有管理草稿');
     return;
@@ -673,47 +699,43 @@ async function resumeManagementDraft(module) {
   }
   document.getElementById('managementStatus').textContent = '已恢复草稿及原版本；请检查预览，冲突时保留候选并对账。';
 }
-async function openRecovery() {
-  try {
-    const response = await fetch((apiBase || '') + '/api/manage?module=trash');
-    const result = await response.json();
-    if (!response.ok) throw Error(result.error || '恢复目录读取失败');
-    document.getElementById('managementOverlay').style.display = 'flex';
-    document.getElementById('managementTitle').textContent = '恢复删除与旧版本';
-    document.getElementById('managementTools').innerHTML = '';
-    document.getElementById('managementActions').innerHTML = '';
-    document.getElementById('managementStatus').textContent = '恢复前会核对当前版本，并保留恢复前副本。';
-    document.getElementById('managementBody').innerHTML = '<div class="management-form" style="grid-column:1/-1">' + (result.data?.transactions || []).slice().reverse().map(item => '<p>' + esc(item.label || item.id) + ' · ' + esc((item.files || []).join('、')) + ' <button class="btn" data-recovery="' + esc(item.id) + '">预览恢复</button></p>').join('') + '</div>';
-    document.querySelectorAll('[data-recovery]').forEach(button => button.onclick = () => recoveryPreview(button.dataset.recovery));
-  } catch (e) {
-    showToast(e.message);
-  }
+function backupScopeLabel(files){
+  const known={'投递数据/投递记录.json':'招聘记录','投递数据/用户编辑数据.json':'个人标记与偏好','投递数据/逐字稿数据.json':'通用题库','投递数据/面试准备数据.json':'公司准备','投递数据/面试复盘数据.json':'面试复盘','岗位探查/探查目录.json':'岗位探查','投递数据/工作区配置.json':'设置','投递数据/草稿数据.json':'编辑草稿'};
+  const labels=[...new Set(files.map(file=>known[file.path]||'正文与附件'))];
+  return labels.join('、')||'无业务文件';
 }
-async function recoveryPreview(id) {
-  const state = await managementRequest('trash');
-  document.getElementById('managementStatus').textContent = '恢复对象 ' + id + '；当前版本 ' + state.version + '。恢复将覆盖该副本涉及的资料，先保留现状。';
-  document.getElementById('managementActions').innerHTML = '<button class="btn" id="recoveryCommit">确认恢复所选副本</button>';
-  document.getElementById('recoveryCommit').onclick = async () => {
-    try {
-      const response = await fetch((apiBase || '') + '/api/manage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          module: 'trash',
-          action: 'restore',
-          id,
-          base: state.version
-        })
-      });
-      const result = await response.json();
-      if (!response.ok) throw Error(result.error || '恢复未提交');
-      showToast('恢复已保存');
-      location.reload();
-    } catch (e) {
-      document.getElementById('managementStatus').textContent = e.message;
-    }
+let recoveryChoices=[];
+function recoveryModuleLabel(module){return managementLabels[module]||{edits:'个人标记与偏好',settings:'设置',drafts:'编辑草稿'}[module]||'关联资料';}
+function recoveryDate(value){const date=new Date(value);return Number.isNaN(date.valueOf())?'历史修改':date.toLocaleString('zh-CN',{hour12:false});}
+function prepareRecoveryDialog(title){
+  showManagementDialog();
+  document.getElementById('managementTitle').textContent=title;
+  document.getElementById('managementTools').innerHTML='';
+  document.getElementById('managementActions').innerHTML='';
+  document.getElementById('managementStatus').textContent='';
+  document.getElementById('managementBody').classList.add('recovery-body');
+}
+async function openRecovery(){
+  try{
+    const state=await managementRequest('trash');recoveryChoices=state.data?.transactions||[];
+    prepareRecoveryDialog('恢复历史修改');
+    document.getElementById('managementStatus').textContent='选择一次修改，先查看影响范围，再确认恢复。';
+    document.getElementById('managementBody').innerHTML=recoveryChoices.length?
+      '<p class="recovery-intro">还原所选修改涉及的整个资料文件，覆盖这些文件中更晚的改动。恢复前会自动保存当前内容。</p><div class="recovery-list">'+recoveryChoices.slice().reverse().map(item=>`<div class="recovery-choice"><div><strong>${esc(recoveryDate(item.createdAt))}</strong><p>${esc((item.modules||[]).map(recoveryModuleLabel).join('、')||'业务资料')} · ${(item.files||[]).length} 个文件</p></div><button class="btn" data-recovery="${esc(item.id)}">查看恢复范围</button></div>`).join('')+'</div>':
+      '<div class="recovery-empty"><strong>暂无可恢复的修改</strong><p>通过 App 或资料工具保存的业务修改会在这里保留恢复副本。</p></div>';
+    document.querySelectorAll('[data-recovery]').forEach(button=>button.onclick=()=>recoveryPreview(button.dataset.recovery));
+  }catch(error){showToast(error.message);}
+}
+async function recoveryPreview(id){
+  const state=await managementRequest('trash'),item=state.data.transactions.find(row=>row.id===id);
+  if(!item){showToast('这份修改副本已不可用，请重新读取历史。');return;}
+  prepareRecoveryDialog('确认恢复范围');
+  document.getElementById('managementBody').innerHTML=`<div class="recovery-summary"><strong>${esc(recoveryDate(item.createdAt))} 修改前的资料</strong><p>涉及：${esc(item.modules.map(recoveryModuleLabel).join('、')||'关联资料')}。</p><p>将还原下列 ${item.files.length} 个完整文件，覆盖其中更晚的改动；其他资料不变。当前内容会自动保留为恢复副本。</p><ul class="recovery-files">${item.files.map(file=>'<li>'+esc(file)+'</li>').join('')}</ul></div>`;
+  document.getElementById('managementActions').innerHTML='<button class="btn" onclick="openRecovery()">返回历史修改</button><button class="btn btn-primary" id="recoveryCommit">确认恢复</button>';
+  document.getElementById('recoveryCommit').onclick=async function(){
+    this.disabled=true;
+    try{await managementRequest('trash',{action:'restore',id,base:state.version});showToast('恢复已保存');location.reload();}
+    catch(error){document.getElementById('managementStatus').textContent=error.message;this.disabled=false;}
   };
 }
 const basicAgentBootstrap = agentBootstrapText;
@@ -721,7 +743,7 @@ function desktopAgentBootstrapText(includeLocalPaths = false) {
   const desktop = window.__TOUDI_DESKTOP__;
   if (!desktop) return basicAgentBootstrap();
   const location = includeLocalPaths ? desktop : {workspace:'{用户指定的正式工作区}',agentTool:'{用户提供的资料工具}',guideRoot:'{随工具提供的通用流程文档目录}'};
-  return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + location.workspace + '\n资料工具：' + location.agentTool + '\n流程文档目录：' + location.guideRoot + '\n\n先读取正式工作区已有的 AGENTS.md、投递数据/AGENTS.md 或信源流程说明（如有），保留现有标准流程和命令入口。然后读取文档目录下的 AGENTS.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
+  return '请协助我使用 TouDi 管理求职资料。\n\n正式工作区：' + location.workspace + '\n资料工具：' + location.agentTool + '\n流程文档目录：' + location.guideRoot + '\n\n先读取正式工作区已有的 AGENTS.md、投递数据/AGENTS.md 或信源流程说明（如有），保留现有标准流程和命令入口。然后读取文档目录下的 AGENTS.md、docs/开始与初始化.md、docs/Agent接入.md、docs/流程协作.md 和 docs/内容与渲染契约.md。使用上述资料工具的 --workspace 参数指向正式工作区；先运行 --help 和 read，读取最新内容及对应版本。\n\n招聘信源、个人材料与本次任务由我提供。首次使用或新增信源时，先用 preference-catalog 清点实际字段词条，确认分类、同义词、学历含义、字段与去重方式，建立工作区 settings.preferenceRules；保留已有设置与偏好，未知标签不作为排除条件。不要照搬作者的信源或预设资格。初始化完成后做一次更新、读回与页面核对，之后沿用更新、准备、探查和复盘流程。只处理本次目标，保留已有标记和无关内容；候选先 validate，再 commit，最后 read 读回核对。版本冲突保留候选，重新对账；不猜测信源、经历或日期。App 与工具共用同一母本，完成后核对正文、关联和附件。未获得相应任务授权时，不网申、不对外沟通、不发布个人资料。';
 }
 agentBootstrapText = function () { return desktopAgentBootstrapText(); };
 if (window.__TOUDI_DESKTOP_READY__) {
@@ -800,7 +822,7 @@ async function refreshWorkspaceData(manual = false) {
   const focusState = originalFocus?.id ? {id: originalFocus.id, start: originalFocus.selectionStart, end: originalFocus.selectionEnd} : null;
   const button = document.getElementById('workspaceRefreshButton');
   if (button) { button.disabled = true; button.textContent = '正在检查…'; }
-  const modules = ['edits', 'records', 'qbank', 'preps', 'prospects', 'reviews'];
+  const modules = ['settings', 'edits', 'records', 'qbank', 'preps', 'prospects', 'reviews'];
   try {
     const results = await Promise.allSettled(modules.map(module => managementRequest(module)));
     let changed = false;
@@ -812,19 +834,30 @@ async function refreshWorkspaceData(manual = false) {
       if (result.status !== 'fulfilled') {
         emptyStateChanged ||= workspaceReadStates[module] !== 'error';
         workspaceReadStates[module] = 'error';
-        failures.push(managementLabels[module] || '个人标记');
+        failures.push(managementLabels[module] || (module === 'settings' ? '工作区设置' : '个人标记'));
         continue;
       }
       emptyStateChanged ||= workspaceReadStates[module] !== 'ready';
       workspaceReadStates[module] = 'ready';
       const fingerprint = JSON.stringify(result.value.data);
       if (workspaceRefreshSnapshots.get(module) === fingerprint) continue;
-      if (workspaceHasDraft(module) || (module === 'records' && workspaceHasDraft('edits'))) {
+      if ((module === 'settings' && (workspaceSettingsSaving || localStorage.getItem('toudiPendingSettings'))) || workspaceHasDraft(module) || (module === 'records' && workspaceHasDraft('edits'))) {
         workspacePendingUpdates.add(module);
         continue;
       }
       // Protect forms opened while the read was in flight. Never advance their save base.
-      if (module === 'edits') await initServerStorage();
+      if (module === 'settings') {
+        settingsState = result.value;
+        sourcePreferenceRules = settingsState.data.preferenceRules || null;
+        if (settingsState.data.display) {
+          workspace = {...WORKSPACE_DEFAULT,...settingsState.data.display};
+          localStorage.setItem(WORKSPACE_KEY,JSON.stringify(workspace));
+          applyWorkspace();
+        }
+        renderQuickViews();
+        if(view === 'settings') renderSettings();
+        else if(['table','kanban','charts'].includes(view)) render();
+      } else if (module === 'edits') await initServerStorage();
       else if (module === 'records') {
         const keys = new Set(data.filter(row => selected.has(row._idx)).map(row => row._key));
         detailInputMemory.clear();
@@ -836,7 +869,7 @@ async function refreshWorkspaceData(manual = false) {
       else if (module === 'prospects') await initProspectsStorage();
       else if (module === 'reviews') await initReviewsStorage();
       const readFailed = SAVE_DOMAINS[module]?.readFailed || (module === 'preps' && workspaceReadStates.preps === 'error') || (module === 'prospects' && !!prospectLoadError);
-      if (readFailed) {workspaceReadStates[module]='error';failures.push(managementLabels[module]||'个人标记');emptyStateChanged=true;continue;}
+      if (readFailed) {workspaceReadStates[module]='error';failures.push(managementLabels[module]||(module==='settings'?'工作区设置':'个人标记'));emptyStateChanged=true;continue;}
       workspaceRefreshSnapshots.set(module, fingerprint);
       workspacePendingUpdates.delete(module);
       changed = true;
@@ -848,6 +881,7 @@ async function refreshWorkspaceData(manual = false) {
       showWorkspaceRefreshNotice('');
       if (manual) showToast(changed ? '已读取工作区最新资料' : '资料没有变化');
     }
+    if(view==='settings'&&['settings','edits','records'].some(module=>updatedModules.has(module)))renderSettings();
     // Unchanged content never redraws, so focus, selection and reader scroll remain intact.
     const visibleModules = view === 'qbank' ? ['qbank','preps'] : view === 'review' ? ['reviews'] : view === 'prospect' ? ['prospects'] : ['records','edits'];
     if (emptyStateChanged || visibleModules.some(module=>updatedModules.has(module))) repaintWorkspaceEmptySurfaces();

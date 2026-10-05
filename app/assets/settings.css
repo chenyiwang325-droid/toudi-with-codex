@@ -24,7 +24,17 @@
 #themeMenu svg { visibility: hidden; width: 16px; height: 16px; }
 #themeMenu [aria-checked="true"] svg { visibility: visible; }
 .theme-toolbar button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Settings primitives: shared row, control, type and spacing contracts. */
 #settingsView {
+  --setting-row-height: 80px;
+  --setting-control-height: 36px;
+  --setting-control-width: 320px;
+  --setting-gap: 24px;
+  --setting-title-size: 24px;
+  --setting-section-size: 16px;
+  --setting-label-size: 14px;
+  --setting-control-size: 13px;
+  --setting-caption-size: 12px;
   max-width: 1000px;
   margin: 0 auto;
   padding: 24px 28px;
@@ -33,98 +43,63 @@
   border-radius: 8px;
 }
 #settingsView .settings-head { margin-bottom: 20px; }
-#settingsView .settings-head h2 { font-size: 24px; line-height: 1.4; margin: 0 0 6px; }
-#settingsView .settings-head p { font-size: 13px; color: var(--text3); margin: 0; }
-.settings-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
-.settings-tabs button {
-  min-height: 46px;
-  padding: 10px 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
-  color: var(--text2);
-  white-space: nowrap;
-  cursor: pointer;
-}
+#settingsView .settings-head h2 { font-size: var(--setting-title-size); line-height: 32px; font-weight: 600; margin: 0 0 4px; }
+#settingsView .settings-head p { font-size: var(--setting-control-size); color: var(--text2); line-height: 20px; margin: 0; }
+.settings-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.settings-tabs button { height: 46px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; font: inherit; font-size: 14px; line-height: 20px; color: var(--text2); white-space: nowrap; cursor: pointer; }
 .settings-tabs button:hover { color: var(--primary); background: var(--bg); }
 .settings-tabs button[aria-selected="true"] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 .settings-panel[hidden] { display: none !important; }
 .settings-panel { animation: settings-panel-in .16s ease-out; }
 @keyframes settings-panel-in { from { opacity: .5; transform: translateY(3px); } to { opacity: 1; transform: none; } }
-/* Opt-in native screenshots settle paused background WebView animations. */
 html[data-render-diagnostic="true"] *, html[data-render-diagnostic="true"] *::before, html[data-render-diagnostic="true"] *::after { animation: none !important; transition: none !important; }
-#settingsView .settings-section { padding: 20px 0 0; border: 0; }
+#settingsView .settings-section { padding: 24px 0 0; border: 0; }
 #settingsView .settings-section + .settings-section { padding-top: 24px; }
-#settingsView .settings-section h3 { font-size: 16px; line-height: 1.5; margin: 0 0 16px; }
-#settingsView .settings-section > p { max-width: 76ch; font-size: 13px; color: var(--text2); }
-#settingsView .setting-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 312px;
-  gap: 24px;
-  align-items: center;
-  min-height: 76px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border-light);
-}
+#settingsView .settings-section h3 { font-size: var(--setting-section-size); font-weight: 600; line-height: 24px; margin: 0 0 12px; }
+#settingsView .settings-section > p.settings-help { font-size: var(--setting-control-size); color: var(--text2); line-height: 20px; margin: 0 0 12px; }
+#settingsView .setting-row { display: grid; grid-template-columns: minmax(0,1fr) var(--setting-control-width); gap: var(--setting-gap); align-items: center; height: var(--setting-row-height); padding: 0; border-bottom: 1px solid var(--border-light); }
 #settingsView .setting-label { min-width: 0; }
-#settingsView .setting-label strong { font-size: 14px; font-weight: 600; }
-#settingsView .setting-label p, #settingsView .settings-note { font-size: 12px; color: var(--text3); line-height: 1.65; margin: 4px 0 0; }
-#settingsView .settings-note { margin-top: 14px; }
-#settingsView .setting-control { display: flex; gap: 8px; justify-content: flex-end; min-width: 0; }
-.settings-segment { display: flex; width: 100%; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.settings-segment button {
-  flex: 1;
-  min-width: 0;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 0;
-  border-right: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text2);
-  font: inherit;
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-  cursor: pointer;
-}
+#settingsView .setting-label strong { display: block; font-size: var(--setting-label-size); font-weight: 600; line-height: 20px; }
+#settingsView .setting-label p { font-size: var(--setting-caption-size); color: var(--text2); line-height: 20px; margin: 4px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#settingsView .settings-note { font-size: var(--setting-caption-size); color: var(--text2); line-height: 20px; margin: 12px 0 0; }
+#settingsView .setting-control { display: flex; align-items: center; gap: 8px; justify-content: flex-end; min-width: 0; }
+#settingsView .btn { display: inline-flex; align-items: center; justify-content: center; height: var(--setting-control-height); min-height: var(--setting-control-height); font: inherit; font-size: var(--setting-control-size); line-height: 20px; padding: 0 12px; white-space: nowrap; }
+#settingsView .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.settings-segment { display: flex; width: 100%; height: 36px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.settings-segment button { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 0; border-right: 1px solid var(--border); background: var(--card); color: var(--text2); font: inherit; font-size: 13px; line-height: 20px; white-space: nowrap; cursor: pointer; }
 .settings-segment button:last-child { border-right: 0; }
 .settings-segment button:hover { background: var(--bg); }
-.settings-segment button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+.settings-segment button[aria-pressed="true"] { background: var(--primary-light); color: var(--text); font-weight: 600; }
 .settings-segment button:focus-visible { outline-offset: -3px; }
-.settings-select { width: 100%; position: relative; }
-#settingsView .settings-select select {
-  appearance: none;
-  width: 100%;
-  min-height: 38px;
-  padding: 8px 36px 8px 12px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.settings-select svg { position: absolute; right: 12px; top: 12px; width: 16px; height: 16px; color: var(--text2); pointer-events: none; }
-#settingsView .btn { min-height: 36px; font-size: 13px; padding: 7px 12px; }
-#settingsView .settings-actions { gap: 8px; margin-top: 12px; }
-#settingsView .settings-section .agent-bootstrap { margin-top: 16px; min-height: 220px; font-size: 13px; background: var(--bg); }
-.settings-preference-summary { color: var(--text2); line-height: 1.6; overflow-wrap: anywhere; }
-.settings-disclosure { margin-top: 20px; border: 1px solid var(--border); border-radius: 6px; }
-.settings-disclosure > .settings-section { padding: 0 16px 16px !important; }
-.settings-disclosure > .settings-section h3 { display: none; }
-.settings-disclosure .setting-row { grid-template-columns: minmax(0, 1fr) auto !important; }
-.settings-disclosure .setting-control { flex-wrap: wrap; }
-.settings-disclosure .setting-control .btn { white-space: nowrap; }
-.settings-disclosure .settings-help { padding-top: 8px; }
-.settings-disclosure .settings-actions { padding-bottom: 0; }
-.settings-disclosure > summary { min-height: 50px; padding: 12px 16px; }
+.settings-select { width: 100%; height: 36px; position: relative; }
+#settingsView .settings-select select { appearance: none; width: 100%; height: 36px; padding: 0 36px 0 12px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
+.settings-select svg { position: absolute; right: 12px; top: 10px; width: 16px; height: 16px; color: var(--text2); pointer-events: none; }
+.settings-disclosure { margin: 16px 0 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.settings-disclosure > summary { min-height: 48px; padding: 12px 16px; }
 .settings-disclosure > summary strong { font-weight: 500; }
-.settings-disclosure > summary small { display: block; color: var(--text3); font-size: 12px; margin-top: 3px; font-weight: 400; }
-.desktop-workspace-row { align-items: flex-start; gap: 16px; }
+.setting-detail { padding: 16px; border-top: 1px solid var(--border-light); font-size: 13px; line-height: 20px; }
+#settingsView .setting-detail p { margin: 0; }
 #settingsView .connection-path { overflow-wrap: anywhere; }
+#settingsView .agent-bootstrap { width: 100%; height: 190px; min-height: 190px; margin: 0; resize: vertical; font: inherit; font-size: 13px; line-height: 22px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
+.agent-setup-flow { list-style: none; margin: 0; padding: 0; }
+.agent-setup-flow li { display: grid; grid-template-columns: 24px minmax(0,1fr); align-items: center; gap: 12px; height: 80px; border-bottom: 1px solid var(--border-light); }
+.agent-setup-flow strong { display: block; font-size: 14px; font-weight: 600; line-height: 20px; }
+.agent-setup-flow p { margin: 4px 0 0; font-size: 13px; color: var(--text2); line-height: 20px; }
+.setup-number { color: var(--text3); font-size: 13px; font-variant-numeric: tabular-nums; text-align: center; }
+.settings-reading { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; line-height: 20px; margin-top: 16px; }
+.settings-reading a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.settings-reading span { color: var(--text2); }
+.management-body.recovery-body { display: block; }
+.management-dialog:has(.recovery-body) { width: min(760px,94vw); }
+.management-dialog:has(.recovery-body) .management-actions { justify-content: flex-end; }
+.management-dialog:has(.recovery-body) .btn { height: 36px; min-height: 36px; padding: 0 12px; font-size: 13px; line-height: 20px; }
+.recovery-intro, .recovery-summary p, .recovery-empty p { margin: 0 0 12px; color: var(--text2); font-size: 13px; line-height: 22px; }
+.recovery-summary strong, .recovery-empty strong { display: block; margin-bottom: 12px; font-size: 14px; line-height: 22px; }
+.recovery-choice { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 24px; align-items: center; min-height: 80px; border-bottom: 1px solid var(--border-light); }
+.recovery-choice strong { font-size: 14px; font-weight: 500; line-height: 20px; }
+.recovery-choice p { margin: 4px 0 0; color: var(--text2); font-size: 12px; line-height: 20px; }
+.recovery-files { margin: 12px 0; padding: 0 16px 0 32px; max-height: 200px; overflow: auto; font-size: 12px; color: var(--text2); line-height: 24px; overflow-wrap: anywhere; }
+.recovery-empty { padding: 40px 0; }
 
 /* Header, classification tabs and actions are stable; only the content scrolls. */
 #prefModal { z-index: 1100; }
@@ -166,14 +141,16 @@ html[data-render-diagnostic="true"] *, html[data-render-diagnostic="true"] *::be
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  min-height: 38px;
-  padding: 8px 10px;
+  height: 44px;
+  min-height: 44px;
+  padding: 11px 10px;
   border: 1px solid transparent;
   border-radius: 4px;
   font-size: 13px;
   line-height: 20px;
   overflow-wrap: anywhere;
 }
+.pref-option > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pref-option:hover { background: var(--bg); }
 .pref-option:has(input:checked) { background: var(--primary-light); border-color: transparent; color: var(--text); }
 .pref-option input { appearance: auto; width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--primary); }
@@ -223,7 +200,7 @@ details[open] > summary .disclosure-action svg { transform: rotate(90deg); }
 @media (min-width: 1100px) { #settingsView .settings-panel { min-height: 450px; } }
 @media (max-width: 1100px) {
   #settingsView { padding: 20px 24px; }
-  #settingsView .setting-row { grid-template-columns: minmax(0, 1fr) 270px; gap: 20px; }
+  #settingsView { --setting-control-width: 270px; --setting-gap: 20px; }
   .settings-tabs { gap: 12px; }
 }
 @media (max-width: 740px) {
@@ -232,7 +209,10 @@ details[open] > summary .disclosure-action svg { transform: rotate(90deg); }
   #settingsView .settings-head h2 { font-size: 21px; }
   .settings-tabs { gap: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .settings-tabs button { padding: 10px 3px; min-height: 44px; font-size: 12px; }
-  #settingsView .setting-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px 0; min-height: 0; }
+  #settingsView .setting-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px 0; height: auto; min-height: 96px; }
+  #settingsView .setting-label p { white-space: normal; }
+  .agent-setup-flow li { height: auto; min-height: 88px; padding: 14px 0; }
+  #settingsView .settings-reading { gap: 4px; flex-direction: column; }
   #settingsView .setting-control { justify-content: flex-start; max-width: 360px; }
   .settings-disclosure .setting-row { grid-template-columns: minmax(0, 1fr) !important; }
   .pref-dialog-head { padding: 16px 18px; }
@@ -255,8 +235,20 @@ html[data-motion="off"] .disclosure-action svg { transition: none; }
 
 /* Color selection stays separate from light/dark theme mode. */
 .settings-palettes { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); width: 100%; border: 1px solid var(--border); border-radius: 6px; }
-.settings-palettes button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 56px; padding: 7px 4px; margin: -1px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text2); font: inherit; font-size: 12px; cursor: pointer; }
+.settings-palettes button { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 4px; height: 36px; min-height: 36px; padding: 0 4px; margin: -1px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text2); font: inherit; font-size: 12px; cursor: pointer; }
 .settings-palettes button:hover { background: var(--bg); }
 .settings-palettes button[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); background: var(--primary-faint); position: relative; z-index: 1; font-weight: 600; }
-.palette-swatch { display: block; width: 17px; height: 17px; border-radius: 50%; background: var(--swatch); border: 1px solid rgba(0,0,0,.15); }
+.palette-swatch { display: block; width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; background: var(--swatch); border: 1px solid rgba(0,0,0,.15); }
 [data-theme="dark"] .palette-swatch { border-color: rgba(255,255,255,.35); }
+
+/* Short laptop windows preserve control geometry while tightening section spacing. */
+@media (min-width: 741px) and (max-height: 900px) {
+  #settingsView { padding-top: 20px; padding-bottom: 20px; }
+  #settingsView .settings-head { margin-bottom: 12px; }
+  #settingsView .settings-section { padding-top: 16px; }
+  #settingsView .settings-section h3 { margin-bottom: 8px; }
+  #settingsView .settings-note { margin-top: 8px; }
+  #settingsView .settings-reading, #settingsView .settings-disclosure { margin-top: 12px; }
+}
+.module-nav button.active:hover, .sb-item.active:hover { background: var(--primary-light); }
+.pref-options:has(> .pref-option:only-child) { grid-template-columns: minmax(0,1fr); }
