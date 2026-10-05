@@ -449,11 +449,14 @@ details.qb-co-fold .qb-co-body .qb-group-fold:first-of-type { margin-top: 10px; 
 .md-pre { background: var(--bg); color: var(--text); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; margin: 8px 0; border: 1px solid var(--border); }
 .md-code { background: var(--border-light); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; }
 .md-pre .md-code { background: transparent; padding: 0; }
-.md-table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; min-width: 0; }
-.md-table th { border: 1px solid var(--border); padding: 6px 10px; text-align: left; line-height: 1.5; vertical-align: top; background: var(--bg); font-weight: 600; color: var(--text2); position: static; cursor: default; }
-.md-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; line-height: 1.5; vertical-align: top; color: var(--text); background: var(--card); }
+.md-table-scroll { display: block; width: 100%; max-width: 100%; min-width: 0; margin: 12px 0; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.md-table-scroll:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.md-table { display: table; border-collapse: collapse; table-layout: fixed; width: 100%; min-width: var(--md-table-width,0); margin: 0; font-size: 13px; white-space: normal; word-break: normal; overflow-wrap: break-word; }
+.md-table th,.md-table td { border: 1px solid var(--border); padding: 9px 12px; line-height: 1.65; vertical-align: top; text-align: left; }
+.md-table th { background: var(--bg); font-weight: 600; color: var(--text2); position: static; cursor: default; }
+.md-table td { color: var(--text); background: var(--card); }
+.md-table :is(th,td) :is(a,code) { white-space: normal; word-break: normal; overflow-wrap: anywhere; }
 .qb-item-body.pp-md { overflow-x: auto; max-width: 100%; }
-.pp-md .md-table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .pp-md code { word-break: break-all; }
 .pp-sec-body a { color: var(--primary); text-decoration: none; word-break: break-all; }
 .pp-note a { color: var(--primary); text-decoration: none; word-break: break-all; }
@@ -652,7 +655,6 @@ body.sb-off .sidebar.open { visibility:visible; transform:none; }
 .pp-chip { flex: 0 0 auto; }
 .pp-sec>summary { padding: 11px 12px; font-size: 14px; }
 .pp-sec-body { padding: 4px 12px 12px; }
-.md-table { display: block; overflow-x: auto; }
 .modal { width: 94%; max-width: 100%; max-height: 90dvh; border-radius: 10px; padding: 18px 16px; }
 .modal-overlay { align-items: center; }
 .detail-row { flex-direction: column; gap: 2px; }
@@ -703,10 +705,6 @@ textarea { font-size: 16px; }
 .rv-meta-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width:600px) {
-.pp-md .md-table th { min-width: 7em; }
-.pp-md .md-table td { min-width: 7em; }
-.pp-md .md-table th:last-child { min-width: 12em; }
-.pp-md .md-table td:last-child { min-width: 12em; }
 .detail-modal .modal { border-radius: 0; padding: 0 14px 18px; }
 .qb-workbar { gap: 6px; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; }
 .qb-workbar input { flex-basis: 100%; grid-column: 1 / 3; grid-row: 2; width: 100%; min-width: 0; font-size: 12px; }
@@ -2430,10 +2428,43 @@ function mdInline(s){
   return t;
 }
 function mdTable(rows){
-  const cells=r=>r.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(c=>mdInline(c.trim()));
-  let html='<table class="md-table"><thead><tr>'+cells(rows[0]).map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
-  for(let i=2;i<rows.length;i++)html+='<tr>'+cells(rows[i]).map(c=>`<td>${c}</td>`).join('')+'</tr>';
-  return html+'</tbody></table>';
+  const parsed=rows.map(mdTableCells),count=parsed.reduce((n,row)=>Math.max(n,row.length),0);
+  const headers=Array.from({length:count},(_,col)=>parsed[0][col]||'');
+  // Measure visible text, not Markdown URLs. Keep a readable measure in every prose column.
+  const measure=text=>Array.from(text.replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/[`*_]/g,'')).reduce((n,c)=>n+(c.codePointAt(0)>255?1:.55),0);
+  const widths=headers.map((header,col)=>{
+    const longest=Math.max(0,...parsed.slice(2).map(row=>measure(row[col]||'')));
+    return Math.min(28,Math.max(6,Math.ceil(measure(header)+2),Math.ceil(Math.min(longest,12)+2),Math.ceil(longest*.65+2)));
+  });
+  const total=widths.reduce((sum,n)=>sum+n,0);
+  const align=parsed[1].map(cell=>/^:-+:$/.test(cell)?'center':/^-+:$/.test(cell)?'right':'left');
+  const cell=(value,col,tag)=>`<${tag}${tag==='th'?' scope="col"':''} style="text-align:${align[col]||'left'}">${mdInline(value)}</${tag}>`;
+  let html=`<div class="md-table-scroll" tabindex="0" role="region" aria-label="表格，可横向滚动"><table class="md-table" style="--md-table-width:${total}em"><colgroup>`;
+  html+=widths.map(width=>`<col style="width:${(width/total*100).toFixed(4)}%">`).join('')+'</colgroup><thead><tr>';
+  html+=headers.map((value,col)=>cell(value,col,'th')).join('')+'</tr></thead><tbody>';
+  for(const row of parsed.slice(2))html+='<tr>'+headers.map((_,col)=>cell(row[col]||'',col,'td')).join('')+'</tr>';
+  return html+'</tbody></table></div>';
+}
+function mdTableCells(row){
+  const text=row.trim(),cells=[];let value='',codeRun=0;
+  for(let i=0;i<text.length;i++){
+    if(text[i]==='\\'&&i+1<text.length){
+      if(text[i+1]==='|'){value+='|';i++;continue;}
+      value+=text[i]+text[++i];continue;
+    }
+    if(text[i]==='`'){
+      let end=i;while(text[end]==='`')end++;
+      const run=end-i;
+      if(codeRun===run)codeRun=0;
+      else if(!codeRun&&text.indexOf('`'.repeat(run),end)!==-1)codeRun=run;
+      value+=text.slice(i,end);i=end-1;continue;
+    }
+    if(text[i]==='|'&&!codeRun){cells.push(value.trim());value='';}else value+=text[i];
+  }
+  cells.push(value.trim());
+  if(text.startsWith('|'))cells.shift();
+  if(cells[cells.length-1]===''&&text.endsWith('|'))cells.pop();
+  return cells;
 }
 function mdList(buf){
   let html='',stack=[];

@@ -33,8 +33,38 @@
       if (subdivision) subdivision.open = true;
     }
     if (target === 'company') switchPrepMode('company');
+    if (target === 'qbank') switchPrepMode('general');
     await new Promise(resolve => setTimeout(resolve, 350));
   }
+  // Reveal one existing table for a read-only rendering check; no business content is changed.
+  const reader = document.querySelector(target === 'prospect' ? '#prospectMain' : target === 'review' ? '#reviewMain' : ['qbank','company'].includes(target) ? '#qbMain' : '.__no_reader__');
+  // The initially selected document may contain no tables. Inspect an existing one when available.
+  const hasTable = text=>/(?:^|\n)\s*\|[^\n]+\|\s*\n\s*\|[\s:|\-]+\|/.test(text||'');
+  if (reader && !reader.querySelector('.md-table')) {
+    if (target === 'qbank') {
+      const category=qbData.categories.find(category=>category.items.some(item=>hasTable(item.body)));
+      if (category) {currentQbCat=category.id;qbSearch='';qbSearchDocument=false;renderQbank();}
+    } else if (target === 'company') {
+      const prep=prepData.preps.find(prep=>prep.sections?.some(section=>hasTable(section.md)));
+      if (prep) openPrep(prep.id);
+    } else if (target === 'review') {
+      const session=reviewData.sessions.find(session=>hasTable(session.summary?.raw));
+      if (session) openReviewSession(session.id);
+    }
+  }
+  const firstTable = reader?.querySelector('.md-table');
+  for (let parent=firstTable?.parentElement; parent && parent!==reader; parent=parent.parentElement) {
+    if (parent.tagName === 'DETAILS') parent.open = true;
+  }
+  const markdownTables = [...(reader?.querySelectorAll('.md-table') || [])].filter(el=>el.getBoundingClientRect().width>0).map(el=>({
+    wrapper: el.parentElement.className,
+    width: el.getBoundingClientRect().width, viewport: el.parentElement.clientWidth,
+    scrollWidth: el.parentElement.scrollWidth,
+    columns: [...el.rows[0].cells].map(cell=>cell.getBoundingClientRect().width),
+    rows: [...el.tBodies[0].rows].map(row=>row.getBoundingClientRect().height),
+    display: getComputedStyle(el).display,
+    allTextVisible: [...el.querySelectorAll('td')].every(cell=>getComputedStyle(cell).textOverflow!=='ellipsis')
+  }));
   const box = selector => {
     const element = document.querySelector(selector);
     if (!element) return null;
@@ -49,7 +79,7 @@
     scripting: typeof switchView === 'function',
     management: !!document.getElementById('managementEntry'),
     service: window.__TOUDI_SERVICE__?.mode || null,
-    filling, fillingDialog:box('#fillingDialog'), fillingBody:box('.filling-body'),
+    filling, markdownTables, fillingDialog:box('#fillingDialog'), fillingBody:box('.filling-body'),
     sidebar: box('.sidebar'), main: box('.main'), topbar: box('.topbar'), table: box('#tableView'),
     managementLayout: box('.management-body'), settings: box('#settingsView'),
     theme: document.documentElement.dataset.theme,
