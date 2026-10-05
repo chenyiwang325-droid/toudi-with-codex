@@ -23,7 +23,7 @@ ALIASES={
  '学历':['学历','education level','qualification'], '学位':['学位','degree'], '学历类型':['学历类型','学习形式','education type'],
  '学校':['学校','学校名称','毕业院校','院校','university','school','institution','school name','university name'],
  '学院':['学院','院系','faculty','college'], '专业':['专业','专业名称','major','field of study'],
- '开始日期':['开始日期','入学时间','入学日期','start date','from'], '结束日期':['结束日期','毕业时间','毕业日期','end date','to'],
+ '开始日期':['开始日期','开始时间','入学时间','入学日期','项目开始时间','项目开始日期','start date','from'], '结束日期':['结束日期','结束时间','毕业时间','毕业日期','项目结束时间','项目结束日期','end date','to'],
  'GPA':['GPA','平均绩点','绩点','grade point average'], '年级排名':['年级排名','专业排名','class rank'],
  '英语四级':['英语四级','四级成绩','cet4','cet-4'], '英语六级':['英语六级','六级成绩','cet6','cet-6'],
  '六级获证日期':['六级获证日期','六级考试日期'],
@@ -58,6 +58,33 @@ def precision(value):
     if re.fullmatch(r'\d{4}[-/.年]\d{1,2}月?',text):return 'month'
     if re.fullmatch(r'\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?',text):return 'day'
     return None
+
+
+def ongoing_end(fact):
+    return fact.get('module') in ('project','internship') and fact.get('label') in ('结束','结束日期') and normalized(fact.get('value','')) in ('至今','present','ongoing','current')
+
+
+def validate_date_policy(fact):
+    if 'ongoing' in fact and not isinstance(fact['ongoing'],bool):raise ValueError('ongoing must be boolean')
+    if fact.get('ongoing') and not ongoing_end(fact):raise ValueError('ongoing is only valid for a present project/work end date')
+    if fact.get('dateFallback') not in (None,'','today'):raise ValueError('unknown ongoing date fallback')
+    if fact.get('dateFallback') and not (fact.get('ongoing') and ongoing_end(fact)):raise ValueError('date fallback requires an ongoing end date')
+
+
+def sort_facts(facts):
+    """Order complete records by start date without changing stable fact/record IDs."""
+    groups={}; modules={'personal':0,'education':1,'internship':2,'project':3,'language':4}
+    for fact in facts:groups.setdefault((fact['module'],fact.get('recordId','')),[]).append(fact)
+    def start_date(group):
+        for label in ('开始日期','开始','时间'):
+            value=next((str(f['value']) for f in group if f['label']==label),'')
+            match=re.match(r'^(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2})(?!\d))?',value)
+            if match:
+                year,month,day=match.groups()
+                try:return datetime.date(int(year),int(month),int(day or 1)).toordinal()
+                except ValueError:pass
+        return 0
+    return [fact for key,group in sorted(groups.items(),key=lambda item:(modules.get(item[0][0],5),-start_date(item[1]))) for fact in group]
 
 
 def source_file(workspace):
@@ -99,7 +126,8 @@ def load_profile(workspace,profile_id='general'):
             current=copy.deepcopy(fact); current.setdefault('recordId','');current.setdefault('recordLabel','');current.setdefault('recordHint','');current.setdefault('aliases',ALIASES.get(fact['label'],[fact['label']]))
             if not isinstance(current['aliases'],list) or any(not isinstance(a,str) for a in current['aliases']):raise ValueError('invalid aliases')
             current['sensitive']=bool(current.get('sensitive') or sensitive_label(current['label']));current['manual']=bool(current.get('manual') or manual_label(current['label']) or current.get('companyScope') or current.get('_专属') or str(current['label']).startswith('_专属'))
-            current.setdefault('precision',precision(current['value']));result['facts'].append(current)
+            current.setdefault('precision',precision(current['value']));validate_date_policy(current);result['facts'].append(current)
+        result['facts']=sort_facts(result['facts'])
         return result
     rules=data.get('_使用规则',[])
     if not isinstance(rules,list) or any(not isinstance(rule,str) for rule in rules):raise ValueError('invalid profile rules')
@@ -142,11 +170,21 @@ def load_profile(workspace,profile_id='general'):
         for index,row in enumerate(data.get('项目经历',[])):
             if not isinstance(row,dict):raise ValueError('invalid project facts')
             for field,value in row.items():add('project','project-'+str(index),str(row.get('名称','项目')),str(row.get('名称','')),field,value,field=='时间')
+    # Policies are explicit source metadata, never inferred from a stale end date.
+    for fact in result['facts']:
+        if ongoing_end(fact):
+            fact['ongoing']=True
+            index=int(fact['recordId'].rsplit('-',1)[1])
+            rows=data.get('项目经历',[]) if fact['module']=='project' else records
+            fallback=rows[index].get('_结束日期兜底')
+            if fallback:fact['dateFallback']=fallback
+            validate_date_policy(fact)
     for field in ('社会及校园活动','奖惩情况_200字版','奖惩情况_带日期版','研究成果_297字版','研究成果_完整版见','专利','IT技能'):
         if field in data:result['supplements'].append({'label':field,'module':'supplement','sourceName':source_name,'sourceKey':field})
     if '家庭成员' in data:result['warnings'].append('家庭成员信息需要人工填写，不自动匹配。')
     if '报名信息_中行' in data:result['warnings'].append('公司专属报名资料不泛化到其他网站；相关字段需要人工确认。')
     if '证件照' in data:result['warnings'].append('附件和照片由用户手动上传。')
+    result['facts']=sort_facts(result['facts'])
     return result
 
 
@@ -174,7 +212,7 @@ def export_profile_pack(workspace):
     return {'schemaVersion':1,'kind':'toudi-filling-profile','name':'个人填报资料',
             'savedAt':packs[0].get('sourceSavedAt'),'sourceName':packs[0]['sourceName'],
             'sourceVersion':packs[0]['sourceVersion'],'profiles':copy.deepcopy(PROFILES),
-            'facts':list(facts.values()),'rules':packs[0]['rules'],
+            'facts':sort_facts(list(facts.values())),'rules':packs[0]['rules'],
             'warnings':list(dict.fromkeys(w for p in packs for w in p['warnings'])),
             'supplements':[{'label':s.get('label'),'module':s.get('module')} for s in packs[0]['supplements']]}
 
@@ -260,12 +298,13 @@ def option_equivalent(value,label):
     return text
 
 
-def plan_fields(profile,scan,mappings=None):
+def plan_fields(profile,scan,mappings=None,today=None):
     if not isinstance(scan,dict) or not isinstance(scan.get('fields'),list):raise ValueError('invalid field scan')
     facts={f['key']:f for f in profile['facts']}; mappings=mappings or {}
     ids=[f.get('id') for f in scan['fields'] if isinstance(f,dict)]
     if len(ids)!=len(scan['fields']) or any(not isinstance(i,str) or not i for i in ids) or len(ids)!=len(set(ids)):raise ValueError('field IDs must be unique strings')
     if not isinstance(mappings,dict) or any(not isinstance(field,str) or not isinstance(key,str) or field not in ids or key not in facts for field,key in mappings.items()):raise ValueError('mapping must use scanned IDs and current profile fact keys')
+    today=today or datetime.date.today()
     rows=[];actions=[];warnings=list(profile.get('warnings',[]))+list(scan.get('warnings',[]))
     for field in scan['fields']:
         row={'fieldId':field['id'],'label':str(field.get('label','')),'module':field.get('module',''),'groupLabel':field.get('groupLabel',''),'status':'missing','reason':'资料中没有可确认的对应字段。','expectedValue':field.get('value','')}
@@ -277,7 +316,10 @@ def plan_fields(profile,scan,mappings=None):
             candidates=[facts[mappings[field['id']]]] if field['id'] in mappings else matching_facts(profile,field)
             if len(candidates)>1:row.update(status='ambiguous',reason='有多个资料记录，分组或记录提示无法唯一确认，请选择事实。')
             elif len(candidates)==1:
-                fact=candidates[0]; value=str(fact['value']);row.update(factKey=fact['key'],value=value,displayValue=mask(value,label) if fact['sensitive'] else value,sensitive=fact['sensitive'])
+                fact=candidates[0]; value=str(fact['value']);value_precision=fact.get('precision');row.update(factKey=fact['key'],value=value,displayValue=mask(value,label) if fact['sensitive'] else value,sensitive=fact['sensitive'])
+                date_format=field.get('dateFormat')
+                if date_format and date_format not in ('YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'):raise ValueError('invalid date format')
+                date_kind=kind if kind in ('date','month') else ('date' if 'DD' in date_format else 'month') if date_format else ''
                 reason=None
                 if field['id'] in mappings and not mapping_matches(profile,field,fact):reason='映射与字段的明确含义、模块或记录不符，不能跨记录填入。'
                 if not reason and fact.get('manual'):reason='此项资料必须人工确认，不使用自动填入。'
@@ -292,9 +334,15 @@ def plan_fields(profile,scan,mappings=None):
                         if scale in (Decimal('4'),Decimal('5')) and str(fact.get('gpaScale','')) not in (str(scale),str(scale.quantize(Decimal('0.1')))):
                             reason='数值字段明确限定 GPA 满分口径，资料未注明相同口径，需人工确认。'
                     except InvalidOperation:pass
-                if not reason and ('至今' in value or re.search(r'待确认|冲突|不确定',value)):reason='资料包含至今或待确认的时间/事实表述，需要人工确认。'
-                if not reason and kind=='date' and fact.get('precision')!='day':reason='资料没有精确到日，不能自行补为每月一号。'
-                if not reason and kind=='month' and fact.get('precision') not in ('day','month'):reason='资料年月精度不明确。'
+                if not reason and fact.get('ongoing') and ongoing_end(fact) and date_kind:
+                    checkbox=any(f.get('type')=='checkbox' and f.get('groupId') and f.get('groupId')==field.get('groupId') and normalized(f.get('label','')) in ('至今','present','ongoing','仍在进行') for f in scan['fields'])
+                    if checkbox:reason='网站提供「至今」勾选，请先手动选择，再重新识别。'
+                    elif fact.get('dateFallback')!='today':reason='经历仍在进行，日期控件不支持「至今」；尚未授权具体日期兜底。'
+                    else:value=today.isoformat();value_precision='day';row.update(dateFallbackUsed=True,resolvedOn=value)
+                if not reason and re.search(r'待确认|冲突|不确定',value):reason='资料包含待确认的时间或事实表述，需要人工确认。'
+                if not reason and '至今' in value and not fact.get('ongoing'):reason='资料包含至今的时间表述，需要人工确认。'
+                if not reason and date_kind=='date' and value_precision!='day':reason='资料没有精确到日，不能自行补为每月一号。'
+                if not reason and date_kind=='month' and value_precision not in ('day','month'):reason='资料年月精度不明确。'
                 if not reason and kind=='number' and not re.fullmatch(r'-?\d+(?:\.\d+)?',value):reason='资料不是该数值控件所需的纯数值。'
                 if not reason and kind=='number':
                     numeric=Decimal(value)
@@ -306,26 +354,30 @@ def plan_fields(profile,scan,mappings=None):
                             if limit.is_finite() and comparison(numeric,limit):
                                 reason='数值超出字段明确范围，需人工核对；未截断或修正资料。';break
                         except InvalidOperation:continue
-                if not reason and kind in ('date','month'):
+                if not reason and date_kind:
                     numbers=re.findall(r'\d+',value)
                     try:
-                        datetime.date(int(numbers[0]),int(numbers[1]),int(numbers[2]) if kind=='date' else 1)
-                        value='-'.join([numbers[0],numbers[1].zfill(2)]+([numbers[2].zfill(2)] if kind=='date' else []));row['value']=value;row['displayValue']=value
+                        datetime.date(int(numbers[0]),int(numbers[1]),int(numbers[2]) if date_kind=='date' else 1)
+                        value='-'.join([numbers[0],numbers[1].zfill(2)]+([numbers[2].zfill(2)] if date_kind=='date' else []))
+                        if (constraints.get('min') and value<constraints['min']) or (constraints.get('max') and value>constraints['max']):reason='日期超出字段明确范围，需人工核对；未截断或修改日期。'
+                        if date_format:value=value.replace('-','/' if '/' in date_format else '.' if '.' in date_format else '-')
+                        row['value']=value;row['displayValue']=value
                     except (ValueError,IndexError):reason='来源日期不符合日历规则，需要人工核对。'
                 cap=field.get('maxLength')
                 if not reason and isinstance(cap,int) and cap>=0 and len(value.encode('utf-16-le'))//2>cap:reason='内容超过字段长度限制，需人工整理；未截断原文。'
                 options=field.get('options',[])
                 if not reason and kind in ('select','radio','combobox'):
-                    matches=[o for o in options if option_equivalent(o.get('text',''),fact['label'])==option_equivalent(value,fact['label']) or str(o.get('value',''))==value]
+                    matches=[o for o in options if option_equivalent(o.get('text',''),fact['label'])==option_equivalent(value,fact['label']) or str(o.get('value',''))==value or (fact.get('ongoing') and ongoing_end(fact) and normalized(o.get('text','')) in ('至今','present','ongoing','current'))]
                     if len(matches)!=1:reason='没有唯一等价选项，需要人工选择。'
                     else:row['optionValue']=matches[0]['value']
                 if reason:row.update(status='manual',reason=reason)
                 else:
                     existing=str(field.get('value') or ''); proposed=str(row.get('optionValue',value))
-                    if existing and (existing==proposed or existing==value):row.update(status='already',reason='已有值与资料相同。')
-                    elif existing:row.update(status='conflict',reason='已有值与资料不同，保留现值，需明确选择覆盖。')
+                    note=' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。' if row.get('dateFallbackUsed') else ''
+                    if existing and (existing==proposed or existing==value):row.update(status='already',reason='已有值与资料相同。'+note)
+                    elif existing:row.update(status='conflict',reason='已有值与资料不同，保留现值，需明确选择覆盖。'+note)
                     else:
-                        row.update(status='ready',reason='事实、记录及控件约束已确认。')
+                        row.update(status='ready',reason='事实、记录及控件约束已确认。'+note)
                         actions.append({k:row[k] for k in ('fieldId','value','expectedValue','optionValue') if k in row})
         rows.append(row)
     counts={}

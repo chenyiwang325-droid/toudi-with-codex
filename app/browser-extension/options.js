@@ -31,7 +31,7 @@ function render() {
   document.querySelectorAll('[data-profile]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.profile===el('profile').value)));
   if(!currentPack){el('facts').innerHTML='<div class="empty"><strong>尚未保存资料</strong><p>导入私人资料包，或点击「添加字段」手动建立资料。</p></div>';el('factCount').textContent='当前口径 0 项';el('source').innerHTML='<p>尚未保存资料。</p>';el('rules').innerHTML='<p>尚未保存额外填写要求。</p>';return;}
   const find=el('search').value.trim().toLowerCase(), id=el('profile').value;
-  const facts=currentPack.facts.filter(f=>f.profiles.includes(id) && (!find || [f.label,f.recordLabel,f.recordHint,...f.aliases].join(' ').toLowerCase().includes(find)));
+  const facts=TouDiFillingCore.profile(currentPack,id).facts.filter(f=>!find || [f.label,f.recordLabel,f.recordHint,...f.aliases].join(' ').toLowerCase().includes(find));
   const groups=new Map();
   for(const mod of Object.keys(modules))for(const fact of facts.filter(f=>f.module===mod)) {const key=mod+'|'+fact.recordId;if(!groups.has(key))groups.set(key,{label:modules[mod]+(fact.recordLabel?' · '+fact.recordLabel:''),facts:[]});groups.get(key).facts.push(fact);}
   if(!recordsInitialized && groups.size){openRecords.add(groups.keys().next().value);recordsInitialized=true;}
@@ -104,14 +104,19 @@ function openEditor(key=null) {
   editingKey=key;const fact=currentPack?.facts.find(f=>f.key===key);
   el('editForm').reset();el('matchingOptions').open=false;el('editor').querySelector('.dialog-body').scrollTop=0;el('editorError').hidden=true;el('editorTitle').textContent=fact?'编辑已确认资料':'添加已确认字段';
   el('factKey').value=key || '';el('factLabel').value=fact?.label || '';el('factValue').value=fact?.value ?? '';el('factModule').value=fact?.module || 'personal';el('factPrecision').value=fact?.precision || '';el('recordId').value=fact?.recordId || '';el('recordLabel').value=fact?.recordLabel || '';el('recordHint').value=fact?.recordHint || '';el('factAliases').value=(fact?.aliases || []).join('\n');el('factSensitive').checked=fact?.sensitive || false;el('factManual').checked=fact?.manual || false;el('gpaScale').value=fact?.gpaScale || '';
+  el('dateFallback').value=fact?.dateFallback || '';syncDatePolicy();
   const profiles=fact?.profiles || (el('profile').value==='general'?['general','state','ai-product']:[el('profile').value]);
   document.querySelectorAll('[name=factProfiles]').forEach(n=>n.checked=profiles.includes(n.value));el('removeFact').hidden=!fact;el('editor').showModal();
 }
 el('addFact').addEventListener('click',()=>openEditor());el('facts').addEventListener('click',event=>{const button=event.target.closest('[data-edit]');if(button)openEditor(button.dataset.edit);});el('closeEditor').addEventListener('click',()=>el('editor').close());
+function syncDatePolicy(){el('ongoingPolicy').hidden=!TouDiFillingCore.ongoingEnd({module:el('factModule').value,label:el('factLabel').value.trim(),value:el('factValue').value.trim()});}
+for(const id of ['factModule','factLabel','factValue'])el(id).addEventListener('input',syncDatePolicy);
 el('editForm').addEventListener('submit',event=>{event.preventDefault();action(async()=>{
   const candidate=structuredClone(currentPack || emptyPack()), old=candidate.facts.find(f=>f.key===editingKey);
   const label=el('factLabel').value.trim(), mod=el('factModule').value;
   const fact={...old,key:editingKey || mod+'.manual-'+crypto.randomUUID(),label,value:el('factValue').value,module:mod,recordId:el('recordId').value.trim(),recordLabel:el('recordLabel').value.trim(),recordHint:el('recordHint').value.trim(),aliases:el('factAliases').value.split('\n').map(s=>s.trim()).filter(Boolean),profiles:[...document.querySelectorAll('[name=factProfiles]:checked')].map(n=>n.value),sensitive:el('factSensitive').checked,manual:el('factManual').checked,precision:el('factPrecision').value || null,gpaScale:el('gpaScale').value || null};
+  delete fact.ongoing;delete fact.dateFallback;
+  if(TouDiFillingCore.ongoingEnd(fact)){fact.ongoing=true;fact.precision=null;if(el('dateFallback').value)fact.dateFallback=el('dateFallback').value;}
   if(!fact.aliases.length)delete fact.aliases;
   if(['education','internship','project'].includes(mod) && (!fact.recordId || !fact.recordLabel))throw Error('经历资料需要填写标识和名称，才能正确区分不同记录。');
   if(old)candidate.facts[candidate.facts.indexOf(old)]=fact;else candidate.facts.push(fact);

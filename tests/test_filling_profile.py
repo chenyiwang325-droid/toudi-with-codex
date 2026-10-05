@@ -61,7 +61,7 @@ class FillingProfileTests(unittest.TestCase):
         self.assertEqual(self.plan(self.field('上传文件',type='file'),mappings={'field':key})['rows'][0]['status'],'manual')
         gpa=next(f['key'] for f in profile['facts'] if f['label']=='GPA')
         self.assertEqual(self.plan(self.field('GPA（满分4.0）'),mappings={'field':gpa})['rows'][0]['status'],'manual')
-        fact=next(f['key'] for f in profile['facts'] if f['label']=='开始日期')
+        fact=next(f['key'] for f in profile['facts'] if f['label']=='开始日期' and f['recordLabel']=='本科')
         self.assertEqual(self.plan(self.field('开始日期',type='date'),mappings={'field':fact})['rows'][0]['status'],'manual')
     def test_project_present_dates_manual_and_supplements_not_auto_pasted(self):
         plan=self.plan(self.field('项目时间',module='project'),profile='state');self.assertEqual(plan['rows'][0]['status'],'manual')

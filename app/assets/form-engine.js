@@ -120,11 +120,13 @@
         else if (!label) unsupported = 'unlabeled';
         else if (members.some(n=>n.disabled || n.readOnly || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) unsupported='disabled-or-readonly';
         const constraints=Object.fromEntries(['min','max','step','pattern'].filter(k=>node.hasAttribute(k)).map(k=>[k,node.getAttribute(k)]));
-        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,required:members.some(x=>x.required || x.getAttribute('aria-required')==='true'),maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
+        const placeholder=(node.getAttribute('placeholder') || '').trim().toUpperCase();
+        const dateFormat=['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'].includes(placeholder)?placeholder:undefined;
+        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...(dateFormat?{dateFormat}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true'),maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
         const signature = JSON.stringify(descriptor), index = counts.get(signature) || 0;
         counts.set(signature,index+1);
         const id = 'field-' + hash(signature + ':' + index);
-        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported ? '' : read({node,nodes:members,type,field:{options}}),options,constraints};
+        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported ? '' : read({node,nodes:members,type,field:{options}}),options,constraints,...(dateFormat?{dateFormat}:{})};
         if (unsupported) field.unsupported = unsupported;
         entries.push({field,descriptor,node,nodes:members,type});
       }

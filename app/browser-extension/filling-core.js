@@ -13,6 +13,21 @@
   const qualifiers = value => String(value).match(/博士研究生|硕士研究生|博士|硕士|本科|专科/g) || [];
   const text = (value, cap=1000) => typeof value==='string' && value.length<=cap;
   const precision = value => /^\d{4}[-/.年]\d{1,2}月?$/.test(String(value)) ? 'month' : /^\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?$/.test(String(value)) ? 'day' : null;
+  const ongoingEnd = f => ['project','internship'].includes(f.module) && ['结束','结束日期'].includes(f.label) && ['至今','present','ongoing','current'].includes(normal(f.value));
+  const localToday = (now=new Date()) => [now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
+  const dateFormats = ['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'];
+  function sortFacts(facts) {
+    const groups=new Map();
+    for(const f of facts){const key=f.module+'|'+f.recordId;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(f);}
+    const start=group=>{
+      for(const label of ['开始日期','开始','时间']) {
+        const m=String(group.find(f=>f.label===label)?.value || '').match(/^(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2})(?!\d))?/);
+        if(m){const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3] || 1),check=new Date(Date.UTC(y,mo-1,d));if(y>=100 && check.getUTCFullYear()===y && check.getUTCMonth()===mo-1 && check.getUTCDate()===d)return y*10000+mo*100+d;}
+      }
+      return 0;
+    };
+    return [...groups.values()].sort((a,b)=>modules.indexOf(a[0].module)-modules.indexOf(b[0].module) || start(b)-start(a)).flat();
+  }
   function validatePack(input) {
     if (!input || input.schemaVersion!==1 || !Array.isArray(input.facts) || input.facts.length>1500 || !Array.isArray(input.rules || []) || (input.rules || []).some(r=>!text(r,12000))) throw Error('资料包格式无效：需要 schemaVersion 1、facts 和 rules。');
     const seen = new Set();
@@ -29,6 +44,9 @@
       f.manual=!!(f.manual || manual(f.label) || f.companyScope || f._专属 || f.label.startsWith('_专属'));
       f.precision=f.precision || precision(f.value);
       if(f.precision && !['month','day'].includes(f.precision))throw Error('日期精度只能为 month 或 day。');
+      if(Object.hasOwn(f,'ongoing') && typeof f.ongoing!=='boolean')throw Error('进行中状态需要为布尔值。');
+      if(f.ongoing && !ongoingEnd(f))throw Error('进行中状态仅适用于内容为「至今」的项目或实习结束日期。');
+      if(f.dateFallback && (f.dateFallback!=='today' || !f.ongoing || !ongoingEnd(f)))throw Error('日期兜底需要先确认经历仍在进行，仅支持使用填写当天。');
       if(f.gpaScale && !['4','4.0','5','5.0'].includes(String(f.gpaScale)))throw Error('GPA 满分口径无效。');
       return f;
     });
@@ -36,7 +54,7 @@
   }
   function profile(pack, id='general') {
     if(!profileIds.includes(id))throw Error('请选择有效的简历口径。');
-    return {...pack,profileId:id,facts:pack.facts.filter(f=>f.profiles.includes(id))};
+    return {...pack,profileId:id,facts:sortFacts(pack.facts.filter(f=>f.profiles.includes(id)))};
   }
   function moduleHint(field) { const value=String(field.module || '').toLowerCase(); return Object.entries(V.modules).find(([alias])=>value.includes(alias))?.[1] || ''; }
   function semantic(field) { return normal(String(field.label || '').replace(/博士研究生|硕士研究生|博士|硕士|本科|专科/g,'')); }
@@ -87,11 +105,12 @@
       if(!f || !text(f.id,300) || !f.id || seen.has(f.id) || ['password','hidden'].includes(f.type) || JSON.stringify(f).length>24000)throw Error('网页字段结构无效。');
       for(const k of ['label','groupLabel','recordHint'])if(!text(f[k] || ''))throw Error('网页字段说明过长。');
       if(f.options && (!Array.isArray(f.options) || f.options.length>1000 || f.options.some(o=>!o || !text(o.text) || !text(o.value,2000))))throw Error('网页选项结构无效。');
+      if(f.dateFormat && !dateFormats.includes(f.dateFormat))throw Error('网页日期格式无效。');
       seen.add(f.id);
     }
     return scan;
   }
-  function plan(p,scan,mappings={}) {
+  function plan(p,scan,mappings={},now=new Date()) {
     scanValid(scan);
     const facts=new Map(p.facts.map(f=>[f.key,f]));
     if(!mappings || typeof mappings!=='object' || Array.isArray(mappings) || Object.entries(mappings).some(([id,key])=>!scan.fields.some(f=>f.id===id) || !facts.has(key)))throw Error('匹配必须使用本页字段和当前口径的资料键。');
@@ -103,7 +122,8 @@
       const list=Object.hasOwn(mappings,field.id)?[facts.get(mappings[field.id])]:candidates(p,field);
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
       if(!list.length)return row;
-      const fact=list[0];let value=String(fact.value), reason='';
+      const fact=list[0];let value=String(fact.value), reason='', valuePrecision=fact.precision;
+      const format=field.dateFormat, dateKind=['date','month'].includes(kind)?kind:format?(format.includes('DD')?'date':'month'):'';
       Object.assign(row,{factKey:fact.key,value,displayValue:fact.sensitive?mask(value,row.label):value,sensitive:fact.sensitive});
       if(Object.hasOwn(mappings,field.id) && !mappingMatches(p,field,fact))reason='映射与字段的明确含义、模块或记录不符，不能跨记录填入。';
       if(!reason && fact.manual)reason='此项资料必须人工确认，不使用自动填入。';
@@ -112,30 +132,44 @@
         const demanded=/4[.．]0|四分/.test(row.label)?4:/5[.．]0|五分/.test(row.label)?5:kind==='number' && ['4','4.0','5','5.0'].includes(constraints.max)?Number(constraints.max):0;
         if(demanded && Number(fact.gpaScale)!==demanded)reason='GPA 未注明相同满分口径，需人工确认。';
       }
-      if(!reason && /至今|待确认|冲突|不确定/.test(value))reason='资料包含至今或待确认的时间/事实表述，需要人工确认。';
-      if(!reason && kind==='date' && fact.precision!=='day')reason='资料没有精确到日，不能自行补为每月一号。';
-      if(!reason && kind==='month' && !['month','day'].includes(fact.precision))reason='资料年月精度不明确。';
+      if(!reason && fact.ongoing && ongoingEnd(fact) && dateKind) {
+        const hasPresentCheckbox=scan.fields.some(f=>f.type==='checkbox' && f.groupId && f.groupId===field.groupId && ['至今','present','ongoing','仍在进行'].includes(normal(f.label)));
+        if(hasPresentCheckbox)reason='网站提供「至今」勾选，请先手动选择，再重新识别。';
+        else if(fact.dateFallback!=='today')reason='经历仍在进行，日期控件不支持「至今」；尚未授权具体日期兜底。';
+        else {value=localToday(now);valuePrecision='day';Object.assign(row,{dateFallbackUsed:true,resolvedOn:value});}
+      }
+      if(!reason && /待确认|冲突|不确定/.test(value))reason='资料包含待确认的时间或事实表述，需要人工确认。';
+      if(!reason && /至今/.test(value) && !fact.ongoing)reason='资料包含至今的时间表述，需要人工确认。';
+      if(!reason && dateKind==='date' && valuePrecision!=='day')reason='资料没有精确到日，不能自行补为每月一号。';
+      if(!reason && dateKind==='month' && !['month','day'].includes(valuePrecision))reason='资料年月精度不明确。';
       if(!reason && kind==='number') {
         if(!/^-?\d+(?:\.\d+)?$/.test(value))reason='资料不是该数值控件所需的纯数值。';
         else if((constraints.min!==undefined && constraints.min!=='' && Number(value)<Number(constraints.min)) || (constraints.max!==undefined && constraints.max!=='' && Number(value)>Number(constraints.max)))reason='数值超出字段明确范围，需人工核对；未截断或修正资料。';
       }
-      if(!reason && ['date','month'].includes(kind)) {
-        const parts=value.match(/\d+/g) || [], year=Number(parts[0]), month=Number(parts[1]), day=kind==='date'?Number(parts[2]):1;
+      if(!reason && dateKind) {
+        const parts=value.match(/\d+/g) || [], year=Number(parts[0]), month=Number(parts[1]), day=dateKind==='date'?Number(parts[2]):1;
         const check=new Date(Date.UTC(year,month-1,day));
         if(year<100 || check.getUTCFullYear()!==year || check.getUTCMonth()!==month-1 || check.getUTCDate()!==day)reason='来源日期不符合日历规则，需要人工核对。';
-        else {value=String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+(kind==='date'?'-'+String(day).padStart(2,'0'):'');row.value=value;row.displayValue=value;}
+        else {
+          value=String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+(dateKind==='date'?'-'+String(day).padStart(2,'0'):'');
+          if((constraints.min && value<constraints.min) || (constraints.max && value>constraints.max))reason='日期超出字段明确范围，需人工核对；未截断或修改日期。';
+          if(format)value=value.replaceAll('-',format.includes('/')?'/':format.includes('.')?'.':'-');
+          row.value=value;row.displayValue=value;
+        }
       }
       if(!reason && Number.isInteger(field.maxLength) && field.maxLength>=0 && value.length>field.maxLength)reason='内容超过字段长度限制，需人工整理；未截断原文。';
       if(!reason && ['select','radio','combobox'].includes(kind)) {
-        const matches=(field.options || []).filter(o=>optionEquivalent(o.text,fact.label)===optionEquivalent(value,fact.label) || String(o.value)===value);
+        const present=v=>['至今','present','ongoing','current'].includes(normal(v));
+        const matches=(field.options || []).filter(o=>optionEquivalent(o.text,fact.label)===optionEquivalent(value,fact.label) || String(o.value)===value || (fact.ongoing && ongoingEnd(fact) && present(o.text)));
         if(matches.length!==1)reason='没有唯一等价选项，需要人工选择。';
         else row.optionValue=matches[0].value;
       }
       if(reason)return {...row,status:'manual',reason};
       const existing=String(field.value ?? ''), proposed=String(row.optionValue ?? value);
-      if(existing && (existing===proposed || existing===value))return {...row,status:'already',reason:'已有值与资料相同。'};
-      if(existing)return {...row,status:'conflict',reason:'已有值与资料不同，保留现值，需明确选择覆盖。'};
-      return {...row,status:'ready',reason:'事实、记录及控件约束已确认。'};
+      const note=row.dateFallbackUsed?' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。':'';
+      if(existing && (existing===proposed || existing===value))return {...row,status:'already',reason:'已有值与资料相同。'+note};
+      if(existing)return {...row,status:'conflict',reason:'已有值与资料不同，保留现值，需明确选择覆盖。'+note};
+      return {...row,status:'ready',reason:'事实、记录及控件约束已确认。'+note};
     });
     const statusCounts={};for(const row of rows)statusCounts[row.status]=(statusCounts[row.status] || 0)+1;
     return {protocol:1,sourceVersion:p.sourceVersion,profileId:p.profileId,origin:scan.origin,path:scan.path,fingerprint:scan.fingerprint,rows,statusCounts,warnings:[...p.warnings,...(scan.warnings || [])],choices:p.facts.filter(f=>!f.manual).map(f=>({key:f.key,label:[f.recordLabel,f.label].filter(Boolean).join(' · ')}))};
@@ -146,6 +180,7 @@
     const actions=selected.map(id=>{
       const row=plan.rows.find(r=>r.fieldId===id);
       if(!row || !['ready','conflict'].includes(row.status) || !row.factKey)throw Error('所选字段需要先核对资料。');
+      if(row.dateFallbackUsed && row.resolvedOn!==localToday())throw Error('填写日期已变化，请重新识别页面以更新「至今」占位日期。');
       if(row.status==='conflict' && !overwrite.includes(id))throw Error('已有内容需要明确选择覆盖。');
       return {fieldId:id,value:row.value,expectedValue:row.expectedValue,overwrite:row.status==='conflict',...(Object.hasOwn(row,'optionValue')?{optionValue:row.optionValue}:{})};
     });
@@ -172,5 +207,5 @@
     }
     return {accepted,rejected};
   }
-  return {validatePack,profile,scanValid,plan,review,confirm,agentRequest,safeAgentMappings,normal,profileIds};
+  return {validatePack,profile,scanValid,plan,review,confirm,agentRequest,safeAgentMappings,normal,profileIds,sortFacts,ongoingEnd};
 });
