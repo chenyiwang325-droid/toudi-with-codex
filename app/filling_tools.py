@@ -15,7 +15,7 @@ import filling_profile
 
 EXTENSION_FILES = (
     'agent-config.js', 'filling-aliases.js', 'filling-core.js', 'manifest.json',
-    'options.css', 'options.html', 'options.js', 'popup.css', 'popup.html',
+    'options.css', 'options.html', 'options.js', 'profile-library.js', 'popup.css', 'popup.html',
     'popup.js', 'worker.js',
 )
 

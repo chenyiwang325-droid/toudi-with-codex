@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TouDi 辅助填报",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "当前招聘网页的个人资料识别、核对与填写；可自行配置 Agent 协作。",
   "permissions": [
     "activeTab",

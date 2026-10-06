@@ -12,7 +12,7 @@
   <div class="buttons"><button id="openWorkbench">打开投递中控台</button><label class="button primary" for="importFile" tabindex="0" role="button">导入／更新资料包</label><input id="importFile" type="file" accept=".json,application/json" hidden><button id="export" disabled>导出备份</button></div>
 </header>
 <main>
-  <div class="intro"><h1>填报资料与设置</h1><p>核对资料口径，再回到招聘网页填写。</p></div>
+  <div class="intro"><h1>填报资料与设置</h1><p>填写自己的资料，再回到招聘网页识别与填写。</p></div>
   <p id="notice" role="status" hidden></p>
   <nav class="settings-tabs" role="tablist" aria-label="填报设置分类">
     <button id="tab-profile" role="tab" aria-controls="panel-profile" aria-selected="true" tabindex="0" data-tab="profile">个人资料</button>
@@ -21,16 +21,13 @@
     <button id="tab-data" role="tab" aria-controls="panel-data" aria-selected="false" tabindex="-1" data-tab="data">资料管理</button>
   </nav>
   <section id="panel-profile" class="settings-panel library" role="tabpanel" aria-labelledby="tab-profile">
-    <div class="section-title"><h2>已确认资料</h2><button id="addFact" class="primary" disabled>添加字段</button></div>
+    <div class="section-title"><div><h2>个人资料</h2><p class="section-description">按模块填写。没有的内容留空，教育、工作和项目可以添加多段。</p></div><button id="addFact">自定义字段</button></div>
     <div class="toolbar">
-      <div class="profile-control"><span id="profileLabel">查看口径</span><div class="profile-segment" role="group" aria-labelledby="profileLabel">
-        <button data-profile="general" aria-pressed="true">个人与教育通用</button><button data-profile="state" aria-pressed="false">央国企／专业口径</button><button data-profile="ai-product" aria-pressed="false">AI 产品口径</button>
-      </div></div>
-      <select id="profile" hidden aria-hidden="true" tabindex="-1"><option value="general">个人与教育通用</option><option value="state">央国企／专业口径</option><option value="ai-product">AI 产品口径</option></select>
-      <div class="search-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="搜索字段或经历" aria-label="搜索资料"></div>
+      <div class="profile-control"><label id="profileLabel" for="profile">资料版本</label><select id="profile" aria-labelledby="profileLabel"><option value="general">默认资料</option></select><button id="manageVersions">管理版本</button></div>
+      <div class="search-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="搜索资料" aria-label="搜索资料"></div>
     </div>
     <p id="factCount" class="result-count"></p>
-    <div id="facts"><div class="empty"><strong>尚未保存资料</strong><p>导入私人资料包，或点击「添加字段」手动建立资料。</p></div></div>
+    <div id="facts" aria-live="polite"></div>
   </section>
   <section id="panel-rules" class="settings-panel" role="tabpanel" aria-labelledby="tab-rules" hidden>
     <div class="section-title"><h2>填写要求</h2><button id="editRules" disabled>编辑填写规则</button></div>
@@ -65,16 +62,26 @@
     <div class="dialog-head"><div class="section-title"><h2 id="editorTitle">编辑资料</h2><button type="button" id="closeEditor" aria-label="关闭资料编辑">关闭</button></div><p id="editorError" role="alert" hidden></p></div>
     <div class="dialog-body">
       <input id="factKey" type="hidden">
-      <div class="form-section"><h3>基本资料</h3><div class="pair"><div><label for="factLabel">字段名称</label><input id="factLabel" required maxlength="200"></div><div><label for="factModule">资料模块</label><select id="factModule"><option value="personal">个人信息</option><option value="education">教育经历</option><option value="internship">实习／工作</option><option value="project">项目经历</option><option value="language">语言能力</option></select></div></div><label for="factValue">已确认内容</label><textarea id="factValue" rows="4" required maxlength="24000"></textarea></div>
-      <div class="form-section"><h3>经历归属</h3><p class="hint">同一段经历使用相同标识。教育、实习与项目资料需填写标识和名称；个人资料可以留空。</p><div class="pair"><div><label for="recordId">经历标识</label><input id="recordId" placeholder="例如：education.master"></div><div><label for="recordLabel">经历名称</label><input id="recordLabel" placeholder="例如：硕士、某段实习"></div></div><label for="recordHint">经历区分提示</label><input id="recordHint" placeholder="教育层级、单位或项目名称"></div>
-      <details id="matchingOptions" class="disclosure"><summary><span>匹配与填写约束</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><label for="factAliases">字段别名（每行一个）</label><textarea id="factAliases" rows="3"></textarea><fieldset><legend>适用简历口径</legend><div class="profile-checks"><label class="check"><input type="checkbox" name="factProfiles" value="general">个人与教育通用</label><label class="check"><input type="checkbox" name="factProfiles" value="state">央国企／专业口径</label><label class="check"><input type="checkbox" name="factProfiles" value="ai-product">AI 产品口径</label></div></fieldset><div class="pair"><div><label for="factPrecision">日期精度</label><select id="factPrecision"><option value="">非日期／按内容识别</option><option value="month">精确到月</option><option value="day">精确到日</option></select></div><div><label for="gpaScale">GPA 满分（如适用）</label><select id="gpaScale"><option value="">未知／不适用</option><option value="4.0">4.0</option><option value="5.0">5.0</option></select></div></div><div id="ongoingPolicy" hidden><label for="dateFallback">网站必须填写具体结束日期时</label><select id="dateFallback"><option value="">保留人工确认</option><option value="today">使用填写当天作为占位日期</option></select><p class="hint">资料仍保存「至今」。仅在明确的日期控件中使用当天日期，计划会注明此日期不是实际结束日。</p></div><div class="constraint-checks"><input id="factSensitive" type="checkbox" hidden><label class="check"><input id="factManual" type="checkbox">仅供人工确认</label></div></div></details>
+      <div class="form-section"><h3>字段内容</h3><div class="pair"><div><label for="factModule">所属模块</label><select id="factModule"><option value="personal">个人信息</option><option value="education">教育经历</option><option value="internship">工作与实习</option><option value="project">项目经历</option><option value="language">语言能力</option></select></div><div><label for="factRecord">所属资料／经历</label><select id="factRecord"></select></div></div><p id="factContext" class="hint"></p><label for="factLabel">字段名称</label><input id="factLabel" required maxlength="200"><label for="factValue">已确认内容</label><textarea id="factValue" rows="4" required maxlength="24000"></textarea></div>
+      <details id="matchingOptions" class="disclosure"><summary><span>匹配与填写约束</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><label for="factAliases">字段别名（每行一个）</label><textarea id="factAliases" rows="3"></textarea><fieldset id="factVersionSection"><legend>适用资料版本</legend><div id="factProfiles" class="profile-checks"></div></fieldset><div class="pair"><div><label for="factPrecision">日期精度</label><select id="factPrecision"><option value="">非日期／按内容识别</option><option value="month">精确到月</option><option value="day">精确到日</option></select></div><div><label for="gpaScale">GPA 满分（如适用）</label><select id="gpaScale"><option value="">未知／不适用</option><option value="4.0">4.0</option><option value="5.0">5.0</option></select></div></div><div id="ongoingPolicy" hidden><label for="dateFallback">网站必须填写具体结束日期时</label><select id="dateFallback"><option value="">保留人工确认</option><option value="today">使用填写当天作为占位日期</option></select><p class="hint">资料仍保存「至今」。仅在明确的日期控件中使用当天日期，计划会注明此日期不是实际结束日。</p></div><div class="constraint-checks"><input id="factSensitive" type="checkbox" hidden><label class="check"><input id="factManual" type="checkbox">仅供人工确认</label></div></div></details>
     </div>
     <div class="dialog-actions"><button type="button" id="removeFact" class="danger">删除此字段</button><button type="submit" class="primary">保存资料</button></div>
   </form>
 </dialog>
+<dialog id="recordEditor" aria-labelledby="recordTitle"><form id="recordForm">
+  <div class="dialog-head"><div class="section-title"><h2 id="recordTitle">填写资料</h2><button type="button" id="closeRecord">取消</button></div><p class="hint dialog-intro">只填写已经确认的信息，未填写的字段不会用于自动填报。</p><p id="recordError" role="alert" hidden></p></div>
+  <div class="dialog-body"><div id="recordFields" class="field-grid"></div>
+    <details id="optionalFields" class="disclosure"><summary><span>补充信息（选填）</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div id="recordOptionalFields" class="disclosure-body field-grid"></div></details>
+    <div id="recordDatePolicy" class="form-section" hidden><label for="recordDateFallback">网站不支持「至今」时</label><select id="recordDateFallback"><option value="">留给人工确认</option><option value="today">用填写当天作为日期占位</option></select><p class="hint">资料保持「至今」。仅在网站要求具体日期时使用占位日期，填写计划会注明。</p></div>
+    <fieldset id="recordVersionSection"><legend>适用资料版本</legend><div id="recordProfiles" class="profile-checks"></div><p id="recordSharing" class="hint"></p></fieldset>
+    <div id="recordExtras" class="hint section-note" hidden></div>
+  </div><div class="dialog-actions"><button type="button" id="removeRecord" class="danger">删除这段资料</button><button type="submit" class="primary">保存资料</button></div>
+</form></dialog>
+<dialog id="versionsEditor" aria-labelledby="versionsTitle"><div class="dialog-head"><div class="section-title"><h2 id="versionsTitle">资料版本</h2><button id="closeVersions">关闭</button></div></div><div class="dialog-body"><p>一套资料即可使用。需要不同简历内容时，再复制一个独立版本。</p><div id="versionList"></div><form id="newVersionForm" class="form-section"><label for="versionName">新版本名称</label><div class="inline-input"><input id="versionName" required maxlength="20" placeholder="由自己命名"><button class="primary" type="submit">复制当前版本</button></div></form><p id="versionError" role="alert" hidden></p></div></dialog>
 <dialog id="rulesEditor" aria-labelledby="rulesTitle"><form id="rulesForm"><div class="dialog-head"><div class="section-title"><h2 id="rulesTitle">编辑填写规则</h2><button type="button" id="closeRules">取消</button></div></div><div class="dialog-body"><p>一行一条。程序检查之外的要求，需要在填写计划中人工核对。</p><label for="rulesText">填写规则</label><textarea id="rulesText" rows="12"></textarea></div><div class="dialog-actions"><button type="submit" class="primary">保存规则</button></div></form></dialog>
 <script src="agent-config.js"></script>
 <script src="filling-aliases.js"></script>
 <script src="filling-core.js"></script>
+<script src="profile-library.js"></script>
 <script src="options.js"></script>
 </body></html>

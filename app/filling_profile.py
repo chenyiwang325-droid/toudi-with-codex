@@ -8,7 +8,7 @@ import re
 import unicodedata
 from pathlib import Path
 
-PROFILES=[{'id':'general','label':'个人与教育通用'}, {'id':'state','label':'央国企／专业口径'}, {'id':'ai-product','label':'AI 产品口径'}]
+DEFAULT_PROFILES=[{'id':'general','label':'默认资料'}]
 ALIASES={
  '姓名':['姓名','name','full name','candidate name'], '性别':['性别','gender','sex'],
  '出生日期':['出生日期','生日','date of birth','birth date','birthday'],
@@ -37,6 +37,14 @@ ALIASES={
  '名称':['项目名称','project name'], '角色':['项目角色','role'], '时间':['项目时间','project dates'],
  '简述':['项目描述','项目简述','project description'], '最高学历':['最高学历','highest education','highest qualification'],
  '最高学位':['最高学位','highest degree'],
+ '工作类型':['工作类型','雇佣类型','employment type'], '工作成果':['工作成果','工作业绩','achievements'],
+ '本人职责':['本人职责','项目职责','项目工作内容','project responsibilities'], '项目成果':['项目成果','项目业绩','project achievements'],
+ '项目链接':['项目链接','作品链接','project url'], '主修课程':['主修课程','主要课程','courses'],
+ 'IT技能':['IT技能','计算机技能','技能特长','skills'], '获奖情况':['获奖情况','奖惩情况','荣誉奖励','awards'],
+ '个人评价':['个人评价','自我评价','个人简介','summary'],
+ '语言／证书名称':['语言／证书名称','语言','外语语种','证书名称','language','certificate name'],
+ '熟练程度':['熟练程度','语言水平','外语水平','proficiency'], '考试成绩':['考试成绩','考试分数','证书成绩','score'],
+ '取得日期':['取得日期','获证日期','考试日期','issue date'],
 }
 MANUAL_TERMS=('验证码','verification code','captcha','协议','同意','承诺','agreement','consent','签名','signature','家庭成员','父亲','母亲','亲属','紧急联系人','证明人','上传','upload','照片','photo','father','mother','family','emergency contact','referee','reference contact')
 SENSITIVE_TERMS=('姓名','name','手机','电话','phone','邮箱','email','证件','身份证','id number','家庭地址','home address')
@@ -96,13 +104,36 @@ def source_file(workspace):
     return None,None
 
 
-def load_profile(workspace,profile_id='general'):
-    if profile_id not in {p['id'] for p in PROFILES}: raise ValueError('unknown profile id')
+def load_profile(workspace,profile_id=None):
     path,source_name=source_file(workspace)
-    if path is None:return {'sourceVersion':'missing','sourceName':None,'profileId':profile_id,'profiles':copy.deepcopy(PROFILES),'facts':[],'rules':[],'warnings':['尚未提供填报资料，未创建示例或推测个人信息。'],'supplements':[]}
+    if path is None:return {'sourceVersion':'missing','sourceName':None,'profileId':profile_id or 'general','profiles':copy.deepcopy(DEFAULT_PROFILES),'facts':[],'rules':[],'warnings':['尚未提供填报资料，未创建示例或推测个人信息。'],'supplements':[]}
     raw=path.read_bytes(); data=json.loads(raw)
     if not isinstance(data,dict):raise ValueError('filling profile root must be an object')
-    result={'sourceVersion':hashlib.sha256(raw).hexdigest(),'sourceName':source_name,'profileId':profile_id,'profiles':copy.deepcopy(PROFILES),'facts':[],'rules':[],'warnings':[],'supplements':[]}
+    if source_name=='填报资料/资料.json':
+        if data.get('schemaVersion')!=1 or not isinstance(data.get('facts'),list):raise ValueError('formal filling profile requires schemaVersion 1 and facts')
+        definitions=copy.deepcopy(data.get('profiles'))
+        if definitions is None:
+            # Old formal packs without metadata retain their field memberships.
+            legacy_ids=['general']
+            for fact in data.get('facts',[]):
+                membership=fact.get('profiles',[]) if isinstance(fact,dict) else []
+                if not isinstance(membership,list):raise ValueError('invalid fact profiles')
+                for key in membership:
+                    if key not in legacy_ids:legacy_ids.append(key)
+            definitions=[{'id':key,'label':'默认资料' if key=='general' else '导入资料 '+str(index)} for index,key in enumerate(legacy_ids)]
+    else:
+        definitions=copy.deepcopy(DEFAULT_PROFILES)
+        # Compatibility for explicit versions in old user files, not product defaults.
+        if '实习经历_央国企口径' in data or '实习经历_仅AI产品口径_央国企不用' in data:
+            definitions.extend([{'id':'state','label':'实习经历_央国企口径'.split('_',1)[1]}, {'id':'ai-product','label':'实习经历_仅AI产品口径_央国企不用'.split('_')[1].removeprefix('仅')}])
+    if not isinstance(definitions,list) or not 1<=len(definitions)<=20:raise ValueError('invalid profile definitions')
+    ids=set()
+    for item in definitions:
+        if not isinstance(item,dict) or not isinstance(item.get('id'),str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}',item['id']) or item['id'] in ids or not isinstance(item.get('label'),str) or not item['label'].strip() or len(item['label'])>80:raise ValueError('invalid profile definition')
+        ids.add(item['id'])
+    if profile_id is None or (profile_id=='general' and profile_id not in ids):profile_id=definitions[0]['id']
+    if profile_id not in ids:raise ValueError('unknown profile id')
+    result={'sourceVersion':hashlib.sha256(raw).hexdigest(),'sourceName':source_name,'profileId':profile_id,'profiles':definitions,'facts':[],'rules':[],'warnings':[],'supplements':[]}
     saved=data.get('savedAt') or data.get('_保存日期') or data.get('updatedAt')
     if not saved:
         date=re.search(r'\d{4}-\d{2}-\d{2}',str(data.get('_说明','')))
@@ -119,9 +150,8 @@ def load_profile(workspace,profile_id='general'):
             if fact['module'] not in {'education','internship','project','personal','language'}:raise ValueError('fact module must be education/internship/project/personal/language')
             if fact['key'] in seen:raise ValueError('duplicate fact key')
             seen.add(fact['key'])
-            profiles=fact.get('profiles',['general','state','ai-product'])
-            if not isinstance(profiles,list) or any(p not in {p['id'] for p in PROFILES} for p in profiles):raise ValueError('invalid fact profiles')
-            if fact['module']=='internship' and 'general' in profiles:raise ValueError('internships require explicit state/ai-product profiles')
+            profiles=fact.get('profiles',[p['id'] for p in definitions])
+            if not isinstance(profiles,list) or not profiles or any(p not in ids for p in profiles):raise ValueError('invalid fact profiles')
             if profile_id not in profiles:continue
             current=copy.deepcopy(fact); current.setdefault('recordId','');current.setdefault('recordLabel','');current.setdefault('recordHint','');current.setdefault('aliases',ALIASES.get(fact['label'],[fact['label']]))
             if not isinstance(current['aliases'],list) or any(not isinstance(a,str) for a in current['aliases']):raise ValueError('invalid aliases')
@@ -160,8 +190,15 @@ def load_profile(workspace,profile_id='general'):
         else:result['warnings'].append('最高教育经历有多个同等级记录，需要人工确认。')
     for field,value in data.get('语言能力',{}).items():
         if not field.startswith('_') and field!='备注':add('language','language','语言能力','语言',field,value)
-    if profile_id!='general':
-        records=list(data.get('实习经历_央国企口径',[]))
+    records=[]
+    split_versions=any(p['id']=='state' for p in definitions)
+    if not split_versions or profile_id!='general':
+        if split_versions:
+            records=list(data.get('实习经历_央国企口径',[]))
+        else:
+            internships,employment=data.get('实习经历',[]),data.get('工作经历',[])
+            if not isinstance(internships,list) or not isinstance(employment,list):raise ValueError('invalid work records')
+            records=internships+employment
         if profile_id=='ai-product':records+=list(data.get('实习经历_仅AI产品口径_央国企不用',[]))
         for index,row in enumerate(records):
             if not isinstance(row,dict):raise ValueError('invalid internship facts')
@@ -196,7 +233,8 @@ def profile_summary(profile):
 
 def export_profile_pack(workspace):
     """Explicit private export. Never use this result in public source or fixtures."""
-    packs=[load_profile(workspace, p['id']) for p in PROFILES]
+    first=load_profile(workspace)
+    packs=[first if p['id']==first['profileId'] else load_profile(workspace,p['id']) for p in first['profiles']]
     if packs[0]['sourceVersion']=='missing':raise ValueError('没有已确认的填报资料可导出')
     if len({p['sourceVersion'] for p in packs})!=1:raise ValueError('资料在导出期间发生变化，请重试')
     facts={}
@@ -211,7 +249,7 @@ def export_profile_pack(workspace):
                 fact['profiles']=[profile['profileId']];facts[fact['key']]=fact
     return {'schemaVersion':1,'kind':'toudi-filling-profile','name':'个人填报资料',
             'savedAt':packs[0].get('sourceSavedAt'),'sourceName':packs[0]['sourceName'],
-            'sourceVersion':packs[0]['sourceVersion'],'profiles':copy.deepcopy(PROFILES),
+            'sourceVersion':packs[0]['sourceVersion'],'profiles':copy.deepcopy(first['profiles']),
             'facts':sort_facts(list(facts.values())),'rules':packs[0]['rules'],
             'warnings':list(dict.fromkeys(w for p in packs for w in p['warnings'])),
             'supplements':[{'label':s.get('label'),'module':s.get('module')} for s in packs[0]['supplements']]}

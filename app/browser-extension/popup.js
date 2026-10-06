@@ -17,7 +17,7 @@ async function task(fn, text) {
   catch (e) { notice(e.message, true); }
   finally {busy = false;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = false);updateAgentControls();selection();}
 }
-function sourceLabel(){if(profileSummary)el('sourceStatus').textContent=`资料更新 ${String(profileSummary.savedAt || '未注明').slice(0,10)} · 当前口径 ${profileSummary.profiles.find(p=>p.id===el('profile').value)?.count || 0} 项`;}
+function sourceLabel(){if(profileSummary)el('sourceStatus').textContent=`资料更新 ${String(profileSummary.savedAt || '未注明').slice(0,10)} · 当前版本 ${profileSummary.profiles.find(p=>p.id===el('profile').value)?.count || 0} 项`;}
 function available(value) {hasProfile=!!value;el('empty').hidden=hasProfile;el('controls').hidden=!hasProfile;}
 function selection() {
   const selected = [...document.querySelectorAll('#review input[data-field]:checked')];
@@ -94,4 +94,4 @@ el('agentCli').addEventListener('click',()=>task(async()=>{
   await checkCodex();state=await send('remap',{agent:true});render();notice('所选模型已返回匹配，请核对计划后填写。');
 },'正在核对歧义字段…'));
 el('fill').addEventListener('click',()=>task(async()=>{const inputs=[...document.querySelectorAll('#review input[data-field]:checked')];state=await send('fill',{selected:inputs.map(input=>input.dataset.field),overwrite:inputs.filter(input=>input.dataset.overwrite==='true').map(input=>input.dataset.field)});render();notice('所选字段已执行并读回核验，请查看逐项结果。');},'正在填写所选字段并读回核验…'));
-task(async()=>{const value=await send('state');available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');
+task(async()=>{const value=await send('state');available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=pref.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');

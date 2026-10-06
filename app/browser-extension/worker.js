@@ -9,8 +9,13 @@ const init=(async()=>{
   await chrome.storage.local.remove(['toudiFillingConnection','toudiNativeDisabled']);
 })();
 async function digest(value) {const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value)));return [...new Uint8Array(bytes)].map(n=>n.toString(16).padStart(2,'0')).join('');}
-async function pack() {const value=(await chrome.storage.local.get(PACK))[PACK];if(!value)throw Error('请先在「资料与设置」导入自己的填报资料包。');return value;}
-async function preferences() {return TouDiAgentConfig.normalize((await chrome.storage.local.get(PREF))[PREF]);}
+async function pack() {const value=(await chrome.storage.local.get(PACK))[PACK];if(!value)throw Error('请先在「资料与设置」填写资料或导入自己的资料包。');return value;}
+async function preferences() {
+  const value=TouDiAgentConfig.normalize((await chrome.storage.local.get(PREF))[PREF]);
+  const current=(await chrome.storage.local.get(PACK))[PACK];
+  if(current && !current.profiles.some(p=>p.id===value.profile))value.profile=current.profiles[0].id;
+  return value;
+}
 function summary(value) {return value?{name:value.name,revision:value.sourceVersion,savedAt:value.savedAt,importedAt:value.importedAt,editedAt:value.editedAt,count:value.facts.length,profiles:value.profiles.map(p=>({...p,count:value.facts.filter(f=>f.profiles.includes(p.id)).length})),rules:value.rules,warnings:value.warnings}:null;}
 async function loadState() {
   const state=(await chrome.storage.session.get(KEY))[KEY];
@@ -112,7 +117,8 @@ async function operation(message) {
     case 'profile-delete':await chrome.storage.local.remove([PACK,MAPS,'toudiLastReport']);await chrome.storage.session.remove(KEY);return {deleted:true};
     case 'preferences': {
       const value={...await preferences(),...message.preferences};
-      if(!Core.profileIds.includes(value.profile) || !['','codex','external'].includes(value.agentMode)
+      const current=(await chrome.storage.local.get(PACK))[PACK];
+      if(!(current?.profiles || [{id:'general'}]).some(p=>p.id===value.profile) || !['','codex','external'].includes(value.agentMode)
         || typeof value.autoAgent!=='boolean' || (value.agentModel && !TouDiAgentConfig.validModel(value.agentModel)))throw Error('协作设置无效。');
       if(value.autoAgent && (value.agentMode!=='codex' || !value.agentModel))throw Error('自动核对需要先选择 Codex 模型。');
       const next=TouDiAgentConfig.normalize(value);

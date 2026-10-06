@@ -283,6 +283,81 @@
     "最高学位": [
       "最高学位",
       "highest degree"
+    ],
+    "工作类型": [
+      "工作类型",
+      "雇佣类型",
+      "employment type"
+    ],
+    "工作成果": [
+      "工作成果",
+      "工作业绩",
+      "achievements"
+    ],
+    "本人职责": [
+      "本人职责",
+      "项目职责",
+      "项目工作内容",
+      "project responsibilities"
+    ],
+    "项目成果": [
+      "项目成果",
+      "项目业绩",
+      "project achievements"
+    ],
+    "项目链接": [
+      "项目链接",
+      "作品链接",
+      "project url"
+    ],
+    "主修课程": [
+      "主修课程",
+      "主要课程",
+      "courses"
+    ],
+    "IT技能": [
+      "IT技能",
+      "计算机技能",
+      "技能特长",
+      "skills"
+    ],
+    "获奖情况": [
+      "获奖情况",
+      "奖惩情况",
+      "荣誉奖励",
+      "awards"
+    ],
+    "个人评价": [
+      "个人评价",
+      "自我评价",
+      "个人简介",
+      "summary"
+    ],
+    "语言／证书名称": [
+      "语言／证书名称",
+      "语言",
+      "外语语种",
+      "证书名称",
+      "language",
+      "certificate name"
+    ],
+    "熟练程度": [
+      "熟练程度",
+      "语言水平",
+      "外语水平",
+      "proficiency"
+    ],
+    "考试成绩": [
+      "考试成绩",
+      "考试分数",
+      "证书成绩",
+      "score"
+    ],
+    "取得日期": [
+      "取得日期",
+      "获证日期",
+      "考试日期",
+      "issue date"
     ]
   },
   "manualTerms": [
@@ -348,15 +423,7 @@
   "profiles": [
     {
       "id": "general",
-      "label": "个人与教育通用"
-    },
-    {
-      "id": "state",
-      "label": "央国企／专业口径"
-    },
-    {
-      "id": "ai-product",
-      "label": "AI 产品口径"
+      "label": "默认资料"
     }
   ]
 };if(typeof module==="object"&&module.exports)module.exports=value;else r.TouDiFillingVocabulary=value;})(globalThis);

@@ -39,11 +39,6 @@ p { color: var(--muted); margin: 6px 0 14px; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 16px 22px; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
 .profile-control { display: flex; align-items: center; gap: 14px; }
 #profileLabel { white-space: nowrap; font-size: 13px; color: var(--muted); }
-.profile-segment { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.profile-segment button { border: 0; border-right: 1px solid var(--line); border-radius: 0; font-size: 13px; padding: 8px 14px; white-space: nowrap; }
-.profile-segment button:last-child { border-right: 0; }
-.profile-segment [aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
-.profile-segment button:focus-visible { outline-offset: -3px; }
 .search-control { position: relative; flex: 1; max-width: 310px; min-width: 210px; }
 .search-control svg { position: absolute; left: 11px; top: 12px; color: var(--muted); }
 input:not([type=checkbox]), textarea, select { border: 1px solid var(--line); border-radius: 6px; min-height: 38px; padding: 8px 10px; background: var(--paper); color: var(--ink); width: 100%; max-width: 100%; }
@@ -133,7 +128,6 @@ input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(-
   .settings-panel { padding: 18px 16px; }
   .profile-control { display: block; }
   #profileLabel { display: block; margin-bottom: 8px; }
-  .profile-segment button { white-space: normal; flex: 1; font-size: 12px; padding: 7px 8px; }
   .record > summary { padding: 12px; gap: 8px; }
   .record-title { font-size: 13px; }
   .record-meta { gap: 10px; }
@@ -158,3 +152,70 @@ input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(-
 .agent-instructions ol { margin:0; padding-left:22px; }
 a { color:var(--accent); text-underline-offset:3px; }
 @media(max-width:700px) { .setting-row > select { width:100%; min-width:0; } .page-header { flex-wrap:wrap; } .page-header .buttons { flex-wrap:wrap; } }
+
+/* The library uses the same module, field and disclosure sizes in every section. */
+.section-title > div { min-width: 0; }
+.section-description { margin: 5px 0 0; font-size: 13px; }
+.profile-control { min-width: 0; flex-wrap: wrap; gap: 10px; }
+.profile-control label { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.profile-control select { width: 210px; }
+.profile-control button { font-size: 13px; }
+.module-section { border-top: 1px solid var(--line-soft); padding: 16px 0; }
+.module-section:last-child { padding-bottom: 0; }
+.module-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 40px; }
+.module-label { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.module-label h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.module-index { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); width: 20px; }
+.module-count { font-size: 12px; color: var(--muted); }
+.module-head > button { flex-shrink: 0; font-size: 13px; }
+.module-placeholder { margin: 4px 0 0 32px; font-size: 13px; }
+.module-section .record { margin-top: 12px; }
+.record-heading { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+.record-range { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.record-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; padding: 10px 16px; border-bottom: 1px solid var(--line-soft); }
+.record-tools button, .extra-fact button { background: none; border: none; color: var(--accent); min-height: 26px; padding: 0; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.field-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px 22px; }
+.template-field { min-width: 0; }
+.template-field > label:first-child { margin-top: 0; }
+.field-wide { grid-column: 1 / -1; }
+.field-grid .date-inputs { display: grid; grid-template-columns: 96px minmax(0,1fr); gap: 8px; }
+.field-grid .date-inputs select { padding-left: 8px; }
+.ongoing-check { margin: 8px 0 0; }
+.custom-choice { margin-top: 8px; }
+#recordOptionalFields { padding-top: 18px; }
+#recordDatePolicy { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line-soft); }
+#recordExtras { margin-top: 0; }
+#recordExtras .disclosure { margin-top: 16px; }
+.extra-fact { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--line-soft); padding: 8px 0; }
+.dialog-intro { margin: 8px 0 0; }
+.dialog-body { min-height: 0; }
+#recordError, #versionError { padding: 10px 14px; background: var(--tint); border-left: 3px solid var(--error); color: var(--ink); font-size: 13px; margin: 12px 0 0; }
+#removeRecord { margin-right: auto; }
+.inline-input { display: flex; align-items: center; gap: 10px; }
+.inline-input > input, .inline-input > select { min-width: 0; }
+.inline-input > button { flex-shrink: 0; }
+#versionsEditor { width: min(600px,calc(100vw - 32px)); }
+#versionsEditor[open] { display: flex; flex-direction: column; }
+.version-row { padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+.version-row > label { margin-top: 0; }
+#newVersionForm { display: block; padding-top: 14px; }
+@media (max-width: 700px) {
+  .profile-control { width: auto; }
+  .field-grid { gap: 16px; }
+  .module-label { flex-wrap: wrap; gap: 4px 10px; }
+  .module-count { flex-basis: 100%; padding-left: 30px; }
+}
+@media (max-width: 520px) {
+  .field-grid { grid-template-columns: minmax(0,1fr); }
+  .field-wide { grid-column: auto; }
+  .module-head { align-items: center; gap: 10px; }
+  .module-label h3 { font-size: 14px; }
+  .module-head > button { padding: 6px 9px; }
+  .module-placeholder { margin-left: 0; }
+  .profile-control { width: 100%; }
+  .profile-control select { flex: 1; width: auto; min-width: 100px; }
+  .search-control { width: 100%; min-width: 0; }
+  #profileLabel { margin: 0; }
+  .record-heading { display: block; }
+  .record-range { display: block; margin-top: 2px; }
+}

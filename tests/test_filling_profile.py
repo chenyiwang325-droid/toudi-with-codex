@@ -125,4 +125,25 @@ class FillingProfileTests(unittest.TestCase):
         (folder/'资料.json').write_text('broken')
         with self.assertRaises(ValueError):load_profile(self.root)
 
+    def test_generic_formal_versions_and_standard_work_in_default_profile(self):
+        from filling_profile import export_profile_pack
+        folder=self.root/'填报资料';folder.mkdir()
+        formal={'schemaVersion':1,'profiles':[{'id':'user-default','label':'Default'},{'id':'user-alt','label':'My variant'}],'rules':[], 'facts':[
+            {'key':'work.name','label':'单位','value':'Generic Company','module':'internship','recordId':'w','profiles':['user-default']},
+            {'key':'work.role','label':'岗位','value':'Generic Role','module':'internship','recordId':'w','profiles':['user-alt']}]}
+        path=folder/'资料.json';path.write_text(json.dumps(formal));before=path.read_bytes()
+        self.assertEqual(load_profile(self.root)['profileId'],'user-default')
+        pack=export_profile_pack(self.root);self.assertEqual(pack['profiles'],formal['profiles']);self.assertEqual(len(pack['facts']),2)
+        self.assertEqual(load_profile(self.root,'user-alt')['facts'][0]['value'],'Generic Role');self.assertEqual(path.read_bytes(),before)
+        formal['profiles']=[{'id':'general','label':'默认资料'}];formal['facts']=formal['facts'][:1];formal['facts'][0]['profiles']=['general'];path.write_text(json.dumps(formal))
+        self.assertEqual(self.plan(self.field('公司名称',module='work'))['actions'][0]['value'],'Generic Company')
+
+    def test_plain_legacy_profile_has_no_author_versions_or_missing_work(self):
+        data={'基本信息':{'姓名':'Generic User'},'教育经历':[], '实习经历':[{'单位':'Generic Employer'}],'工作经历':[{'单位':'Other Employer'}],'项目经历':[{'名称':'Generic Project'}]}
+        (self.root/'网申信息库.json').write_text(json.dumps(data))
+        profile=load_profile(self.root)
+        self.assertEqual(profile['profiles'],[{'id':'general','label':'默认资料'}])
+        self.assertEqual([f['value'] for f in profile['facts'] if f['module']=='internship' and f['label']=='单位'],['Generic Employer','Other Employer'])
+        self.assertTrue(any(f['module']=='project' for f in profile['facts']))
+
 if __name__=='__main__':unittest.main()

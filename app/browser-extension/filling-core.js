@@ -30,13 +30,20 @@
   }
   function validatePack(input) {
     if (!input || input.schemaVersion!==1 || !Array.isArray(input.facts) || input.facts.length>1500 || !Array.isArray(input.rules || []) || (input.rules || []).some(r=>!text(r,12000))) throw Error('资料包格式无效：需要 schemaVersion 1、facts 和 rules。');
+    const inferred=[...new Set(['general',...input.facts.flatMap(f=>Array.isArray(f?.profiles)?f.profiles:[])])];
+    const profiles=structuredClone(input.profiles ?? inferred.map((id,i)=>({id,label:id==='general'?'默认资料':'导入资料 '+i}))),ids=new Set();
+    if(!Array.isArray(profiles) || !profiles.length || profiles.length>20)throw Error('资料版本需要为 1 到 20 项。');
+    for(const p of profiles){
+      if(!p || typeof p.id!=='string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(p.id) || ids.has(p.id) || !text(p.label,80) || !p.label.trim())throw Error('资料版本标识或名称无效。');
+      ids.add(p.id);
+    }
     const seen = new Set();
     const facts=input.facts.map(original=>{
       const f=structuredClone(original);
       if (!f || !text(f.key,300) || !f.key || seen.has(f.key) || !text(f.label) || !f.label || !modules.includes(f.module) || !['string','number'].includes(typeof f.value) || (typeof f.value==='number' && !Number.isFinite(f.value)) || String(f.value).length>24000) throw Error('资料字段有重复键、缺失内容或不支持的类型。');
       seen.add(f.key);
-      f.profiles=f.profiles || profileIds.slice();
-      if (!Array.isArray(f.profiles) || !f.profiles.length || f.profiles.some(p=>!profileIds.includes(p)) || (f.module==='internship' && f.profiles.includes('general'))) throw Error('实习资料需要明确简历口径，不能混入通用口径。');
+      f.profiles=f.profiles || [...ids];
+      if (!Array.isArray(f.profiles) || !f.profiles.length || f.profiles.some(p=>!ids.has(p))) throw Error('字段需要至少归属一个已有资料版本。');
       for (const k of ['recordId','recordLabel','recordHint']) { f[k]=f[k] || ''; if(!text(f[k]))throw Error('经历记录标识无效。'); }
       f.aliases=f.aliases || V.aliases[f.label] || [f.label];
       if(!Array.isArray(f.aliases) || f.aliases.length>80 || f.aliases.some(a=>!text(a) || !a.trim()))throw Error('字段别名无效。');
@@ -50,10 +57,10 @@
       if(f.gpaScale && !['4','4.0','5','5.0'].includes(String(f.gpaScale)))throw Error('GPA 满分口径无效。');
       return f;
     });
-    return {schemaVersion:1,kind:'toudi-filling-profile',name:text(input.name,200)?input.name:'个人填报资料',savedAt:text(input.savedAt,80)?input.savedAt:null,sourceName:text(input.sourceName,300)?input.sourceName:'导入资料包',sourceVersion:text(input.sourceVersion,150)?input.sourceVersion:'',profiles:structuredClone(V.profiles),facts,rules:(input.rules || []).slice(),warnings:Array.isArray(input.warnings)?input.warnings.filter(w=>text(w,2000)).slice(0,100):[],supplements:Array.isArray(input.supplements)?input.supplements.filter(s=>s&&text(s.label)).map(s=>({label:s.label,module:s.module})):[]};
+    return {schemaVersion:1,kind:'toudi-filling-profile',name:text(input.name,200)?input.name:'个人填报资料',savedAt:text(input.savedAt,80)?input.savedAt:null,sourceName:text(input.sourceName,300)?input.sourceName:'浏览器资料编辑',sourceVersion:text(input.sourceVersion,150)?input.sourceVersion:'',profiles,facts,rules:(input.rules || []).slice(),warnings:Array.isArray(input.warnings)?input.warnings.filter(w=>text(w,2000)).slice(0,100):[],supplements:Array.isArray(input.supplements)?input.supplements.filter(s=>s&&text(s.label)).map(s=>({label:s.label,module:s.module})):[]};
   }
-  function profile(pack, id='general') {
-    if(!profileIds.includes(id))throw Error('请选择有效的简历口径。');
+  function profile(pack, id=pack.profiles[0].id) {
+    if(!pack.profiles.some(p=>p.id===id))throw Error('请选择有效的资料版本。');
     return {...pack,profileId:id,facts:sortFacts(pack.facts.filter(f=>f.profiles.includes(id)))};
   }
   function moduleHint(field) { const value=String(field.module || '').toLowerCase(); return Object.entries(V.modules).find(([alias])=>value.includes(alias))?.[1] || ''; }

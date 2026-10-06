@@ -18,7 +18,7 @@ vm.runInContext(fs.readFileSync(path.join(root,'worker.js'),'utf8'),context);
   assert.equal(Config.normalize({agentMode:'external',agentModel:'ignored',autoAgent:true}).autoAgent,false);
   const op=value=>context.operation(value);
   const Core=context.TouDiFillingCore;
-  const pack=Core.validatePack({schemaVersion:1,name:'Synthetic',facts:[{key:'personal.city',label:'现居地',value:'Synthetic City',module:'personal'}],rules:[]});
+  const pack=Core.validatePack({schemaVersion:1,name:'Synthetic',profiles:[{id:'general',label:'默认资料'},{id:'ai-product',label:'Synthetic variant'}],facts:[{key:'personal.city',label:'现居地',value:'Synthetic City',module:'personal'}],rules:[]});
   pack.sourceVersion='fixture';local.toudiPrivateProfile=pack;
   function plan(){const scan={protocol:1,origin:'https://example.invalid',path:'/apply',fingerprint:'fixture',fields:[{id:'f',label:'地理位置待确认',module:'personal',type:'text',options:[],value:''}]};session.toudiFillingSession={startedAt:Date.now(),tabId:1,origin:scan.origin,path:scan.path,sourceVersion:pack.sourceVersion,scan,mappings:{},plan:Core.plan(Core.profile(pack,'general'),scan)};}
   plan();await assert.rejects(op({op:'remap',agent:true}),/先.*选择/);assert.equal(sent.length,0);
