@@ -2,7 +2,7 @@ const el = id => document.getElementById(id);
 const escapeHtml = text => String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const labels = {ready:'可填写',already:'已一致',conflict:'已有内容',manual:'人工核对',missing:'资料待补',ambiguous:'需选记录',unsupported:'需手动',verified:'核验通过',failed:'未通过'};
 const reasons = {'readback-matched':'写入后读回一致','value-not-retained':'网站未保留填写值，请手动检查','validation-failed':'网站字段校验未通过','field-disappeared':'字段已隐藏或移除，请重新识别','page-changed':'网页已切换，请重新识别','structure-changed':'表单结构已变化，请重新识别','value-changed':'你已修改此字段，保留当前值','existing-value':'已有内容未覆盖','field-changed':'字段内容或控件已变化','disabled-or-readonly':'字段只读或已停用','option-not-found':'页面没有该选项','option-disabled':'对应选项不可用','maxlength-exceeded':'内容超过网站长度限制','scan-required':'需要重新识别当前页面'};
-let state, busy = false, hasProfile = false, profileSummary;
+let state, busy = false, agentBusy = false, hasProfile = false, profileSummary;
 let pref = TouDiAgentConfig.normalize();
 async function send(op, data = {}) {
   const result = await chrome.runtime.sendMessage({op,...data});
@@ -35,7 +35,7 @@ function render() {
     const groups = new Map();
     for (const row of plan.rows) {const key = row.groupLabel || ({personal:'个人信息',education:'教育经历',work:'工作经历',projects:'项目经历'}[row.module] || '其他字段');if (!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
     el('profile').value = plan.profileId;
-    el('review').innerHTML = `<h2>核对本页填写计划</h2><div class="site">${escapeHtml(plan.origin + plan.path)}</div><div class="summary"><span><b>${plan.rows.length}</b>识别字段</span><span><b>${counts.ready || 0}</b>可填写</span><span><b>${counts.already || 0}</b>已有一致</span><span><b>${pending}</b>待核对</span></div>` + [...groups].map(([group, rows]) => `<h3>${escapeHtml(group)}</h3>` + rows.map(row => {
+    el('review').innerHTML = `<h2>核对本页填写计划</h2><div class="site">${escapeHtml(plan.origin + plan.path)}</div>${state.timings?`<p class="caption">页面扫描 ${(state.timings.scanMs/1000).toFixed(2)} 秒 · 本地计划 ${(state.timings.totalMs/1000).toFixed(2)} 秒</p>`:''}<div class="summary"><span><b>${plan.rows.length}</b>识别字段</span><span><b>${counts.ready || 0}</b>可填写</span><span><b>${counts.already || 0}</b>已有一致</span><span><b>${pending}</b>待核对</span></div>` + [...groups].map(([group, rows]) => `<h3>${escapeHtml(group)}</h3>` + rows.map(row => {
       const selectable = ['ready','conflict'].includes(row.status) && row.factKey;
       const choices = ['missing','ambiguous'].includes(row.status) ? `<select data-map="${escapeHtml(row.fieldId)}" aria-label="为${escapeHtml(row.label)}选择资料字段"><option value="">选择已确认资料…</option>${plan.choices.map(choice => `<option value="${escapeHtml(choice.key)}">${escapeHtml(choice.label)}</option>`).join('')}</select>` : '';
       const value = row.displayValue;
@@ -63,7 +63,7 @@ function updateAgentControls(){
   el('autoAgentRow').hidden=!direct;el('autoAgent').checked=pref.autoAgent;
   el('agentCli').hidden=pref.agentMode==='external';
   el('agentCli').textContent=direct?'用 '+pref.agentModel+' 核对':'配置 Agent 协作';
-  el('agentCli').disabled=busy || (direct && !state?.plan?.rows.some(row=>['missing','ambiguous'].includes(row.status)));
+  el('agentCli').disabled=busy || agentBusy || (direct && !state?.plan?.rows.some(row=>['missing','ambiguous'].includes(row.status)));
   el('agentCheck').hidden=!direct;
   el('agentTransfer').open=pref.agentMode==='external';
   el('agentConnectionStatus').textContent=direct?'当前模型：'+pref.agentModel+' · 现有 Codex 额度。仅核对歧义，不自动替换模型。':pref.agentMode==='external'?'当前方式：自己的 Agent。复制任务后，导入返回的 JSON。':'尚未接入 Agent；明确字段和手动选择资料仍可使用。';
@@ -71,7 +71,28 @@ function updateAgentControls(){
 el('agentSettings').addEventListener('click',()=>send('settings',{section:'agent'}));
 el('openWorkbench').addEventListener('click',()=>task(async()=>{await send('open-workbench');notice('投递中控台已打开。');},'正在打开中控台…'));
 el('autoAgent').addEventListener('change',()=>task(async()=>{pref=await send('preferences',{preferences:{autoAgent:el('autoAgent').checked}});state=null;render();notice(pref.autoAgent?'自动核对已开启，使用你已选择的模型和 Codex 额度。':'自动核对已关闭。');},'正在保存偏好…'));
-el('scan').addEventListener('click', () => task(async () => {state=await send('scan',{profile:el('profile').value});showSync(state.sync);render();notice(state.agentError || '计划已生成；勾选的字段会填写，已有内容默认保留。',!!state.agentError);},'正在识别字段并核对资料…'));
+async function checkAgentPlan(){
+  if(agentBusy || !state?.plan)return;
+  const startedAt=state.startedAt;
+  agentBusy=true;updateAgentControls();notice('本地计划已显示；Agent 正在核对歧义字段，你可以先填写已确认的项目。');
+  try{
+    const next=await send('remap',{agent:true,startedAt});
+    if(state?.startedAt!==startedAt || !state?.plan)return;
+    // Preserve user checkbox/manual choices while the model was running.
+    if(busy || document.querySelector('[data-map]:focus')){notice('Agent 核对完成；重新打开插件可查看更新后的计划。');return;}
+    const selected=new Map([...document.querySelectorAll('[data-field]')].map(n=>[n.dataset.field,n.checked]));
+    const choices=new Map([...document.querySelectorAll('[data-map]')].map(n=>[n.dataset.map,n.value]));
+    state=next;render();
+    document.querySelectorAll('[data-field]').forEach(n=>{if(selected.has(n.dataset.field))n.checked=selected.get(n.dataset.field);});
+    document.querySelectorAll('[data-map]').forEach(n=>{if(choices.has(n.dataset.map))n.value=choices.get(n.dataset.map);});selection();
+    notice(state.agentError || 'Agent 核对完成，请查阅匹配结果。',!!state.agentError);
+  }catch(e){if(state?.startedAt===startedAt && state?.plan)notice(e.message,true);}
+  finally{agentBusy=false;updateAgentControls();}
+}
+el('scan').addEventListener('click', async()=>{
+  await task(async()=>{state=null;render();state=await send('scan',{profile:el('profile').value});showSync(state.sync);render();notice('本地计划已生成；已有内容默认保留。');},'正在识别当前页面…');
+  if(state?.autoAgentPending)checkAgentPlan();
+});
 el('profile').addEventListener('change', () => task(async()=>{pref=await send('preferences',{preferences:{profile:el('profile').value}});state=null;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
 el('review').addEventListener('change', selection);
 el('review').addEventListener('click', event => {
@@ -90,9 +111,9 @@ async function checkCodex() {
   return provider;
 }
 el('agentCheck').addEventListener('click',()=>task(async()=>{await checkCodex();notice('登录与所选模型目录已确认，没有发起模型生成。');},'正在检查 Codex 连接…'));
-el('agentCli').addEventListener('click',()=>task(async()=>{
-  if(pref.agentMode!=='codex' || !pref.agentModel){await send('settings',{section:'agent'});return;}
-  await checkCodex();state=await send('remap',{agent:true});render();notice('所选模型已返回匹配，请核对计划后填写。');
-},'正在核对歧义字段…'));
+el('agentCli').addEventListener('click',()=>{
+  if(pref.agentMode!=='codex' || !pref.agentModel){send('settings',{section:'agent'});return;}
+  checkAgentPlan();
+});
 el('fill').addEventListener('click',()=>task(async()=>{const inputs=[...document.querySelectorAll('#review input[data-field]:checked')];state=await send('fill',{selected:inputs.map(input=>input.dataset.field),overwrite:inputs.filter(input=>input.dataset.overwrite==='true').map(input=>input.dataset.field)});render();notice('所选字段已执行并读回核验，请查看逐项结果。');},'正在填写所选字段并读回核验…'));
 task(async()=>{const value=await send('state');showSync(value.sync);available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=pref.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');

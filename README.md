@@ -28,7 +28,7 @@
 
 ## 安装与开始使用
 
-**当前源码版本为 v0.4.0，桌面定位为 macOS Apple Silicon 预览版。** 下载以最新 Release 中实际提供的附件为准。 完整源码、安装包与已验证范围随 Release 发布，平台与签名边界见安装说明。
+**桌面 App 当前为 v0.4.0，定位为 macOS Apple Silicon 预览版；浏览器扩展修正版为 [v0.4.1](https://github.com/chenyiwang325-droid/toudi-workbench/releases/tag/v0.4.1)。** 下载以最新 Release 中实际提供的附件为准。 完整源码、安装包与已验证范围随 Release 发布，平台与签名边界见安装说明。
 
 **先选择对应系统与架构的 Release 文件，再按安装说明打开应用。** 当前版本的平台测试与签名情况以 Release 说明为准；macOS 测试构建采用临时签名，未正式公证，首次下载可能遇到系统确认或拦截。Windows 已提供 CI 构建模板，构建结果以实际任务为准，仍待 Windows 实机验收。
 

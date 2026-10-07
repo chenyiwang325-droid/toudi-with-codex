@@ -134,8 +134,10 @@
     const rows=scan.fields.map(field=>{
       const row={fieldId:field.id,label:field.label || '',module:field.module || '',groupLabel:field.groupLabel || '',status:'missing',reason:'资料中没有可确认的对应字段。',expectedValue:field.value ?? ''};
       const kind=field.type || 'text';
-      if(field.unsupported || !['text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'].includes(kind))return {...row,status:'unsupported',reason:'控件尚不支持可靠填入。'};
-      if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length) || manual(row.label))return {...row,status:'manual',reason:'上传、协议、家庭/联系人或复杂控件需要人工操作。'};
+      const unsupportedReasons={'disabled-or-readonly':'网站锁定了此字段，请先在网站中解除或修改关联记录。','custom-date':'已识别日期字段；此网站的日历控件需手动选择。','split-date':'已识别分开的年月选项；请按对应经历手动选择，避免混填日期。','unlabeled':'未找到可靠的字段标题，请在网页中确认。','custom-selector':'已识别下拉字段，但暂不能可靠读取选项，请手动选择。'};
+      if(field.unsupported || !['text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'].includes(kind))return {...row,status:'unsupported',reason:unsupportedReasons[field.unsupported] || '控件尚不支持可靠填入。'};
+      const deferredSelect=kind==='combobox' && field.adapter==='moka-select';
+      if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length && !deferredSelect) || manual(row.label))return {...row,status:'manual',reason:'上传、协议、家庭/联系人或复杂控件需要人工操作。'};
       const list=Object.hasOwn(mappings,field.id)?[facts.get(mappings[field.id])]:candidates(p,field);
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
       if(!list.length)return row;
@@ -175,7 +177,7 @@
         }
       }
       if(!reason && Number.isInteger(field.maxLength) && field.maxLength>=0 && value.length>field.maxLength)reason='内容超过字段长度限制，需人工整理；未截断原文。';
-      if(!reason && ['select','radio','combobox'].includes(kind)) {
+      if(!reason && ['select','radio','combobox'].includes(kind) && !deferredSelect) {
         const present=v=>['至今','present','ongoing','current'].includes(normal(v));
         const matches=(field.options || []).filter(o=>optionEquivalent(o.text,fact.label)===optionEquivalent(value,fact.label) || String(o.value)===value || (fact.ongoing && ongoingEnd(fact) && present(o.text)));
         if(matches.length!==1)reason='没有唯一等价选项，需要人工选择。';
@@ -186,7 +188,7 @@
       const note=row.dateFallbackUsed?' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。':'';
       if(existing && (existing===proposed || existing===value))return {...row,status:'already',reason:'已有值与资料相同。'+note};
       if(existing)return {...row,status:'conflict',reason:'已有值与资料不同，保留现值，需明确选择覆盖。'+note};
-      return {...row,status:'ready',reason:'事实、记录及控件约束已确认。'+note};
+      return {...row,status:'ready',reason:(deferredSelect?'资料已匹配；填写时展开此字段菜单，仅选择唯一同名选项，未找到则保留原值。':'事实、记录及控件约束已确认。')+note};
     });
     const statusCounts={};for(const row of rows)statusCounts[row.status]=(statusCounts[row.status] || 0)+1;
     return {protocol:1,sourceVersion:p.sourceVersion,profileId:p.profileId,origin:scan.origin,path:scan.path,fingerprint:scan.fingerprint,rows,statusCounts,warnings:[...p.warnings,...(scan.warnings || [])],choices:p.facts.filter(f=>!f.manual).map(f=>({key:f.key,label:[f.recordLabel,f.label].filter(Boolean).join(' · ')}))};

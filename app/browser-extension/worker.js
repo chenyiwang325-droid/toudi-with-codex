@@ -27,12 +27,28 @@ async function loadState() {
   }
   await chrome.storage.session.remove(KEY);return null;
 }
-const publicState=state=>state?{startedAt:state.startedAt,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,agentError:state.agentError || state.lunaError}:null;
+const publicState=state=>state?{startedAt:state.startedAt,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,timings:state.timings,autoAgentPending:state.autoAgentPending,agentError:state.agentError || state.lunaError}:null;
 async function putState(state) {await chrome.storage.session.set({[KEY]:state});return publicState(state);}
 let nativePort, nativeTimer, nextId=0;
 const nativeRequests=new Map();
 function nativeFailure() {return Error('本机 Codex 连接工具尚未安装或不可用；请在「资料与设置」查看安装步骤。本地识别和填写仍可使用。');}
-async function native(payload) {
+// Model work has its own host process so a slow model cannot block local profile reads.
+async function nativeModel(payload) {
+  return new Promise((resolve,reject)=>{
+    let port,done=false;
+    const finish=(error,value)=>{if(done)return;done=true;clearTimeout(timer);port?.disconnect();error?reject(error):resolve(value);};
+    const timer=setTimeout(()=>finish(Error('Codex 核对超时；本地计划保留，可继续填写。')),110000);
+    try {
+      port=chrome.runtime.connectNative(HOST);
+      const requestId=++nextId;
+      port.onMessage.addListener(message=>{if(message.requestId===requestId)finish(message.error?Error(message.error):null,message.value);});
+      port.onDisconnect.addListener(()=>finish(nativeFailure()));
+      port.postMessage({...payload,requestId});
+    }catch(_){finish(nativeFailure());}
+  });
+}
+async function native(payload,timeoutMs=30000) {
+  if(payload.op==='map')return nativeModel(payload);
   clearTimeout(nativeTimer);
   if(!nativePort) {
     try {nativePort=chrome.runtime.connectNative(HOST);}catch(_){throw nativeFailure();}
@@ -49,7 +65,7 @@ async function native(payload) {
   const requestId=++nextId;
   try {
     return await new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{nativeRequests.delete(requestId);reject(Error('Codex 核对超时；原计划保留，可继续使用本地匹配。'));if(!nativeRequests.size)nativePort?.disconnect();},payload.op==='map'?110000:30000);
+      const timer=setTimeout(()=>{nativeRequests.delete(requestId);reject(Error('本机资料连接超时；浏览器资料保留，请检查连接后同步。'));if(!nativeRequests.size)nativePort?.disconnect();},timeoutMs);
       nativeRequests.set(requestId,{resolve,reject,timer});
       try{nativePort.postMessage({...payload,requestId});}catch(_){clearTimeout(timer);nativeRequests.delete(requestId);reject(nativeFailure());}
     });
@@ -58,8 +74,8 @@ async function native(payload) {
 async function engine(tabId,op,arg) {
   const tab=await chrome.tabs.get(tabId);
   if(!/^https?:\/\//.test(tab.url || ''))throw Error('请在招聘网站的填写页面打开插件。');
-  const present=await chrome.scripting.executeScript({target:{tabId},func:()=>!!globalThis.TouDiFormEngine});
-  if(!present[0]?.result)await chrome.scripting.executeScript({target:{tabId},files:['form-engine.js']});
+  // A scan always installs the current engine, including on pages open before an update.
+  await chrome.scripting.executeScript({target:{tabId},files:['form-engine.js']});
   const result=await chrome.scripting.executeScript({target:{tabId},func:async(method,value)=>{
     const bridge=globalThis.TouDiFormEngine;
     if(method==='scan')return bridge.scan();
@@ -117,11 +133,11 @@ async function writeAndRead(workspaceKey,base,pack){
   if(written.workspaceKey!==workspaceKey || readback.workspaceKey!==workspaceKey || readback.version!==written.version || !Sync.same(readback.pack,pack))throw Error('保存后工作区资料已变化或读回不一致；本地候选保留，请重新核对。');
   return readback;
 }
-async function synchronize(connect=false){
+async function synchronize(connect=false,readTimeout=30000){
   let state=await syncState();if(!connect && !state.enabled)return state;
   const local=(await chrome.storage.local.get(PACK))[PACK] || null;
   try{
-    const remote=validateRemote(await native({op:'profile-read',protocol:1}));
+    const remote=validateRemote(await native({op:'profile-read',protocol:1},readTimeout));
     if(state.workspaceKey && state.workspaceKey!==remote.workspaceKey && !connect){await chrome.storage.session.remove(KEY);return storeSync({...state,status:'workspace-changed',error:'中控台已切换工作区。原资料保留；请重新连接并核对，避免写入其他工作区。'});}
     const base=connect?null:state.basePack;
     const type=local===null && remote.pack!==null?'remote':Sync.compare(base,local,remote.pack);
@@ -153,7 +169,7 @@ async function resolveSync(message){
 async function operation(message) {
   await init;
   switch(message.op) {
-    case 'state':await synchronize();return {sync:await syncState(),profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState()),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
+    case 'state':return {sync:await syncState(),profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState()),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
     case 'profile-sync':return synchronize();
     case 'profile-connect':return synchronize(true);
     case 'profile-resolve':return resolveSync(message);
@@ -187,17 +203,19 @@ async function operation(message) {
     case 'clear-plan':await chrome.storage.session.remove(KEY);return {cleared:true};
     case 'codex-status':return native({op:'status',protocol:1});
     case 'scan': {
-      const sync=await synchronize();
+      const started=Date.now();
+      const sync=await synchronize(false,3500);
       if(sync.status==='workspace-changed')throw Error('中控台工作区已切换。请在资料与设置重新连接核对；若要继续使用原浏览器资料，请先断开同步。');
       const value=await pack(), pref=await preferences(), p=Core.profile(value,message.profile || pref.profile);
       const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.id)throw Error('没有可识别的当前网页。');
-      const scan=Core.scanValid(await engine(tab.id,'scan'));
+      const scanStarted=Date.now(), scan=Core.scanValid(await engine(tab.id,'scan'));
       if(!scan.fields.length)throw Error('当前页面没有可见填写字段；请先打开网申表单。');
-      const state={startedAt:Date.now(),tabId:tab.id,origin:scan.origin,path:scan.path,sourceVersion:value.sourceVersion,scan,mappings:{},plan:Core.plan(p,scan)};
+      const state={startedAt:Date.now(),tabId:tab.id,origin:scan.origin,path:scan.path,sourceVersion:value.sourceVersion,scan,mappings:{},plan:Core.plan(p,scan),timings:{syncMs:scanStarted-started,scanMs:Date.now()-scanStarted}};
       const saved=(await chrome.storage.local.get(MAPS))[MAPS]?.[await scope(state)]?.mappings || {};
       const allowed=new Set(p.facts.map(f=>f.key));state.mappings=Object.fromEntries(Object.entries(saved).filter(([id,key])=>scan.fields.some(f=>f.id===id) && allowed.has(key)));
       state.plan=Core.plan(p,scan,state.mappings);await putState(state);
-      if(pref.autoAgent && state.plan.rows.some(r=>['missing','ambiguous'].includes(r.status)))try{await remap(state,{agent:true});}catch(e){state.agentError=e.message;}
+      state.autoAgentPending=!!(pref.autoAgent && state.plan.rows.some(r=>['missing','ambiguous'].includes(r.status)));
+      state.timings.totalMs=Date.now()-started;
       return {...await putState(state),sync:await syncState()};
     }
     case 'remap':return putState(await remap(await current(),message));
@@ -220,8 +238,31 @@ async function operation(message) {
   }
 }
 let operationQueue=Promise.resolve();
+function enqueue(fn){const run=operationQueue.then(fn);operationQueue=run.catch(()=>{});return run;}
+async function agentOperation(message){
+  const state=await enqueue(()=>current());
+  if(message.startedAt && message.startedAt!==state.startedAt)throw Error('计划已变化，请重新核对。');
+  const pref=await preferences(),p=Core.profile(await pack(),state.plan.profileId);
+  if(pref.agentMode!=='codex' || !pref.agentModel)throw Error('请先在协作设置选择本机 Codex 与模型。');
+  if(message.model && message.model!==pref.agentModel)throw Error('模型与已保存的配置不一致，请先更新 Agent 协作设置。');
+  const request=Core.agentRequest(p,state.scan,state.plan,pref.agentModel);
+  if(!request.fields.length)return publicState(state);
+  // Do not hold the mutation queue while waiting for a model response.
+  let result,error;
+  try{result=await native(request);}catch(e){error=e;}
+  return enqueue(async()=>{
+    const active=await current();
+    if(active.startedAt!==state.startedAt || active.sourceVersion!==state.sourceVersion || JSON.stringify(active.mappings)!==JSON.stringify(state.mappings))throw Error('核对期间页面、资料或手动匹配已变化；本次模型结果未采用。');
+    active.autoAgentPending=false;
+    if(error){active.agentError=error.message;return putState(active);}
+    const safe=Core.safeAgentMappings(p,active.scan,result.mappings);
+    await remap(active,{mappings:safe.accepted});
+    active.plan.provider={...result.provider,mapped:Object.keys(safe.accepted).length,rejected:safe.rejected.length};
+    return putState(active);
+  });
+}
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(sender.id!==chrome.runtime.id || !['popup.html','options.html'].some(name=>sender.url?.split('#')[0]===chrome.runtime.getURL(name)))return false;
-  const run=operationQueue.then(()=>operation(message));operationQueue=run.catch(()=>{});
+  const run=message.op==='remap' && message.agent?agentOperation(message):enqueue(()=>operation(message));
   run.then(value=>respond({value})).catch(e=>respond({error:e.message}));return true;
 });
