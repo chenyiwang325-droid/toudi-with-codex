@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const src=fs.readFileSync(require('node:path').join(__dirname,'../app/browser-extension/worker.js'),'utf8');
+const facts=[{key:'project.description',label:'项目职责',module:'project',recordLabel:'合成项目',value:'整理需求',profiles:['general']},{key:'personal.name',label:'姓名',module:'personal',value:'合成姓名'},{key:'project.contact',label:'项目电话',module:'project',value:'13900000000'},{key:'project.other',label:'职责',module:'project',value:'联系 fixture@example.invalid'},{key:'project.private',label:'职责',module:'project',sensitive:true,value:'私有内容'}];
+let fields=[{id:'q',label:'个人评价',module:'personal',type:'textarea',value:'',maxLength:15}],changed=false;
+const state={startedAt:1,sourceVersion:'v1',plan:{profileId:'general'},scan:{fingerprint:'fp1',fields},tabId:1};
+const c={Core:{profile:()=>({facts,profileId:'general'}),scanValid:x=>x},pack:async()=>({}),engine:async()=>({fingerprint:changed?'fp2':'fp1',fields}),digest:async x=>JSON.stringify(x),current:async()=>state,enqueue:async fn=>fn(),preferences:async()=>({agentMode:'codex',agentModel:'fixture-model'}),native:async payload=>{assert.equal(payload.model,'fixture-model');return {answer:{answer:'我善于整理需求。',sourceKeys:['project.description'],uncertainties:[]}}},putState:async s=>s};
+vm.createContext(c);vm.runInContext(src.slice(src.indexOf('// Subjective answers')),c);
+(async()=>{
+ for(const label of ['家庭描述','验证码','同意协议','身份证优势','邮箱'])assert.equal(c.subjectiveField({label,type:'textarea'}),false);
+ assert.equal(c.subjectiveField({label:'个人评价',type:'select'}),false);
+ for(const label of ['兴趣爱好','专业技能','优劣势'])assert.equal(c.subjectiveField({label,type:'textarea'}),true);
+ const request=await c.answerRequest(state,'q');assert.deepEqual(Array.from(request.sources,s=>s.key),['project.description']);
+ await assert.rejects(()=>c.answerRequest(state,'unknown'));
+ const generated=await c.answerOperation({fieldId:'q'});assert.equal(generated.answerDraft.approved,false);assert.equal(generated.answerDraft.sourceLabels[0],'合成项目 · 项目职责');assert(!generated.plan.rows);
+ assert.throws(()=>c.validateAnswer(request,{answer:'x'.repeat(16),sourceKeys:['project.description'],uncertainties:[]}));
+ assert.throws(()=>c.validateAnswer(request,{answer:'回答',sourceKeys:['unknown'],uncertainties:[]}));
+ const binding=await c.answerBinding(state);state.sourceVersion='v2';assert.notEqual(await c.answerBinding(state),binding);
+ changed=true;await assert.rejects(()=>c.answerRequest(state,'q'));
+ console.log('PASS subjective worker: explicit semantic question, private-source filter, mock generation, approval and stale bindings');
+})().catch(e=>{console.error(e);process.exitCode=1});

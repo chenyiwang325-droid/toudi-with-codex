@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (adapterLibrary) {
   'use strict';
   let latest = null;
-  const ENGINE_VERSION = '0.5.0';
+  const ENGINE_VERSION = '0.5.1';
   let structureHints={};
   const wait=(milliseconds=100)=>new Promise(resolve=>setTimeout(resolve,milliseconds));
   const adapters=adapterLibrary?.create({compact:v=>compact(v),visible,structuralPath,labelText,wait,setNative});
@@ -152,7 +152,8 @@
         }
         const module = ctx.module || (/姓名|性别|出生|手机|电话|邮箱|证件|地址|name|email|phone/i.test(label) ? 'personal' : 'other');
         let unsupported = '';
-        if (type === 'file') unsupported = 'file-upload';
+        if (/家庭|亲属|family/i.test(ctx.groupLabel || ctx.module)) unsupported='family-member';
+        else if (type === 'file') unsupported = 'file-upload';
         else if (/验证码|校验码|安全验证|captcha|verification code|one.time code/i.test(label)) unsupported = 'verification-code';
         else if (['checkbox','radio'].includes(type) && /同意|声明|隐私|条款|协议|我已阅读|本人确认|agree|consent|terms|declaration/i.test(label)) unsupported = 'consent';
         else if (type === 'combobox' && !adapter && (!options.length || options.some(x => !x.value))) unsupported = 'custom-selector';
@@ -221,6 +222,12 @@
     const win = node.ownerDocument.defaultView;
     for (const name of ['input','change','blur','focusout']) node.dispatchEvent(new win.Event(name,{bubbles:true,composed:true}));
   }
+  function retained(entry,expected){
+    const actual=read(entry);
+    if(actual===expected)return true;
+    // Websites can render numeric results with trailing zeros. Never normalize identifiers.
+    return /^(语言成绩|考试成绩|成绩（GPA）|GPA|平均绩点|身高|体重)$/.test(entry.field.label) && /^-?\d+(?:\.\d+)?$/.test(String(actual)) && /^-?\d+(?:\.\d+)?$/.test(String(expected)) && Number(actual)===Number(expected);
+  }
   async function apply(plan) {
     const actions = Array.isArray(plan?.actions) ? plan.actions : [];
     const initial = collect(), output = [], applied = new Map();
@@ -282,7 +289,7 @@
       const entry=final.entries.find(x=>x.field.id===item.fieldId);
       if(final.report.origin!==plan.origin || final.report.path!==plan.path) output[i]=result(item.fieldId,'failed','page-changed');
       else if(!entry) output[i]=result(item.fieldId,'failed','field-disappeared');
-      else if(read(entry)!==applied.get(item.fieldId)) output[i]=result(item.fieldId,'failed','value-not-retained',entry);
+      else if(!retained(entry,applied.get(item.fieldId))) output[i]=result(item.fieldId,'failed','value-not-retained',entry);
       else if(entry.node.validity && !entry.node.validity.valid) output[i]=result(item.fieldId,'failed','validation-failed',entry);
       else output[i]=result(item.fieldId,'verified','readback-matched',entry);
     }

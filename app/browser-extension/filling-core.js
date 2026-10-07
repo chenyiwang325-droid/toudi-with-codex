@@ -73,7 +73,15 @@
     if(!pack.profiles.some(p=>p.id===id))throw Error('请选择有效的资料版本。');
     return {...pack,profileId:id,facts:sortFacts(pack.facts.filter(f=>f.profiles.includes(id)))};
   }
-  function moduleHint(field) { if(/^(毕业院校|毕业学校|最近毕业专业)$/.test(field.label || ''))return 'education'; const value=String(field.module || '').toLowerCase(); return Object.entries(V.modules).find(([alias])=>value.includes(alias))?.[1] || ''; }
+  const manualField = field => ['label','module','groupLabel','recordHint'].some(key=>manual(field[key] || '')) || /家庭情况|家庭信息|家庭关系/.test([field.module,field.groupLabel].join(' '));
+  function moduleHint(field) {
+    if(manualField(field))return 'manual';
+    const context=[field.module,field.groupLabel].join(' ');
+    if(/在校任职|校园任职|学生干部|获奖|奖励|论文|发表|出版|school[ _-]*posts|campus[ _-]*posts|awards|publications/i.test(context))return 'unsupported-module';
+    if(/^(毕业院校|毕业学校|最近毕业专业)$/.test(field.label || ''))return 'education';
+    const value=String(field.module || '').toLowerCase();
+    return Object.entries(V.modules).find(([alias])=>value.includes(alias))?.[1] || (value.trim()?'unsupported-module':'');
+  }
   function semantic(field) { return normal(String(field.semanticLabel || field.label || '').replace(/博士研究生|硕士研究生|博士|硕士|本科|专科/g,'')); }
   function recordMatches(fact,field) {
     const qs=qualifiers([field.label,field.groupLabel,field.recordHint].join(' '));
@@ -81,10 +89,24 @@
     return fact.module!=='education' || qs.every(q=>hint.includes(normal(q.replace('研究生',''))));
   }
   function labelMatches(fact,field) {
-    const label=semantic(field), aliases=[fact.label,...fact.aliases];
+    const label=semantic(field), aliases=[fact.label,...(fact.aliases || [])];
+    for(const [canonical,synonyms] of Object.entries(V.aliases)) {
+      if([canonical,...synonyms].some(a=>normal(a)===normal(fact.label)))aliases.push(...synonyms);
+    }
     return aliases.some(a=>normal(a)===label) || (fact.label==='GPA' && V.aliases.GPA.some(a=>label.startsWith(normal(a))) && /4[.．]0|5[.．]0|满分|scale/i.test(field.label));
   }
+  const personalGraduation = field => moduleHint(field)==='personal' && /^(毕业时间|毕业日期)$/.test(field.label || '');
+  function highestEducationEnd(p,field) {
+    const highest=p.facts.filter(f=>f.label==='最高学历' && !f.manual);
+    const levels=new Set(highest.map(f=>optionEquivalent(f.value,'学历')));
+    if(levels.size!==1)return [];
+    const level=[...levels][0];
+    const records=new Set(p.facts.filter(f=>f.module==='education' && f.label==='学历' && optionEquivalent(f.value,'学历')===level).map(f=>f.recordId));
+    if(records.size!==1)return [];
+    return p.facts.filter(f=>f.module==='education' && records.has(f.recordId) && labelMatches(f,field) && recordMatches(f,field));
+  }
   function candidates(p,field) {
+    if(personalGraduation(field))return highestEducationEnd(p,field);
     const mod=moduleHint(field);
     let result=p.facts.filter(f=>(!mod || f.module===mod || (mod==='education' && f.label.startsWith('最高'))) && labelMatches(f,field) && recordMatches(f,field));
     const hint=normal([field.groupLabel,field.recordHint].join(' '));
@@ -95,6 +117,8 @@
     return result;
   }
   function mappingMatches(p,field,fact) {
+    if(manualField(field))return false;
+    if(personalGraduation(field))return highestEducationEnd(p,field).some(f=>f.key===fact.key);
     const mod=moduleHint(field);
     if((mod && fact.module!==mod && !(mod==='education' && fact.label.startsWith('最高'))) || !recordMatches(fact,field))return false;
     const known=p.facts.some(f=>labelMatches(f,field)) || Object.values(V.aliases).flat().some(a=>normal(a)===semantic(field));
@@ -104,8 +128,13 @@
   }
   function optionEquivalent(value,label) {
     const n=normal(value);
-    const map=['学历','最高学历'].includes(label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:['学位','最高学位'].includes(label)?{'硕士学位':'硕士','学士学位':'学士','博士学位':'博士','工学学士':'学士','理学学士':'学士','文学学士':'学士','工学硕士':'硕士','理学硕士':'硕士','文学硕士':'硕士'}:{};
+    const map=['学历','最高学历'].includes(label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:['学位','最高学位'].includes(label)?{'硕士学位':'硕士','学士学位':'学士','博士学位':'博士','工学学士':'学士','理学学士':'学士','文学学士':'学士','工学硕士':'硕士','理学硕士':'硕士','文学硕士':'硕士'}:label==='学历类型'?{'普通全日制':'全日制','全日制普通':'全日制'}:{};
     return map[n] || n;
+  }
+  function numericEquivalent(a,b,label) {
+    if(!/^(?:GPA|平均绩点|绩点|考试成绩|考试分数|证书成绩|英语四级|英语六级|四级成绩|六级成绩|身高(?:cm)?|体重(?:kg)?)$/i.test(label))return false;
+    const numeric=v=>/^-?\d+(?:\.\d+)?$/.test(String(v).trim());
+    return numeric(a) && numeric(b) && Number.isFinite(Number(a)) && Number(a)===Number(b);
   }
   function mask(value,label) {
     const s=String(value);
@@ -138,7 +167,7 @@
       const unsupportedReasons={'disabled-or-readonly':'网站锁定了此字段，请先在网站中解除或修改关联记录。','custom-date':'已识别日期字段；此网站的日历控件需手动选择。','split-date':'已识别分开的年月选项；请按对应经历手动选择，避免混填日期。','unlabeled':'未找到可靠的字段标题，请在网页中确认。','custom-selector':'已识别下拉字段，但暂不能可靠读取选项，请手动选择。'};
       if(field.unsupported || !['text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'].includes(kind))return {...row,status:'unsupported',reason:unsupportedReasons[field.unsupported] || '控件尚不支持可靠填入。'};
       const deferredSelect=kind==='combobox' && ['moka-select','phoenix-select','phoenix-date'].includes(field.adapter);
-      if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length && !deferredSelect) || manual(row.label))return {...row,status:'manual',reason:'上传、协议、家庭/联系人或复杂控件需要人工操作。'};
+      if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length && !deferredSelect) || manualField(field))return {...row,status:'manual',reason:'上传、协议、家庭/联系人或复杂控件需要人工操作。'};
       const list=Object.hasOwn(mappings,field.id)?[facts.get(mappings[field.id])]:candidates(p,field);
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
       if(!list.length)return row;
@@ -188,7 +217,7 @@
       if(reason)return {...row,status:'manual',reason};
       const existing=String(field.value ?? ''), proposed=String(row.optionValue ?? value);
       const note=row.dateFallbackUsed?' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。':'';
-      if(existing && (existing===proposed || existing===value || (['select','radio','combobox'].includes(kind) && optionEquivalent(existing,fact.label)===optionEquivalent(value,fact.label))))return {...row,status:'already',reason:existing===value?'已有值与资料相同。'+note:'已有选项与资料语义一致，无需覆盖。'+note};
+      if(existing && (existing===proposed || existing===value || numericEquivalent(existing,value,fact.label) || (['select','radio','combobox'].includes(kind) && optionEquivalent(existing,fact.label)===optionEquivalent(value,fact.label))))return {...row,status:'already',reason:existing===value?'已有值与资料相同。'+note:'已有选项与资料语义一致，无需覆盖。'+note};
       if(existing)return {...row,status:'conflict',reason:'已有值与资料不同，保留现值，需明确选择覆盖。'+note};
       return {...row,status:'ready',reason:(deferredSelect?'资料已匹配；填写时展开此字段菜单，仅选择唯一对应选项，未找到则保留原值。':'事实、记录及控件约束已确认。')+note};
     });
@@ -210,7 +239,7 @@
   function agentRequest(p,scan,plan,model='') {
     const pending=new Set(plan.rows.filter(r=>['missing','ambiguous'].includes(r.status)).map(r=>r.fieldId));
     const pick=(item,keys)=>Object.fromEntries(keys.filter(k=>item[k]!==undefined).map(k=>[k,item[k]]));
-    return {protocol:1,op:'map',model,fields:scan.fields.filter(f=>pending.has(f.id)).map(f=>pick(f,['id','label','module','groupLabel','recordHint','type','options'])),allowedFacts:p.facts.filter(f=>!f.manual).map(f=>pick(f,['key','label','module','recordId','recordLabel','recordHint','aliases']))};
+    return {protocol:1,op:'map',model,fields:scan.fields.filter(f=>pending.has(f.id) && !manualField(f) && moduleHint(f)!=='unsupported-module').map(f=>pick(f,['id','label','module','groupLabel','recordHint','type','options'])),allowedFacts:p.facts.filter(f=>!f.manual).map(f=>pick(f,['key','label','module','recordId','recordLabel','recordHint','aliases']))};
   }
   function safeAgentMappings(p,scan,mappings) {
     const accepted={}, rejected=[];
@@ -218,7 +247,7 @@
       const field=scan.fields.find(f=>f.id===id), fact=p.facts.find(f=>f.key===key);
       if(!field || !fact || !mappingMatches(p,field,fact)) {rejected.push(id);continue;}
       // A model may not choose the first repeated education/work card by guesswork.
-      const related=p.facts.filter(f=>f.module===fact.module && f.label===fact.label && recordMatches(f,field));
+      const related=personalGraduation(field)?highestEducationEnd(p,field):p.facts.filter(f=>f.module===fact.module && f.label===fact.label && recordMatches(f,field));
       if(['education','internship','project'].includes(fact.module) && new Set(related.map(f=>f.recordId)).size>1) {
         const hint=normal([field.label,field.groupLabel,field.recordHint].join(' '));
         const matching=related.filter(f=>[f.recordLabel,f.recordHint,...qualifiers(f.recordHint)].some(t=>normal(t) && hint.includes(normal(t))));

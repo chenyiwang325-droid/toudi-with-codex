@@ -27,7 +27,7 @@ ALIASES={
  'GPA':['GPA','平均绩点','绩点','grade point average'], '年级排名':['年级排名','专业排名','class rank'],
  '英语四级':['英语四级','四级成绩','cet4','cet-4'], '英语六级':['英语六级','六级成绩','cet6','cet-6'],
  '六级获证日期':['六级获证日期','六级考试日期'],
- '单位':['单位','公司','公司名称','实习单位','雇主','company','company name','employer','employer name'], '部门':['部门','department'],
+ '单位':['单位','单位名称','公司','公司名称','实习单位','雇主','company','company name','employer','employer name'], '部门':['部门','department'],
  '职务':['职务','职位','岗位','position','job title'], '工作地点':['工作地点','实习地点','work location'],
  '开始':['开始','开始时间','开始日期','实习开始时间','start date','from'],
  '结束':['结束','结束时间','结束日期','实习结束时间','end date','to'],
@@ -263,11 +263,19 @@ def mask(value,label):
     return '***'
 
 
+def manual_field(field):
+    return any(manual_label(field.get(key,'')) for key in ('label','module','groupLabel','recordHint')) or bool(re.search(r'家庭情况|家庭信息|家庭关系',' '.join(str(field.get(key,'')) for key in ('module','groupLabel'))))
+
+
 def module_hint(field):
     text=str(field.get('module','')).casefold()
+    context=' '.join(str(field.get(key,'')) for key in ('module','groupLabel'))
+    if manual_field(field):return 'manual'
+    if re.search(r'在校任职|校园任职|学生干部|获奖|奖励|论文|发表|出版|school[ _-]*posts|campus[ _-]*posts|awards|publications',context,re.I):return 'unsupported-module'
+    if re.fullmatch(r'毕业院校|毕业学校|最近毕业专业',str(field.get('label',''))):return 'education'
     for alias,module in MODULES.items():
         if alias in text:return module
-    return None
+    return 'unsupported-module' if text.strip() else None
 
 
 def semantic_label(field):
@@ -292,11 +300,29 @@ def record_matches(fact,field):
 def label_matches(fact,field):
     label,_=semantic_label(field)
     aliases=[fact['label'],*fact.get('aliases',[])]
+    # Old packs may have custom or incomplete aliases. Shared synonyms remain live.
+    fact_label=normalized(fact['label'])
+    for canonical, synonyms in ALIASES.items():
+        if fact_label in {normalized(canonical),*(normalized(a) for a in synonyms)}:
+            aliases.extend(synonyms)
     grading_label=fact['label']=='GPA' and any(label.startswith(normalized(a)) for a in ALIASES['GPA']) and bool(re.search(r'4[.．]0|5[.．]0|满分|scale',str(field.get('label','')),re.I))
     return label in {normalized(a) for a in aliases} or grading_label
 
 
+def personal_graduation(field):
+    return module_hint(field)=='personal' and field.get('label') in ('毕业时间','毕业日期')
+
+
+def highest_education_end(profile,field):
+    levels={option_equivalent(f['value'],'学历') for f in profile['facts'] if f['label']=='最高学历' and not f.get('manual')}
+    if len(levels)!=1:return []
+    records={f['recordId'] for f in profile['facts'] if f['module']=='education' and f['label']=='学历' and option_equivalent(f['value'],'学历') in levels}
+    if len(records)!=1:return []
+    return [f for f in profile['facts'] if f['module']=='education' and f['recordId'] in records and label_matches(f,field) and record_matches(f,field)]
+
+
 def matching_facts(profile,field):
+    if personal_graduation(field):return highest_education_end(profile,field)
     module=module_hint(field); candidates=[]
     for fact in profile['facts']:
         if module and fact['module']!=module and not (module=='education' and fact['label'].startswith('最高')):continue
@@ -314,6 +340,8 @@ def matching_facts(profile,field):
 
 
 def mapping_matches(profile,field,fact):
+    if manual_field(field):return False
+    if personal_graduation(field):return any(f['key']==fact['key'] for f in highest_education_end(profile,field))
     module=module_hint(field)
     if module and fact['module']!=module and not (module=='education' and fact['label'].startswith('最高')):return False
     if not record_matches(fact,field):return False
@@ -331,9 +359,16 @@ def option_equivalent(value,label):
     text=normalized(value)
     if label in ('学历','最高学历'):
         return {'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}.get(text,text)
+    if label=='学历类型':return {'普通全日制':'全日制','全日制普通':'全日制'}.get(text,text)
     if label in ('学位','最高学位'):
         return {'硕士学位':'硕士','学士学位':'学士','博士学位':'博士','工学学士':'学士','理学学士':'学士','文学学士':'学士','工学硕士':'硕士','理学硕士':'硕士','文学硕士':'硕士'}.get(text,text)
     return text
+
+
+def numeric_equivalent(a,b,label):
+    if not re.fullmatch(r'GPA|平均绩点|绩点|考试成绩|考试分数|证书成绩|英语四级|英语六级|四级成绩|六级成绩|身高(?:cm)?|体重(?:kg)?',label,re.I):return False
+    if not all(re.fullmatch(r'-?\d+(?:\.\d+)?',str(value).strip()) for value in (a,b)):return False
+    return Decimal(str(a).strip())==Decimal(str(b).strip())
 
 
 def plan_fields(profile,scan,mappings=None,today=None):
@@ -349,7 +384,7 @@ def plan_fields(profile,scan,mappings=None,today=None):
         kind=field.get('type','text'); label=row['label']
         if field.get('unsupported') or kind not in ('text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'):
             row.update(status='unsupported',reason='控件尚不支持可靠填入。')
-        elif kind in ('file','checkbox') or (kind=='combobox' and not field.get('options')) or manual_label(label):row.update(status='manual',reason='上传、协议、家庭/联系人或复杂控件需要人工操作。')
+        elif kind in ('file','checkbox') or (kind=='combobox' and not field.get('options')) or manual_field(field):row.update(status='manual',reason='上传、协议、家庭/联系人或复杂控件需要人工操作。')
         else:
             candidates=[facts[mappings[field['id']]]] if field['id'] in mappings else matching_facts(profile,field)
             if len(candidates)>1:row.update(status='ambiguous',reason='有多个资料记录，分组或记录提示无法唯一确认，请选择事实。')
@@ -412,7 +447,7 @@ def plan_fields(profile,scan,mappings=None,today=None):
                 else:
                     existing=str(field.get('value') or ''); proposed=str(row.get('optionValue',value))
                     note=' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。' if row.get('dateFallbackUsed') else ''
-                    if existing and (existing==proposed or existing==value):row.update(status='already',reason='已有值与资料相同。'+note)
+                    if existing and (existing==proposed or existing==value or numeric_equivalent(existing,value,fact['label'])):row.update(status='already',reason='已有值与资料相同。'+note)
                     elif existing:row.update(status='conflict',reason='已有值与资料不同，保留现值，需明确选择覆盖。'+note)
                     else:
                         row.update(status='ready',reason='事实、记录及控件约束已确认。'+note)

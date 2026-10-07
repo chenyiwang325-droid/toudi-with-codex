@@ -21,6 +21,43 @@ class FillingProfileTests(unittest.TestCase):
     def write(self): (self.root/'网申信息库.json').write_text(json.dumps(self.data))
     def field(self,label,**kw):return {'id':'field','label':label,'type':'text','module':'','value':'',**kw}
     def plan(self,field,profile='general',mappings=None):return plan_fields(load_profile(self.root,profile),{'origin':'https://example.invalid','path':'/apply','fingerprint':'fixture','fields':[field]},mappings)
+    def test_module_boundaries_and_live_shared_aliases(self):
+        from filling_profile import matching_facts, mapping_matches
+        profile={'facts':[
+            {'key':'name','label':'姓名','module':'personal','recordId':'','aliases':['姓名']},
+            {'key':'start','label':'入学时间','module':'education','recordId':'edu','aliases':['入学时间']},
+            {'key':'end','label':'毕业时间','module':'education','recordId':'edu','aliases':['毕业时间']},
+            {'key':'unit','label':'单位','module':'internship','recordId':'job','aliases':['单位']},
+            {'key':'home','label':'现居地','module':'personal','recordId':'','aliases':['现居地']},
+            {'key':'project','label':'开始日期','module':'project','recordId':'project','aliases':['开始日期']}]}
+        for field in [self.field('姓名',module='personal',groupLabel='家庭成员'),self.field('开始时间',module='project',groupLabel='在校任职'),self.field('开始时间',module='awards'),self.field('结束时间',module='publications'),self.field('开始时间',module='other-experience')]:
+            self.assertEqual(matching_facts(profile,field),[])
+            self.assertTrue(all(not mapping_matches(profile,field,fact) for fact in profile['facts']))
+        for label,module,key in [('开始时间','education','start'),('结束时间','education','end'),('单位名称','internship','unit'),('现居住地','personal','home')]:
+            self.assertEqual([f['key'] for f in matching_facts(profile,self.field(label,module=module))],[key])
+        self.assertEqual(self.plan(self.field('姓名',module='personal',groupLabel='家庭成员'))['rows'][0]['status'],'manual')
+
+    def test_highest_graduation_and_numeric_equality(self):
+        from filling_profile import matching_facts,mapping_matches,option_equivalent,numeric_equivalent
+        profile=load_profile(self.root)
+        profile['facts']=[f for f in profile['facts'] if f['label']!='最高学历']
+        field=self.field('毕业时间',module='personal')
+        self.assertEqual(matching_facts(profile,field),[])
+        profile['facts'].append({'key':'fixture.highest','label':'最高学历','module':'personal','value':'硕士研究生','recordId':'','aliases':['最高学历']})
+        ends=matching_facts(profile,field)
+        self.assertEqual(len(ends),1)
+        self.assertEqual(ends[0]['value'],'2027-06')
+        self.assertTrue(mapping_matches(profile,field,ends[0]))
+        other=next(f for f in profile['facts'] if f['label']=='结束日期' and f['value']=='2024-06')
+        self.assertFalse(mapping_matches(profile,field,other))
+        profile['facts'].append({'key':'second.master','label':'学历','module':'education','value':'硕士','recordId':'second','aliases':['学历']})
+        self.assertEqual(matching_facts(profile,field),[])
+        self.assertFalse(mapping_matches(profile,field,ends[0]))
+        self.assertEqual(option_equivalent('普通全日制','学历类型'),option_equivalent('全日制','学历类型'))
+        self.assertTrue(numeric_equivalent('554.00000','554','考试成绩'))
+        self.assertFalse(numeric_equivalent('554.00000','554','证件号码'))
+        self.assertFalse(numeric_equivalent('3.8','38','GPA'))
+
     def test_missing_source_and_summary_never_contain_personal_values(self):
         summary=profile_summary(load_profile(self.root)); rendered=json.dumps(summary)
         for private in ('Fixture User','12345678901','fixture@example.invalid','Private address','Graduate University'):self.assertNotIn(private,rendered)

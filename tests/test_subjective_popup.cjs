@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const html=fs.readFileSync(path.join(__dirname,'../app/browser-extension/popup.html'),'utf8');
+const nodes=new Map([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],{hidden:false,value:'',innerHTML:'',textContent:'',disabled:false,dataset:{},handlers:{},classList:{toggle(){}},addEventListener(type,fn){this.handlers[type]=fn;},replaceChildren(){},insertAdjacentHTML(){}}]));
+const row={fieldId:'q',label:'个人评价',module:'personal',status:'missing',reason:'待补充'},plan={origin:'https://fixture.invalid',path:'/application',profileId:'general',rows:[row],statusCounts:{missing:1},choices:[]};
+const fixture={startedAt:1,plan,subjectiveFields:['q']},pref={profile:'general',agentMode:'codex',agentModel:'fixture-model'};let copied='',calls=[];
+const c={document:{getElementById:id=>nodes.get(id),querySelectorAll:()=>[],querySelector:()=>null},window:{scrollTo(){},addEventListener(){}},setInterval:()=>1,clearInterval(){},Option:function(){},TouDiAgentConfig:{normalize:()=>pref},navigator:{clipboard:{writeText:async v=>copied=v}},chrome:{runtime:{sendMessage:async msg=>{calls.push(msg);if(msg.op==='state')return {value:{state:fixture,preferences:pref,profile:{count:1,profiles:[{id:'general',label:'合成资料',count:1}]}}};if(msg.op==='answer-task')return {value:{task:'fixture question sources'}};if(msg.op==='answer-generate'){fixture.answerDraft={fieldId:'q',answer:'合成草稿',sourceKeys:['project.description'],sourceLabels:['合成项目 · 项目职责'],uncertainties:['缺少结果'],approved:false};return {value:fixture};}if(msg.op==='answer-approve'){fixture.answerDraft={...fixture.answerDraft,answer:msg.answer,approved:true};return {value:fixture};}throw Error(msg.op);}}}};
+vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/browser-extension/popup.js'),'utf8'),c);
+(async()=>{
+ await new Promise(r=>setImmediate(r));
+ vm.runInContext("answerField='q'; renderAnswer();",c);
+ assert.equal(nodes.get('answerBox').hidden,false);assert.equal(nodes.get('answerApprove').disabled,true);
+ assert(nodes.get('review').innerHTML.includes('根据我的资料回答此题'));
+ await nodes.get('answerCopy').handlers.click();assert.equal(copied,'fixture question sources');
+ await nodes.get('answerGenerate').handlers.click();assert.equal(nodes.get('answerText').value,'合成草稿');assert.equal(fixture.answerDraft.approved,false);assert(nodes.get('answerEvidence').textContent.includes('合成项目 · 项目职责'));assert(!nodes.get('answerEvidence').textContent.includes('project.description'));assert(nodes.get('answerEvidence').textContent.includes('缺少结果'));
+ nodes.get('answerText').value='用户编辑后的草稿';await nodes.get('answerApprove').handlers.click();
+ assert.equal(fixture.answerDraft.answer,'用户编辑后的草稿');assert.equal(fixture.answerDraft.approved,true);assert(nodes.get('review').innerHTML.includes('草稿已采纳'));
+ assert(nodes.get('review').innerHTML.includes('data-field="q"'));assert(!nodes.get('review').innerHTML.includes(' checked'));
+ vm.runInContext('answerField=undefined;renderAnswer();',c);assert.equal(nodes.get('answerBox').hidden,false);assert.equal(nodes.get('answerText').value,'用户编辑后的草稿');
+ assert(!calls.some(c=>c.op==='fill'));console.log('PASS synthetic popup: explicit single-question copy/generate, editable preview, adoption and unchecked fill action');
+})().catch(e=>{console.error(e);process.exitCode=1});

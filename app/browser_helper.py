@@ -14,7 +14,7 @@ HOST='com.toudi.filling.codex'
 EXTENSION_ID='edfgnahdkpobmkhckjhadadnlbhpbpmd'
 ORIGIN='chrome-extension://'+EXTENSION_ID+'/'
 MAX_MESSAGE=512*1024
-VERSION='0.5.0'
+VERSION='0.5.1'
 
 
 def validate_request(request):
@@ -30,6 +30,14 @@ def validate_request(request):
             raise ValueError('请先读取当前工作区和资料版本。')
         from profile_store import validate_pack
         validate_pack(request.get('pack'))
+        return request
+    if request.get('op') == 'answer':
+        if set(request)!={'protocol','requestId','op','model','question','profileId','sourceVersion','sources'}:
+            raise ValueError('问答请求不接受路径或任意操作。')
+        if not isinstance(request.get('model'),str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}',request['model']):
+            raise ValueError('请明确选择有效的 Codex 模型。')
+        from codex_mapping import validate_answer_request
+        validate_answer_request({k:request[k] for k in ('question','profileId','sourceVersion','sources')})
         return request
     if request.get('op') == 'adapt':
         if set(request) != {'protocol', 'requestId', 'op', 'model', 'candidates'}:
@@ -85,6 +93,10 @@ def operation(request):
                 result=subprocess.run(['open',str(app)],capture_output=True,timeout=10)
                 if not result.returncode:return {'opened':True}
         raise ValueError('未找到已安装的 TouDi App，请通过「中控台安装与使用」安装后打开。')
+    if request['op'] == 'answer':
+        from codex_mapping import answer_with_codex
+        answer,provider=answer_with_codex({k:request[k] for k in ('question','profileId','sourceVersion','sources')},model=request['model'])
+        return {'answer':answer,'provider':provider,'helperVersion':VERSION}
     if request['op'] == 'adapt':
         from codex_mapping import adapt_with_codex
         hints, provider = adapt_with_codex(request['candidates'], model=request['model'])

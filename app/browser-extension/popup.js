@@ -1,7 +1,8 @@
 const el = id => document.getElementById(id);
 const escapeHtml = text => String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const labels = {ready:'可填写',already:'已一致',conflict:'已有内容',manual:'人工核对',missing:'资料待补',ambiguous:'需选记录',unsupported:'需手动',verified:'核验通过',failed:'未通过'};
-const reasons = {'option-not-unique':'存在多个同名选项，需要手动确认','menu-not-unique':'出现多个选项面板，未继续操作','menu-not-associated':'未能确定当前字段对应的选项面板','selector-layout-unsupported':'该选项面板结构暂不支持，请手动选择','multiple-selection-unsupported':'多选集合需手动核对，未改变已有选择','option-confirm-unavailable':'未找到可用的确认按钮，请手动核对','date-precision-required':'资料需要精确到日，未补造日期','date-control-unsupported':'此日期控件需手动选择','date-not-retained':'日期未被控件保留，请手动核对','invalid-date':'日期不符合日历规则','readback-matched':'写入后读回一致','value-not-retained':'网站未保留填写值，请手动检查','validation-failed':'网站字段校验未通过','field-disappeared':'字段已隐藏或移除，请重新识别','page-changed':'网页已切换，请重新识别','structure-changed':'表单结构已变化，请重新识别','value-changed':'你已修改此字段，保留当前值','existing-value':'已有内容未覆盖','field-changed':'字段内容或控件已变化','disabled-or-readonly':'字段只读或已停用','option-not-found':'页面没有该选项','option-disabled':'对应选项不可用','maxlength-exceeded':'内容超过网站长度限制','scan-required':'需要重新识别当前页面'};
+const reasons = {'family-member':'家庭成员资料需单独确认，不套用本人信息','option-not-selected':'网站未选中目标选项，请手动检查','option-not-unique':'存在多个同名选项，需要手动确认','menu-not-unique':'出现多个选项面板，未继续操作','menu-not-associated':'未能确定当前字段对应的选项面板','selector-layout-unsupported':'该选项面板结构暂不支持，请手动选择','multiple-selection-unsupported':'多选集合需手动核对，未改变已有选择','option-confirm-unavailable':'未找到可用的确认按钮，请手动核对','date-precision-required':'资料需要精确到日，未补造日期','date-control-unsupported':'此日期控件需手动选择','date-not-retained':'日期未被控件保留，请手动核对','invalid-date':'日期不符合日历规则','readback-matched':'写入后读回一致','value-not-retained':'网站未保留填写值，请手动检查','validation-failed':'网站字段校验未通过','field-disappeared':'字段已隐藏或移除，请重新识别','page-changed':'网页已切换，请重新识别','structure-changed':'表单结构已变化，请重新识别','value-changed':'你已修改此字段，保留当前值','existing-value':'已有内容未覆盖','field-changed':'字段内容或控件已变化','disabled-or-readonly':'字段只读或已停用','option-not-found':'页面没有该选项','option-disabled':'对应选项不可用','maxlength-exceeded':'内容超过网站长度限制','scan-required':'需要重新识别当前页面'};
+let answerField;
 let state, busy = false, agentBusy = false, hasProfile = false, profileSummary;
 let pref = TouDiAgentConfig.normalize();
 async function send(op, data = {}) {
@@ -15,7 +16,7 @@ async function task(fn, text) {
   busy = true;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = true);notice(text);
   try { await fn(); }
   catch (e) { notice(e.message, true); }
-  finally {busy = false;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = false);updateAgentControls();selection();}
+  finally {busy = false;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = false);updateAgentControls();selection();renderAnswer();}
 }
 function showSync(sync){const labels={pending:'资料已保存在本机，等待与中控台同步',conflict:'资料同步有冲突，请到资料与设置核对双方', 'workspace-changed':'中控台工作区已切换，请重新连接核对'};const text=labels[sync?.status] || '';el('workspaceSync').hidden=!text;el('workspaceSync').textContent=text;}
 function sourceLabel(){if(profileSummary)el('sourceStatus').textContent=`资料更新 ${String(profileSummary.savedAt || '未注明').slice(0,10)} · 当前版本 ${profileSummary.profiles.find(p=>p.id===el('profile').value)?.count || 0} 项`;}
@@ -43,7 +44,7 @@ function renderStructureFeedback(){
 }
 function render() {
   const plan = state?.plan;
-  renderAgentFeedback();renderStructureFeedback();
+  renderAgentFeedback();renderStructureFeedback();renderAnswer();
   el('review').hidden = !plan;el('agent').hidden = !plan;el('actions').hidden = !plan;el('result').hidden = !state?.report;
   if (plan) {
     const counts = plan.statusCounts || {};
@@ -52,10 +53,11 @@ function render() {
     for (const row of plan.rows) {const key = row.groupLabel || ({personal:'个人信息',education:'教育经历',work:'工作经历',projects:'项目经历'}[row.module] || '其他字段');if (!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
     el('profile').value = plan.profileId;
     el('review').innerHTML = `<h2>核对本页填写计划</h2><div class="site">${escapeHtml(plan.origin + plan.path)}</div>${state.timings?`<p class="caption">引擎 ${escapeHtml(state.engineVersion || '未知')} · 页面扫描 ${(state.timings.scanMs/1000).toFixed(2)} 秒 · 本地计划 ${(state.timings.totalMs/1000).toFixed(2)} 秒</p>`:''}<div class="summary"><span><b>${plan.rows.length}</b>识别字段</span><span><b>${counts.ready || 0}</b>可填写</span><span><b>${counts.already || 0}</b>已有一致</span><span><b>${pending}</b>待核对</span></div>` + [...groups].map(([group, rows]) => `<h3>${escapeHtml(group)}</h3>` + rows.map(row => {
-      const selectable = ['ready','conflict'].includes(row.status) && row.factKey;
+      const draft=state.answerDraft?.approved && state.answerDraft.fieldId===row.fieldId?state.answerDraft:null;
+      const selectable = (['ready','conflict'].includes(row.status) && row.factKey) || !!draft;
       const choices = ['missing','ambiguous'].includes(row.status) ? `<select data-map="${escapeHtml(row.fieldId)}" aria-label="为${escapeHtml(row.label)}选择资料字段"><option value="">选择已确认资料…</option>${plan.choices.map(choice => `<option value="${escapeHtml(choice.key)}">${escapeHtml(choice.label)}</option>`).join('')}</select>` : '';
-      const value = row.displayValue;
-      return `<div class="field"><div class="field-top">${selectable ? `<input type="checkbox" data-field="${escapeHtml(row.fieldId)}" data-overwrite="${row.status === 'conflict'}" aria-label="${row.status === 'conflict' ? '覆盖已有' : '填写'}${escapeHtml(row.label)}" ${row.status === 'ready' ? 'checked' : ''}>` : ''}<button class="field-title" data-jump="${escapeHtml(row.fieldId)}" title="定位网页字段">${escapeHtml(row.label || '未命名字段')}</button><span class="state ${row.status}">${labels[row.status] || row.status}</span></div>${value ? `<div class="value">${escapeHtml(value)}</div>` : ''}<div class="reason">${escapeHtml(row.reason)}</div>${choices}</div>`;
+      const value = draft?.answer || row.displayValue;
+      return `<div class="field"><div class="field-top">${selectable ? `<input type="checkbox" data-field="${escapeHtml(row.fieldId)}" data-overwrite="${row.status === 'conflict' || !!(draft && draft.originalValue)}" aria-label="${row.status === 'conflict' ? '覆盖已有' : '填写'}${escapeHtml(row.label)}" ${row.status === 'ready' && !draft ? 'checked' : ''}>` : ''}<button class="field-title" data-jump="${escapeHtml(row.fieldId)}" title="定位网页字段">${escapeHtml(row.label || '未命名字段')}</button><span class="state ${row.status}">${draft?'草稿已采纳':labels[row.status] || row.status}</span></div>${value ? `<div class="value">${escapeHtml(value)}</div>` : ''}<div class="reason">${escapeHtml(row.reason)}</div>${choices}${state.subjectiveFields?.includes(row.fieldId)?`<button data-answer="${escapeHtml(row.fieldId)}">根据我的资料回答此题</button>`:""}</div>`;
     }).join('')).join('');
     if (document.querySelector('[data-map]')) el('review').insertAdjacentHTML('beforeend','<label class="check"><input id="rememberSelections" type="checkbox">记住本页所选匹配</label><button id="applyChoices">应用所选匹配并重新核对</button>');
 
@@ -115,6 +117,7 @@ el('scan').addEventListener('click', async()=>{
 el('profile').addEventListener('change', () => task(async()=>{pref=await send('preferences',{preferences:{profile:el('profile').value}});state=null;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
 el('review').addEventListener('change', selection);
 el('review').addEventListener('click', event => {
+  const answer=event.target.closest('[data-answer]');if(answer){answerField=answer.dataset.answer;renderAnswer();el('answerBox').scrollIntoView?.({block:'start',behavior:'smooth'});}
   const jump=event.target.closest('[data-jump]');
   if(jump)task(()=>send('highlight',{fieldId:jump.dataset.jump}),'正在定位网页字段…');
   if(event.target.id==='applyChoices')task(async()=>{const mappings=Object.fromEntries([...document.querySelectorAll('[data-map]')].filter(select=>select.value).map(select=>[select.dataset.map,select.value]));state=await send('remap',{mappings,remember:el('rememberSelections').checked});render();notice('匹配已应用，请再次核对计划。');},'正在核对所选资料…');
@@ -166,3 +169,9 @@ const agentPoll=setInterval(async()=>{
   }catch(_){}
 },1200);
 window.addEventListener('unload',()=>clearInterval(agentPoll));
+
+function renderAnswer(){if(!answerField && state?.answerDraft)answerField=state.answerDraft.fieldId;const row=state?.plan?.rows.find(r=>r.fieldId===answerField),d=state?.answerDraft && state.answerDraft.fieldId===answerField?state.answerDraft:null;el('answerBox').hidden=!row;if(!row)return;el('answerQuestion').textContent=row.label;el('answerText').value=d?.answer || '';el('answerEvidence').textContent=d?'依据：'+(d.sourceLabels || ['当前已验证资料']).join('、')+'；待确认：'+(d.uncertainties.join('；') || '无')+(d.approved?' · 已采纳':' · 尚未采纳'):'';el('answerGenerate').hidden=pref.agentMode!=='codex' || !pref.agentModel;el('answerApprove').disabled=!d || busy;}
+el('answerGenerate').addEventListener('click',()=>task(async()=>{state=await send('answer-generate',{fieldId:answerField});renderAnswer();notice('回答草稿已生成，请核对依据并编辑后采纳。');},'正在根据当前资料生成单题草稿…'));
+el('answerCopy').addEventListener('click',()=>task(async()=>{const value=await send('answer-task',{fieldId:answerField});await navigator.clipboard.writeText(value.task);notice('单题任务已复制，包含经过筛选的当前版本经历资料。');},'正在准备单题任务…'));
+el('answerImport').addEventListener('click',()=>task(async()=>{state=await send('answer-import',{fieldId:answerField,result:JSON.parse(el('answerImportText').value)});renderAnswer();notice('草稿已导入，请预览并采纳。');},'正在验证草稿来源和字数…'));
+el('answerApprove').addEventListener('click',()=>task(async()=>{state=await send('answer-approve',{fieldId:answerField,answer:el('answerText').value});render();renderAnswer();notice('草稿已采纳，请勾选对应字段再填入。');},'正在采纳草稿…'));

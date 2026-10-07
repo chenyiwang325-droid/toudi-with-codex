@@ -73,14 +73,14 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
   }
   const phoenixField=node=>node.closest('.form-item--phoenix');
   const phoenixTitle=field=>compact(field?.querySelector(':scope > .form-item__title .form-item__text')?.textContent);
-  const moduleOf=title=>/教育|学历/.test(title)?'education':/实习|工作经历|任职/.test(title)?'work':/项目|科研|实践/.test(title)?'projects':/个人|基本|求职意向/.test(title)?'personal':/语言|外语|证书/.test(title)?'language':'other';
+  const moduleOf=title=>/教育|学历/.test(title)?'education':/实习|工作经历|任职/.test(title)?'work':/在校职务|学生工作/.test(title)?'campus-role':/获奖|荣誉/.test(title)?'awards':/论文|专著|发表/.test(title)?'publications':/家庭|亲属/.test(title)?'family':/项目|科研|实践/.test(title)?'projects':/个人|基本|求职意向/.test(title)?'personal':/语言|外语|证书/.test(title)?'language':'other';
   function phoenixContext(field) {
     const record=field.closest('.ux-standard-form') || field.closest('.form-part') || field.parentElement;
     if(contexts.has(record))return contexts.get(record);
     let section=null,title='';
     for(let p=record?.parentElement,depth=0;p&&depth<8;p=p.parentElement,depth++) {
       const headings=[...p.children].filter(n=>!n.querySelector('.form-item,input,textarea,select') && !n.matches('input,textarea,select')).map(n=>compact(n.textContent));
-      title=headings.find(t=>/^(个人信息|基本信息|求职意向|教育经历|教育背景|工作经历|实习经历|实习经验|项目经历|项目经验|在校经历|在校职务|语言能力|外语能力|语言及证书|获奖情况|荣誉奖励|科研经历|社会实践|家庭成员|家庭情况|自我评价|其他信息|附加信息|附件|培训经历)$/.test(t)) || '';
+      title=headings.find(t=>/^(个人信息|基本信息|求职意向|教育经历|教育背景|工作经历|实习经历|实习经验|项目经历|项目经验|在校经历|在校职务|在校实践|论文\/专著|语言能力|外语能力|语言及证书|获奖情况|荣誉奖励|科研经历|社会实践|家庭成员|家庭情况|自我评价|其他信息|附加信息|附件|培训经历)$/.test(t)) || '';
       if(title){section=p;break;}
     }
     const records=section?[...section.querySelectorAll('.ux-standard-form')]:[record];
@@ -112,7 +112,7 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
   function describe(node){if(!descriptions.has(node))descriptions.set(node,describeRaw(node));return descriptions.get(node);}
   const disabled=node=>!!node.closest('[class*="--disabled"],[class*="--statusDisable"],[aria-disabled="true"],fieldset[disabled]');
   const disabledOption=node=>disabled(node)||!!node.closest('a[href],button[type="submit"],[class*="Disabled"],[class*="disabled"]');
-  const equivalence=(v,label)=>{const text=String(v).normalize('NFKC').trim();const dict=/^(最高)?学历$/.test(label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:{};return dict[text]||text;};
+  const equivalence=(v,label)=>{const text=String(v).normalize('NFKC').trim();const dict=/^(最高)?学历$/.test(label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:/^(最高)?学位$/.test(label)?{'硕士学位':'硕士','学士学位':'学士','博士学位':'博士','工学学士':'学士','理学学士':'学士'}:/学习形式|学历类型/.test(label)?{'普通全日制':'全日制'}:{};return dict[text]||text;};
   const layers=doc=>[...doc.querySelectorAll('.common-unmodeled-layer')].filter(visible);
   function footerButton(layer,text){return [...layer.querySelectorAll('.selector-footer-button .phoenix-button,.area-footer-button .phoenix-button')].filter(n=>compact(n.textContent)===text);}
   async function openPhoenix(entry) {
@@ -154,12 +154,35 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
         if(dateValue(phoenixRead(entry.node))!==target)throw Error('date-not-retained');
         confirmed=true;return target;
       }
+      if(layer.querySelector('.phoenix-selectList')){
+        const menu=layer.querySelector('.phoenix-selectList');
+        if(menu.querySelector('[class*="multiple"],[class*="multiLabel"]'))throw Error('multiple-selection-unsupported');
+        const search=menu.querySelector('.phoenix-selectList__searchWrapper input');
+        if(search){setNative(search,equivalence(target,entry.field.label));await wait(250);}
+        let matches=[];
+        for(let i=0;i<20;i++){
+          matches=[...menu.querySelectorAll('.phoenix-selectList__listItem')].filter(visible).filter(n=>equivalence(compact(n.querySelector('.phoenix-selectList__singleLabel')?.textContent || n.textContent),entry.field.label)===equivalence(target,entry.field.label));
+          if(matches.length)break;await wait(60);
+        }
+        if(matches.length!==1)throw Error(matches.length?'option-not-unique':'option-not-found');
+        const chosen=matches[0];if(disabledOption(chosen))throw Error('option-disabled');
+        chosen.click();confirmed=true;await wait(120);
+        const actual=phoenixRead(entry.node);if(equivalence(actual,entry.field.label)!==equivalence(target,entry.field.label))throw Error('value-not-retained');return actual;
+      }
       const area=!!layer.querySelector('.area-selector-container'),constant=!!layer.querySelector('.constant-main-selector-container');
       if(!area&&!constant)throw Error('selector-layout-unsupported');
       // Search only in this newly opened control's menu. Do not traverse other portals.
       const search=layer.querySelector(area?'.area-search-input input':'.content-search input');
       const normalize=v=>{const t=equivalence(v,entry.field.label);return area?t.replace(/[\s/／>、]+/g,'').replace(/(省|市|自治区|特别行政区)/g,''):t;};
-      const term=equivalence(target,entry.field.label);
+      const regionParts=v=>String(v).split(/(?<=省|市|自治区|特别行政区)|[\s/／>]+/).filter(Boolean).map(normalize).filter(Boolean);
+      const wanted=regionParts(target);
+      const regionMatches=(label,path)=>{
+        const actual=regionParts(path+'/'+label);
+        if(actual.at(-1)!==wanted.at(-1))return false;
+        let index=0;for(const part of actual)if(part===wanted[index])index++;
+        return index===wanted.length;
+      };
+      const term=area?String(target).split(/(?<=省|市|自治区|特别行政区)|[\s/／>]+/).filter(Boolean).at(-1):equivalence(target,entry.field.label);
       if(search){setNative(search,term);await wait(350);}
       let matches=[];
       for(let i=0;i<20;i++) {
@@ -167,7 +190,7 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
         matches=rows.filter(row=>{
           const label=compact(row.querySelector(area?'.area-text-label':'.item-text-label')?.textContent);
           const path=compact(row.querySelector('.area-item-path')?.textContent);
-          return normalize(label)===normalize(target) || (path && normalize(path+label)===normalize(target));
+          return area?regionMatches(label,path):normalize(label)===normalize(target);
         });
         if(matches.length)break;
         await wait(60);
@@ -176,11 +199,12 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       const chosen=matches[0];if(disabledOption(chosen))throw Error('option-disabled');
       const icon=chosen.querySelector('.icon-container');
       // Region text may drill down; the radio/check icon selects the current region.
-      (area && icon?icon:chosen).click();await wait(40);
+      (icon || chosen).click();await wait(80);
+      if(icon?.querySelector('[class*=Unchecked]'))throw Error('option-not-selected');
       const buttons=footerButton(layer,'确定');if(buttons.length!==1 || disabledOption(buttons[0]))throw Error('option-confirm-unavailable');
       // A successful click is not success: read back the persisted displayed value below.
       buttons[0].click();confirmed=true;await wait(80);
-      const actual=phoenixRead(entry.node);if(normalize(actual)!==normalize(target))throw Error('value-not-retained');return actual;
+      const actual=phoenixRead(entry.node),selectedLabel=compact(chosen.querySelector(area?'.area-text-label':'.item-text-label')?.textContent);if(normalize(actual)!==normalize(target) && !(area&&normalize(actual)===normalize(selectedLabel)))throw Error('value-not-retained');return actual;
     } finally {
       if(!confirmed){const cancel=footerButton(layer,'取消');if(cancel.length===1)cancel[0].click();}
       phoenixField(entry.node)?.querySelector('.form-item__title')?.click();
