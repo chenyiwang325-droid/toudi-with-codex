@@ -47,3 +47,15 @@
 .filling-handoff { padding-bottom:18px; margin-bottom:20px!important; border-bottom:1px solid var(--border); }
 .filling-text-link { border:0; background:none; padding:0; color:var(--primary); font:inherit; font-size:12px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
 .filling-body a { color:var(--primary); text-decoration:underline; text-underline-offset:3px; }
+
+.filling-dialog{width:min(1200px,calc(100vw - 32px));height:calc(100dvh - 48px)}
+.filling-body:has(.filling-profile-frame){padding:0;overflow:hidden;max-height:none;display:flex}
+.filling-profile-frame{border:0;width:100%;height:100%;min-height:0;flex:1;background:var(--card)}
+.filling-head-actions{display:flex;gap:8px;flex-shrink:0}
+@media(max-width:600px){.filling-head{gap:10px;flex-wrap:wrap}.filling-dialog{height:calc(100dvh - 24px)}}
+
+.filling-footer{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:12px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)}
+.filling-footer a{color:var(--primary);text-decoration:underline;text-underline-offset:3px}
+html[data-profile-workspace] #panel-agent{display:none!important}
+html[data-profile-workspace] main{max-width:1100px}
+@media(max-width:480px){html[data-profile-workspace] .section-title{flex-wrap:wrap;align-items:flex-start}html[data-profile-workspace] .section-title>button{white-space:nowrap}.filling-footer{padding:10px 18px;gap:8px 14px}}

@@ -21,6 +21,7 @@ import json
 import os
 import threading
 import time
+from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 CODE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -87,6 +88,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send_json({'error': '辅助填报仅连接本机工作区'}, 403)
             try:
                 import filling_tools
+                if route == '/api/filling/profile':
+                    import profile_store
+                    return self._send_json(profile_store.read(WORKSPACE))
                 if route == '/api/filling':
                     profile_id = parse_qs(urlsplit(self.path).query).get('profile', ['general'])[0]
                     return self._send_json(filling_tools.profile_status(WORKSPACE, profile_id))
@@ -107,6 +111,7 @@ class Handler(SimpleHTTPRequestHandler):
                 workbench = Workbench(WORKSPACE)
                 if route == '/api/manage':
                     module = parse_qs(urlsplit(self.path).query).get('module', ['workspace'])[0]
+                    if module=='profile' and hosted.MODE=='hosted': return self._send_json({'error':'填报资料同步仅连接本机工作区'},403)
                     return self._send_json({**workbench.get(module), 'workspaceKey': WORKSPACE_KEY})
                 body = workbench.backup()
                 self.send_response(200); self.send_header('Content-Type', 'application/zip')
@@ -118,6 +123,17 @@ class Handler(SimpleHTTPRequestHandler):
             return self._serve_GET()
 
     def _serve_GET(self):
+        route = urlsplit(self.path).path
+        if route.startswith('/browser-extension/'):
+            from filling_tools import EXTENSION_FILES
+            name = route.removeprefix('/browser-extension/')
+            if name in EXTENSION_FILES or name in ('logo.svg','form-engine.js'):
+                source = Path(CODE_DIR) / 'browser-extension' / name
+                if name in ('logo.svg','form-engine.js'): source=Path(CODE_DIR)/'assets'/('favicon.svg' if name=='logo.svg' else name)
+                body=source.read_bytes()
+                self.send_response(200); self.send_header('Content-Type', self.guess_type(str(source)))
+                self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body); return
+            return self._send_json({'error':'not_found'},404)
         if urlsplit(self.path).path == '/assets/preference-defaults.js':
             from preference_rules import bootstrap_script
             body = bootstrap_script().encode('utf-8')
@@ -146,7 +162,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers(); self.wfile.write(body); return
-        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js', '/assets/workspace-storage.js', '/assets/settings.css', '/assets/filling.js', '/assets/filling.css'):
+        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js', '/assets/workspace-storage.js', '/assets/settings.css', '/assets/filling.js', '/assets/filling.css', '/assets/profile-workspace.js'):
             name = os.path.basename(urlsplit(self.path).path)
             body = open(os.path.join(CODE_DIR, 'assets', name), 'rb').read()
             self.send_response(200); self.send_header('Content-Type', 'text/javascript; charset=utf-8' if name.endswith('.js') else 'text/css; charset=utf-8' if name.endswith('.css') else 'image/svg+xml')
@@ -235,6 +251,17 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         route = urlsplit(self.path).path
         if not hosted.authorize(self, PORT): return
+        if route == '/api/filling/profile':
+            if hosted.MODE == 'hosted': return self._send_json({'error':'填报资料同步仅连接本机工作区'},403)
+            try:
+                import profile_store
+                length=int(self.headers.get('Content-Length',0))
+                if not 0 < length <= 512*1024: raise ValueError('资料请求大小无效。')
+                payload=json.loads(self.rfile.read(length))
+                if not isinstance(payload,dict) or set(payload)-{'workspaceKey','base','pack'}: raise ValueError('资料同步请求无效。')
+                return self._send_json(profile_store.write(WORKSPACE,payload.get('base'),payload.get('pack'),payload.get('workspaceKey')))
+            except Conflict as exc: return self._send_json({'error':str(exc)},409)
+            except (ValueError,OSError,TypeError,KeyError) as exc: return self._send_json({'error':str(exc)},400)
         if route.startswith('/api/filling'):
             return self._send_json({'error': 'not_found'}, 404)
         if urlsplit(self.path).path in ('/api/manage', '/api/backup'):
@@ -244,6 +271,7 @@ class Handler(SimpleHTTPRequestHandler):
                 payload = json.loads(self.rfile.read(length))
                 if not isinstance(payload, dict): raise ValueError('payload must be an object')
                 if payload.get('workspaceKey', WORKSPACE_KEY) != WORKSPACE_KEY: raise Conflict('workspace_conflict')
+                if payload.get('module')=='profile' and hosted.MODE=='hosted': return self._send_json({'error':'填报资料同步仅连接本机工作区'},403)
                 workbench = Workbench(WORKSPACE)
                 if urlsplit(self.path).path == '/api/manage': result = workbench.mutate(payload)
                 else:

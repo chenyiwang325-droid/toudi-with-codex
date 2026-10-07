@@ -6,7 +6,7 @@ const managementLabels = {
   reviews: '面试复盘',
   qbank: '通用题库'
 };
-let management = null,
+let management = null, managementPreviewGeneration = 0,
   managementDraftTimer = null,
   settingsState = null,
   persistQueue = Promise.resolve(),
@@ -88,7 +88,7 @@ async function openManagement(module) {
       index: -1,
       importing: false
     };
-    document.getElementById('managementTitle').textContent = '管理' + managementLabels[module];
+    document.getElementById('managementTitle').textContent = (module === 'qbank' ? '高级导入与导出：' : '管理') + managementLabels[module];
     showManagementDialog();
     managementRender();
   } catch (e) {
@@ -99,12 +99,14 @@ function managementRender() {
   const m = management;
   const legacyDraft=JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDraft') || 'null');
   const draft = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}')[m.module] || (legacyDraft?.module === m.module ? legacyDraft : null);
-  document.getElementById('managementTools').innerHTML = (draft ? `<button class="btn" onclick="resumeManagementDraft('${m.module}')">继续未保存编辑</button>` : '') + `<button class="btn" onclick="managementSelect(-1)">新增</button><label class="btn">选择导入文件<input hidden type="file" accept=".json,.md,.markdown" onchange="managementImport(event)"></label><button class="btn" onclick="managementExport()">导出完整规范资料</button><button class="btn" onclick="managementExportDraft()">导出当前草稿</button>`;
+  document.getElementById('managementTools').innerHTML = (draft ? `<button class="btn" onclick="resumeManagementDraft('${m.module}')">继续未保存编辑</button>` : '') + `${m.module === 'qbank' ? '<button class="btn btn-primary" onclick="closeManagement();startWorkspaceContent(\'qbank\')">添加准备条目</button>' : '<button class="btn btn-primary" onclick="managementSelect(-1)">新增</button>'}<label class="btn">选择导入文件<input hidden type="file" accept=".json,.md,.markdown" onchange="managementImport(event)"></label><button class="btn" onclick="managementExport()">导出完整规范资料</button><button class="btn" onclick="managementExportDraft()">导出当前草稿</button><button class="btn" onclick="copyAgentBootstrap('${m.module}')">交给 Agent</button>`;
   document.getElementById('managementBody').innerHTML = `<aside class="management-list">${managementItems().map((item, i) => `<button class="btn btn-sm" onclick="managementSelect(${i})">${esc(managementName(item))}</button>`).join('') || '<p class="management-message">尚无资料，可新增或导入。</p>'}</aside><div id="managementForm" class="management-form"></div>`;
   managementSelect(m.index);
 }
 function managementSelect(index) {
   const m = management;
+  managementPreviewGeneration++;
+  m.checked = null;
   m.index = index;
   m.importing = false;
   m.original = index < 0 ? null : structuredClone(managementItems()[index]);
@@ -116,7 +118,7 @@ function managementSelect(index) {
     }));
   }
   m.recordKey = m.module === 'records' && index >= 0 ? m.keys?.[index] : null;
-  const fieldNames = {id: '资料标识', companyKey: '关联投递记录（可留空）', company: '公司', position: '岗位', researchedAt: '调研日期', file: '报告文件路径（自动生成，可留空）', markdown: '正文（Markdown）'};
+  const fieldNames = {id: '资料标识', companyKey: '关联投递记录（可留空）', company: '公司（必填）', position: '岗位', researchedAt: '调研日期', file: '报告文件路径（自动生成，可留空）', markdown: '正文（Markdown）', prepBody: '准备内容（可选，支持 Markdown）'};
   const label = (key, value, area = false) => `<label>${esc(fieldNames[key] || key)}${area ? `<textarea data-mfield="${esc(key)}">${esc(value || '')}</textarea>` : `<input data-mfield="${esc(key)}" value="${esc(value || '')}">`}</label>`;
   let form = '';
   if (m.module === 'records') {
@@ -128,13 +130,14 @@ function managementSelect(index) {
     form = '';
     if (m.module === 'preps') form += label('company', m.item.company) + label('position', m.item.position);
     if (m.module === 'prospects') form += label('company', m.item.company) + label('researchedAt', m.item.researchedAt) + label('file', m.item.file || m.item.filename);
-    form += label('markdown', m.item.markdown || m.item.content || '', true);
+    form += label(m.module === 'preps' && !m.original ? 'prepBody' : 'markdown', m.item.markdown || m.item.content || '', true);
+    if(m.module === 'preps' && !m.original) form += '<p class="management-message">填写公司即可建立空白准备；正文可稍后补充。系统自动组织标题和章节，支持 Markdown。</p>';
     form += '<details><summary>关联与资料标识</summary>' + label('companyKey', m.item.companyKey) + label('id', m.item.id) + '<p class="management-message">资料标识自动生成。已有资料请保留原标识，便于持续更新。</p></details>';
     form += '<div class="management-actions"><label class="btn">添加附件<input type="file" hidden multiple onchange="managementAttachments(event)"></label></div><div id="managementAttachments"></div>';
   } else if (m.module === 'reviews') {
     form = managementReviewForm();
   } else {
-    form = label('题库 JSON', JSON.stringify(m.data, null, 2), true) + '<p class="management-message">规范格式为 {categories:[{id,name,items:[{id,title,body}]}]}。保留已有 id 和其他字段。</p>';
+    form = label('题库 JSON', JSON.stringify(m.data, null, 2), true) + '<p class="management-message">JSON 仅用于高级批量导入；日常新增和编辑请使用通用准备中的分类与条目表单。规范格式为 {categories:[{id,name,items:[{id,title,body}]}]}。保留已有 id 和其他字段。</p>';
   }
   form += '<p class="management-message">先检查范围和预览，再提交。只有服务确认后才显示已保存；错误和冲突保留当前草稿。</p><div id="managementPreview" class="management-preview" hidden></div>';
   document.getElementById('managementForm').innerHTML = form;
@@ -142,6 +145,7 @@ function managementSelect(index) {
   document.getElementById('managementStatus').textContent = '正在编辑草稿；尚未提交。';
   document.getElementById('managementForm').oninput = () => {
     m.checked = null;
+    managementPreviewGeneration++;
     document.getElementById('managementSubmit').disabled = true;
     managementRemember();
   };
@@ -185,6 +189,7 @@ function managementRemoveReviewQuestion(index) {
 function managementReviewQuestionsChanged() {
   document.getElementById('managementReviewQuestions').innerHTML = managementReviewQuestionsMarkup();
   management.checked = null;
+  managementPreviewGeneration++;
   document.getElementById('managementSubmit').disabled = true;
   managementRemember();
 }
@@ -207,6 +212,12 @@ function managementCandidate() {
   }
   if (['preps', 'prospects'].includes(m.module)) {
     if (!fields.id.trim()) throw Error('请填写稳定的 id');
+    if(m.module === 'preps' && !m.original) {
+      if(!fields.company?.trim()) throw Error('请填写公司');
+      fields.markdown = '## 准备内容\n' + (fields.prepBody || '');
+      fields.structured = true;
+      delete fields.prepBody;
+    }
     if (!fields.markdown.trim()) throw Error('Markdown 正文不能为空');
     return {
       action: 'upsert',
@@ -262,20 +273,28 @@ function managementCandidate() {
 function managementReviewPreview(item) {
   return '<p><strong>' + esc(item.company) + '</strong> · ' + esc(item.position || '') + ' · ' + esc(item.round || '') + ' · ' + esc(item.date) + '</p>' + renderMd(item.summary?.raw || '') + item.questions.map(question => '<h3>Q' + esc(question.n) + ' ' + esc(question.question) + '</h3>' + renderMd(question.originalAnswer || '')).join('');
 }
-function managementPreview() {
+async function managementPreview() {
+  const current=management, generation=++managementPreviewGeneration;
+  current.checked=null;
+  document.getElementById('managementSubmit').disabled=true;
   try {
     const payload = managementCandidate();
+    document.getElementById('managementStatus').textContent='正在校验格式和版本…';
+    await managementRequest(current.module,{base:current.version,...payload,dryRun:true});
+    if(management!==current || generation!==managementPreviewGeneration)return;
     management.checked = payload;
     const box = document.getElementById('managementPreview');
     box.hidden = false;
     box.innerHTML = '<p><strong>提交范围：</strong>' + esc(managementLabels[management.module]) + '；' + esc(payload.action === 'replace' ? '替换所预览的规范集合' : payload.action === 'import' ? '导入文件中的条目' : '仅当前条目') + '</p>' + (management.module === 'reviews' && payload.item?.questions ? managementReviewPreview(payload.item) : payload.item?.markdown || payload.markdown ? renderMd(payload.item?.markdown || payload.markdown) : '<pre style="white-space:pre-wrap">' + esc(JSON.stringify(payload.item || payload.data, null, 2)) + '</pre>');
     document.getElementById('managementSubmit').disabled = false;
-    document.getElementById('managementStatus').textContent = '格式已检查，预览中的内容将在当前版本基础上提交。';
+    document.getElementById('managementStatus').textContent = '服务已校验格式和当前版本。请核对预览后提交；尚未保存。';
   } catch (e) {
+    if(management!==current || generation!==managementPreviewGeneration)return;
     document.getElementById('managementStatus').textContent = '检查未通过：' + e.message;
   }
 }
 function managementDeletePreview() {
+  managementPreviewGeneration++;
   management.checked = {
     action: 'delete',
     id: management.recordKey || management.original.id || management.original._key
@@ -385,6 +404,7 @@ async function managementImport(event) {
     management.importing = true;
     management.importPayload = payload;
     management.checked = null;
+  managementPreviewGeneration++;
     document.getElementById('managementForm').innerHTML = '<p class="management-message">已选择 ' + esc(file.name) + '（' + file.size + ' 字节）。检查预览不会写入工作区。</p><div id="managementPreview" class="management-preview" hidden></div>';
     document.getElementById('managementSubmit').disabled = true;
     managementPreview();
@@ -409,13 +429,14 @@ async function managementAttachments(event) {
         attachment.markdown = await file.text();
       } else {
         attachment.contentBase64 = await fileBase64(file);
-        const body = document.querySelector('[data-mfield=markdown]');
+        const body = document.querySelector('[data-mfield=markdown],[data-mfield=prepBody]');
         body.value += '\n\n[' + file.name + '](' + file.name + ')';
       }
       management.item.attachments.push(attachment);
     }
     managementAttachmentList();
     management.checked = null;
+  managementPreviewGeneration++;
     document.getElementById('managementSubmit').disabled = true;
     managementRemember();
   } catch (e) {
@@ -432,10 +453,11 @@ function managementRemoveAttachment(index) {
   const attachment = management.item.attachments[index];
   management.item.deletedAttachments = management.item.deletedAttachments || [];
   management.item.deletedAttachments.push(attachment.file);
-  const body = document.querySelector('[data-mfield=markdown]');
+  const body = document.querySelector('[data-mfield=markdown],[data-mfield=prepBody]');
   if (body) body.value = body.value.replace(new RegExp('\\[[^\\]]*\\]\\(' + attachment.file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\)', 'g'), '');
   management.item.attachments.splice(index, 1);
   management.checked = null;
+  managementPreviewGeneration++;
   document.getElementById('managementSubmit').disabled = true;
   managementAttachmentList();
   managementRemember();
@@ -672,7 +694,8 @@ async function previewBackup(event) {
     backupCandidate.base = preview.base;
     prepareRecoveryDialog('从备份恢复');
     const files = preview.files || [];
-    document.getElementById('managementBody').innerHTML = `<div class="recovery-summary"><strong>${esc(file.name)}</strong><p>备份包含 ${files.length} 个文件：${esc(backupScopeLabel(files))}。</p><p>确认后将完整业务资料与设置恢复到这份备份；备份中没有的现有业务文件也会移除。当前内容会自动保留为恢复副本；如只需撤销一次改动，请使用“恢复历史修改”。</p><details class="settings-disclosure"><summary><span class="disclosure-title">查看备份中的文件</span>${disclosureAction()}</summary><ul class="recovery-files">${files.map(entry=>'<li>'+esc(entry.path)+'</li>').join('')}</ul></details></div>`;
+    const preserved = preview.preserved || [];
+    document.getElementById('managementBody').innerHTML = `<div class="recovery-summary"><strong>${esc(file.name)}</strong><p>备份包含 ${files.length} 个文件：${esc(backupScopeLabel(files))}。</p><p>确认后将完整业务资料与设置恢复到这份备份；备份中没有的现有业务文件也会移除。${preserved.length ? '这份旧备份未包含填报资料，以下现有文件会保留：'+preserved.map(esc).join('、')+'。' : ''}当前内容会自动保留为恢复副本；如只需撤销一次改动，请使用“恢复历史修改”。</p><details class="settings-disclosure"><summary><span class="disclosure-title">查看备份中的文件</span>${disclosureAction()}</summary><ul class="recovery-files">${files.map(entry=>'<li>'+esc(entry.path)+'</li>').join('')}</ul></details></div>`;
     document.getElementById('managementActions').innerHTML='<button class="btn" onclick="closeManagement()">取消</button><button class="btn btn-primary" id="backupCommit" onclick="commitBackup()">确认恢复全部资料</button>';
   } catch (e) {
     showToast(e.message);
@@ -730,12 +753,12 @@ async function resumeManagementDraft(module) {
   document.getElementById('managementStatus').textContent = '已恢复草稿及原版本；请检查预览，冲突时保留候选并对账。';
 }
 function backupScopeLabel(files){
-  const known={'投递数据/投递记录.json':'招聘记录','投递数据/用户编辑数据.json':'个人标记与偏好','投递数据/逐字稿数据.json':'通用题库','投递数据/面试准备数据.json':'公司准备','投递数据/面试复盘数据.json':'面试复盘','岗位探查/探查目录.json':'岗位探查','投递数据/工作区配置.json':'设置','投递数据/草稿数据.json':'编辑草稿'};
+  const known={'投递数据/投递记录.json':'招聘记录','投递数据/用户编辑数据.json':'个人标记与偏好','投递数据/逐字稿数据.json':'通用题库','投递数据/面试准备数据.json':'公司准备','投递数据/面试复盘数据.json':'面试复盘','岗位探查/探查目录.json':'岗位探查','投递数据/工作区配置.json':'设置','投递数据/草稿数据.json':'编辑草稿','填报资料/资料.json':'填报资料','网申信息库.json':'原始填报资料'};
   const labels=[...new Set(files.map(file=>known[file.path]||'正文与附件'))];
   return labels.join('、')||'无业务文件';
 }
 let recoveryChoices=[];
-function recoveryModuleLabel(module){return managementLabels[module]||{edits:'个人标记与偏好',settings:'设置',drafts:'编辑草稿'}[module]||'关联资料';}
+function recoveryModuleLabel(module){return managementLabels[module]||{edits:'个人标记与偏好',settings:'设置',drafts:'编辑草稿',profile:'填报资料'}[module]||'关联资料';}
 function recoveryDate(value){const date=new Date(value);return Number.isNaN(date.valueOf())?'历史修改':date.toLocaleString('zh-CN',{hour12:false});}
 function prepareRecoveryDialog(title){
   showManagementDialog();
@@ -776,16 +799,25 @@ if (window.__TOUDI_DESKTOP_READY__) {
 
 // Empty-state actions and refresh share the existing management and save contracts.
 async function startWorkspaceContent(module, importing = false) {
+  if(module === 'qbank' && !importing) {
+    if(!qbankMutationAllowed())return;
+    qbMode = 'general';
+    if(!qbData.categories.length) { await qbAddCategory(); }
+    const category=qbData.categories.find(c=>c.id===currentQbCat)||qbData.categories[0];
+    if(category){currentQbCat=category.id;qbAddItem(category.id);}
+    return;
+  }
   await openManagement(module);
   if (importing && document.getElementById('managementOverlay').style.display === 'flex') {
     document.querySelector('#managementTools input[type=file]')?.click();
   }
 }
-copyAgentBootstrap = async function () {
-  const text = agentBootstrapText();
+copyAgentBootstrap = async function (module) {
+  const isTask = ['records','qbank','preps','prospects','reviews'].includes(module);
+  const text = isTask ? agentTaskText(module) : agentBootstrapText();
   try {
     await navigator.clipboard.writeText(text);
-    showToast('启动消息已复制，请补充信源、材料与任务后发送');
+    showToast(isTask ? '任务消息已复制，请补充材料和范围后发送' : '接入消息已复制，请补充本次任务后发送');
   } catch (error) {
     const field = document.createElement('textarea');
     field.value = text;

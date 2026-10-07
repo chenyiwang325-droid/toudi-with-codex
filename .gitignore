@@ -29,6 +29,7 @@ node_modules/
 /desktop/src-tauri/icons/
 /desktop/src-tauri/gen/
 /desktop/ui/assets/
+/desktop/ui/browser-extension/
 /desktop/ui/workbench.html
 *.dmg
 *.app/

@@ -61,3 +61,34 @@ assert.equal(vm.runInContext("workspaceHasDraft('reviews')", refreshContext), tr
 vm.runInContext("toudiWorkspaceStorage.getItem = () => JSON.stringify({preps:{base:'original'}})", refreshContext);
 assert.equal(vm.runInContext("workspaceHasDraft('preps')", refreshContext), true);
 console.log('PASS refresh protects stored drafts, dirty reviews and unsaved detail fields');
+
+const prepContext = vm.createContext({management:{module:'preps',original:null,item:{id:'prep-new',attachments:[],custom:'preserve'}},document:{querySelectorAll:()=>Object.entries({id:'prep-new',company:'合成公司',position:'岗位',companyKey:'',prepBody:''}).map(([key,value])=>({dataset:{mfield:key},value}))}});
+const candidateStart=source.indexOf('function managementCandidate('),candidateEnd=source.indexOf('\nfunction ',candidateStart+1);
+vm.runInContext(source.slice(candidateStart,candidateEnd),prepContext);
+const prepCandidate=vm.runInContext('managementCandidate()',prepContext);
+assert.equal(prepCandidate.item.structured,true);
+assert.equal(prepCandidate.item.markdown,'## 准备内容\n');
+assert.equal(prepCandidate.item.custom,'preserve');
+assert.equal(prepCandidate.item.prepBody,undefined);
+const html=fs.readFileSync(path.join(__dirname,'../app/投递管理.html'),'utf8');
+const taskStart=html.indexOf('function agentTaskText('),taskEnd=html.indexOf('\nasync function copyAgentBootstrap',taskStart);
+const taskContext=vm.createContext({AGENT_START_GUIDE_URL:'https://example.invalid/guide'});
+vm.runInContext(html.slice(taskStart,taskEnd),taskContext);
+for(const module of ['qbank','preps','prospects','reviews'])assert(!vm.runInContext(`agentTaskText('${module}')`,taskContext).includes('preference-catalog'));
+assert(vm.runInContext("agentTaskText('records')",taskContext).includes('preference-catalog'));
+console.log('PASS cold-start prep accepts empty structured content and task messages only classify recruiting sources');
+
+(async()=>{
+  let release;
+  const elements={managementSubmit:{disabled:false},managementStatus:{textContent:''},managementPreview:{hidden:true,innerHTML:''}};
+  const previewContext=vm.createContext({management:{module:'preps',version:'v1'},managementPreviewGeneration:0,managementCandidate:()=>({action:'upsert',item:{markdown:'## 正文\n内容'}}),managementRequest:()=>new Promise(resolve=>{release=resolve;}),document:{getElementById:id=>elements[id]},managementLabels:{preps:'公司准备'},esc:x=>x,renderMd:x=>x});
+  const start=source.indexOf('async function managementPreview('),end=source.indexOf('\nfunction ',start+1);
+  vm.runInContext(source.slice(start,end),previewContext);
+  const pending=vm.runInContext('managementPreview()',previewContext);
+  vm.runInContext('managementPreviewGeneration++',previewContext);
+  release({ok:true,dryRun:true});await pending;
+  assert.equal(elements.managementSubmit.disabled,true);
+  assert.equal(vm.runInContext('management.checked',previewContext),null);
+  assert.equal(elements.managementPreview.hidden,true);
+  console.log('PASS editing while server validation is pending never re-enables stale save');
+})().catch(error=>{console.error(error);process.exitCode=1;});

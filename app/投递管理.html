@@ -719,7 +719,7 @@ textarea { font-size: 16px; }
 }
 @media (max-width:480px) {
 .topbar { flex-wrap: wrap; gap: 10px; }
-.topbar-actions { width:auto; flex:0 0 auto; justify-content:flex-end; }
+.topbar-actions { width:auto; max-width:100%; min-width:0; flex:0 1 auto; justify-content:flex-end; }
 .topbar-title { max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #deliveryModes .icon { display: none; }
 .stat-card { padding: 8px 10px; display: inline-flex; align-items: center; gap: 7px; min-height: 36px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--text2); white-space: nowrap; }
@@ -2411,7 +2411,7 @@ function workspaceEmptyState(module, filtered=false) {
   const names={records:'招聘记录',qbank:'通用准备',preps:'公司准备',prospects:'探查报告',reviews:'面试复盘'};
   const title=state==='loading'?'正在读取'+names[module]:state==='error'?names[module]+'读取失败':filtered?'没有匹配结果':'尚无'+names[module];
   const note=state==='loading'?'请稍候。':state==='error'?'已有资料不会被清空，请检查连接后重新读取。':filtered?'可调整搜索或筛选条件。':'从新增、导入或自己的 Agent 开始整理资料。';
-  const actions=state==='ready'&&!filtered&&!window.__SNAPSHOT__?`<button class="btn btn-sm" onclick="startWorkspaceContent('${module}')">新增</button><button class="btn btn-sm" onclick="startWorkspaceContent('${module}',true)">导入资料</button><button class="btn btn-sm" onclick="copyAgentBootstrap()">复制启动消息</button>`:state==='error'?'<button class="btn btn-sm" onclick="refreshWorkspaceData(true)">重新读取</button>':'';
+  const actions=state==='ready'&&!filtered&&!window.__SNAPSHOT__?`<button class="btn btn-sm btn-primary" onclick="startWorkspaceContent('${module}')">${({records:'添加记录',qbank:'添加准备条目',preps:'建立公司准备',prospects:'添加探查报告',reviews:'添加复盘场次'})[module]}</button><button class="btn btn-sm" onclick="startWorkspaceContent('${module}',true)">导入资料</button><button class="btn btn-sm" onclick="copyAgentBootstrap('${module}')">交给 Agent</button>`:state==='error'?'<button class="btn btn-sm" onclick="refreshWorkspaceData(true)">重新读取</button>':'';
   return `<div class="workspace-empty" data-empty-module="${module}" data-empty-state="${state}"><h3>${title}</h3><p>${note}</p><div class="workspace-empty-actions">${actions}</div></div>`;
 }
 
@@ -3370,22 +3370,33 @@ function showSelectedIndustries(){industryOnlySelected=!industryOnlySelected;con
 // One fixed entry point replaces repeated per-workflow Agent fields. Existing exports retain legacy settings.
 let workspaceConnection=null,workspaceConnectionError='',agentGuideText='',workspaceInfoPromise=null;
 const AGENT_START_GUIDE_URL='https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/开始与初始化.md';
-const GENERIC_AGENT_BOOTSTRAP=`请帮我接入 TouDi 投递中控台，并完成下面这次任务。
+const GENERIC_AGENT_BOOTSTRAP=`请帮我首次接入 TouDi 投递中控台，确认工具、工作区与现有资料。
 开始指南：${AGENT_START_GUIDE_URL}
 
-我的信源：{填写招聘网站链接、表格或文件；已有来源可写“沿用现有信源”}
+招聘信源（可选）：{只有要更新招聘记录时才提供；暂不处理可留空}
 我的材料：{填写简历、JD、面试记录等；暂时没有可写“暂不提供”}
-本次任务：{先处理一份材料或几条记录，说明要更新、准备、探查或复盘什么}
+接入后任务（可选）：{若需要，填写一份材料或几条记录的具体范围；没有则仅完成接入}
 已有资料：{填写“首次使用”或“沿用现有工作区和流程”}
 
 请按以下顺序执行：
 1. 先阅读开始指南。在我已授权的电脑上定位已安装的 TouDi 资料工具，运行 workspace status 确认当前绑定，再读取随包文档及工作区已有规则。无需让我重新填写目录；若无法访问，说明缺少的权限或材料，不扫描无关目录。
-2. 读取我的信源，列出实际字段、原始标签、学历词条及更新方式。以产品默认的行业层级和常用学历为基础，用 preference-catalog 核对实际词条；首次使用或新增来源时，只修正分类、同义词和明确学历范围的差异。已有规则继续沿用，只就影响筛选含义的歧义向我确认，再保存自己的 preferenceRules。地区、企业性质等附带信息不列为行业选项；MBA 等特殊、复杂或不明学历要求保留原文并兜底保留。
-3. 读取最新资料及版本，完成本次小范围任务，保留既有进度、收藏、备注和无关内容。候选先 validate，再 commit，最后 read 读回；版本冲突保留候选并对账。
+2. 仅当本次涉及招聘记录或新增信源时，读取我的信源，列出实际字段、原始标签、学历词条及更新方式。以产品默认的行业层级和常用学历为基础，用 preference-catalog 核对实际词条；首次使用或新增来源时，只修正分类、同义词和明确学历范围的差异。已有规则继续沿用，只就影响筛选含义的歧义向我确认，再保存自己的 preferenceRules。地区、企业性质等附带信息不列为行业选项；MBA 等特殊、复杂或不明学历要求保留原文并兜底保留。
+3. 有明确后续任务时，读取最新资料及版本，完成所指定的小范围任务，保留既有进度、收藏、备注和无关内容。候选先 validate，再 commit，最后 read 读回；版本冲突保留候选并对账。
 4. 告诉我本次保存了什么、还有什么待确认，并让我在 App 点击“刷新资料”核对正文、标记与附件。后续沿用已确认流程，不重复初始化。
 
 缺少事实时明确报告，不猜测日期、学历资格或个人经历。没有相应任务授权时，不提交网申、不对外沟通、不发布个人资料。`;
 function agentBootstrapText(){return GENERIC_AGENT_BOOTSTRAP;}
+function agentTaskText(module){
+  const tasks={records:['更新招聘记录','招聘信源或待整理记录'],qbank:['整理通用准备','本人真实经历、已有回答和要整理的题目'],preps:['建立或更新公司准备','公司、岗位 JD、实际投递简历和本次面试要求'],prospects:['探查岗位','指定公司/岗位、城市及待核实问题'],reviews:['复盘面试','真实逐字稿或纪要、公司、岗位与日期']};
+  const [task,materials]=tasks[module]||tasks.records;
+  return `请帮我在 TouDi 中${task}。
+开始指南：${AGENT_START_GUIDE_URL}
+本次范围：{填写具体对象与需要完成的内容}
+本次材料：{提供${materials}；缺少的事实保留未知}
+
+先在已授权的电脑上定位 TouDi 资料工具，运行 workspace status，读取当前工作区规则及最新资料和版本。首次接入只完成工具与工作区确认；已有流程直接沿用。
+${module==='records'?'若首次读取或新增招聘信源，清点实际原词，使用 preference-catalog 对照默认分类，只修正有依据的同义词、分类和明确学历范围；未知及特殊要求保留。\n':''}只完成本模块授权范围，保留稳定标识、关联与无关内容。候选先 validate，再 commit，最后 read 读回；冲突保留候选，不覆盖。报告保存结果、待核实项和 App 中的查看入口。不自动提交网申、联系他人或发布。`;
+}
 
 async function copyAgentBootstrap(){const text=agentBootstrapText();try{await navigator.clipboard.writeText(text);showToast('启动消息已复制，请补充后发送');}catch(e){const el=document.createElement('textarea');el.value=text;document.body.append(el);el.select();const copied=document.execCommand('copy');el.remove();showToast(copied?'启动消息已复制，请补充后发送':'请展开并选择启动消息');}}
 async function inspectWorkspace(force=false){if(window.__SNAPSHOT__||(!window.__TOUDI_SERVICE__&&!['127.0.0.1','localhost','[::1]'].includes(location.hostname))){workspaceConnection=null;workspaceConnectionError='当前为静态阅读页，不能凭路径连接本机文件。';return;}if(workspaceInfoPromise&&!force)return workspaceInfoPromise;workspaceInfoPromise=(async()=>{try{const response=await fetch('/api/workspace');if(!response.ok)throw Error('工作区服务暂不可用，请检查部署状态。');const info=await response.json();if(info.protocol!==1||!['local','hosted','desktop'].includes(info.mode)||!info.sameOriginOnly)throw Error('工作区状态接口不匹配');workspaceConnection=info;workspaceConnectionError='';if(view==='settings'){const box=document.getElementById('connectionStatus');if(box)box.innerHTML=workspaceConnectionMarkup();const text=document.getElementById('agentBootstrap');if(text)text.value=agentBootstrapText();}}catch(e){workspaceConnection=null;workspaceConnectionError=e.message;if(view==='settings'){const box=document.getElementById('connectionStatus');if(box)box.innerHTML=workspaceConnectionMarkup();}}})();return workspaceInfoPromise;}
@@ -3455,12 +3466,12 @@ function renderSettings(){
       ${window.__TOUDI_SERVICE__?.mode==='hosted'?'<section class="settings-section"><h3>访问</h3><form action="/auth/logout" method="post"><button class="btn">退出登录</button></form></section>':''}
     </div>
     <div class="settings-panel" id="settings-panel-agent" role="tabpanel" aria-labelledby="settings-tab-agent">
-      <section class="settings-section"><h3>如何开始</h3><p class="settings-help">把信源和材料交给你正在使用的 Agent，按下面的步骤完成第一次更新。</p>
+      <section class="settings-section"><h3>如何开始</h3><p class="settings-help">先确认 Agent 能访问当前工作区，再按本次任务提供材料。也可以直接在各模块手动新增。</p>
         <div class="settings-reading agent-start-link"><a href="${AGENT_START_GUIDE_URL}" target="_blank" rel="noopener noreferrer">阅读 GitHub 开始指南 ↗</a><span>逐步操作、可复制消息与日常任务示例</span></div>
         <ol class="agent-setup-flow">
-          <li><span class="setup-number">1</span><div><strong>把信源和材料发给 Agent</strong><p>提供招聘网站链接、表格或文件，以及这次要用的简历、JD 等材料。信源由 Agent 读取，无需在设置中另外添加。</p></div></li>
-          <li><span class="setup-number">2</span><div><strong>复制启动消息，补充后发送</strong><p>点击下方“复制启动消息”，填好信源、材料与本次任务，发给已获本机文件权限的 Agent。它会先查找 TouDi 并确认当前资料。</p></div></li>
-          <li><span class="setup-number">3</span><div><strong>确认分类，完成一次小范围任务</strong><p>Agent 以默认行业层级和常用学历为基础，核对实际信源并修正差异。你只需确认歧义，再完成一项小范围任务；特殊或不明要求继续保留。</p></div></li>
+          <li><span class="setup-number">1</span><div><strong>按任务提供材料</strong><p>更新记录时提供招聘信源；准备面试时提供 JD 与简历；复盘时提供真实逐字稿。只提供本次任务需要的内容。</p></div></li>
+          <li><span class="setup-number">2</span><div><strong>复制启动消息，补充后发送</strong><p>点击下方“复制启动消息”，补充接入状态和可选任务，发给已获本机文件权限的 Agent。它会先查找 TouDi 并确认当前资料。</p></div></li>
+          <li><span class="setup-number">3</span><div><strong>完成一次小范围任务</strong><p>在对应模块点击“交给 Agent”，补充材料与范围。只有更新招聘记录且首次读取或新增信源时，才核对分类；已有流程直接沿用。</p></div></li>
           <li><span class="setup-number">4</span><div><strong>刷新 App，核对后继续协作</strong><p>Agent 保存并读回后，点击右上角“刷新资料”，检查正文、进度与附件。以后直接告诉它要更新、准备、探查或复盘什么。</p></div></li>
         </ol>
         ${row('启动消息','复制后填好花括号中的内容，发送给你的 Agent。','<button class="btn" onclick="copyAgentBootstrap()">复制启动消息</button>')}

@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent / '脚本'))
 from update_common import atomic_write, data_lock, runtime_keys
 from publish_records import validate as validate_records
 import remote_files
+import profile_store
 
 MODULES = {
  'records': ('投递数据/投递记录.json', []),
@@ -31,6 +32,7 @@ MODULES = {
  'prospects': ('岗位探查/探查目录.json', {'companies': []}),
  'settings': ('投递数据/工作区配置.json', {'schemaVersion': 1}),
  'drafts': ('投递数据/草稿数据.json', {}),
+ 'profile': (profile_store.PROFILE_PATH, profile_store.empty_pack()),
 }
 class Conflict(ValueError): pass
 
@@ -52,6 +54,8 @@ class Workbench:
     def __init__(self, root):
         self.root=Path(root).resolve(); self.data=self.root/'投递数据'; self.data.mkdir(parents=True, exist_ok=True)
     def path(self, relative):
+        if relative in (profile_store.PROFILE_PATH, profile_store.LEGACY_PATH):
+            return profile_store.safe_path(self.root, relative)
         if re.fullmatch(r'投递数据/\.adoptions/[a-f0-9]{32}\.json', relative):
             target=self.root/relative
             if any(p.is_symlink() for p in [target,target.parent,target.parent.parent]): raise ValueError('symlink adoption record denied')
@@ -62,10 +66,12 @@ class Workbench:
             return self.root/relative_path
         return remote_files.allowed_path(self.root, relative, getattr(self,'_materials_override',None))
     def read(self, module):
+        if module == 'profile': return profile_store.read_data(self.root)
         relative, default=MODULES[module]; path=self.path(relative)
         if not path.exists(): return copy.deepcopy(default)
         value=json.loads(path.read_text(encoding='utf-8')); self.validate(module,value); return value
     def validate(self,module,value):
+        if module == 'profile': return profile_store.validate_pack(value)
         if module=='records': return validate_records(value)
         if not isinstance(value,dict): raise ValueError('JSON root must be an object')
         key={'qbank':'categories','preps':'preps','reviews':'sessions','prospects':'companies'}.get(module)
@@ -118,18 +124,19 @@ class Workbench:
         if module=='edits' and (not isinstance(value.get('edits'),dict) or not isinstance(value.get('pref'),dict) or any(not isinstance(v,dict) for v in value['edits'].values())): raise ValueError('invalid edits/pref')
     def inventory(self):
         out={}
-        for relative in [row['path'] for row in remote_files.files(self.root)]+[MODULES['drafts'][0]]:
+        for relative in [row['path'] for row in remote_files.files(self.root)]+[MODULES['drafts'][0], profile_store.PROFILE_PATH, profile_store.LEGACY_PATH]:
             path=self.path(relative)
             if path.is_file(): out[relative]=path.read_bytes()
         return out
     def version(self,module=None):
+        if module == 'profile': return profile_store.revision(self.root)
         if module in ('settings','drafts'):
             relative=MODULES[module][0]; path=self.path(relative)
             values={relative:path.read_bytes()} if path.is_file() else {}
         else:
             values=self.inventory()
         if module in MODULES and module not in ('settings','drafts'):
-            values={k:v for k,v in values.items() if k not in (MODULES['settings'][0],MODULES['drafts'][0])}
+            values={k:v for k,v in values.items() if k not in (MODULES['settings'][0],MODULES['drafts'][0],profile_store.PROFILE_PATH,profile_store.LEGACY_PATH)}
         return hashlib.sha256(encoded({k:hashlib.sha256(v).hexdigest() for k,v in sorted(values.items())})).hexdigest()
     def recover_pending(self):
         from legacy_update import recover
@@ -184,6 +191,11 @@ class Workbench:
     def get(self,module):
         with data_lock(self.data):
             self.recover_pending()
+            if module == 'profile':
+                value = self.read(module)
+                return {'version':self.version(module), 'data':value,
+                        'exists':any(self.path(p).exists() for p in (profile_store.PROFILE_PATH, profile_store.LEGACY_PATH)),
+                        'legacySource':not self.path(profile_store.PROFILE_PATH).exists() and self.path(profile_store.LEGACY_PATH).exists()}
             if module=='workspace': return {'version':self.version(),'data':{'modules':list(MODULES)}}
             if module=='trash':
                 txs=self.data/'.transactions'
@@ -234,11 +246,21 @@ class Workbench:
             module=payload['module']
             if payload.get('base')!=self.version(module): raise Conflict('version_conflict')
             module=payload['module']; action=payload['action']; changes={}
+            if module == 'profile':
+                if action not in ('replace', 'import') or payload.get('files'): raise ValueError('填报资料通过完整规范资料包更新。')
+                self.read(module)  # Corrupt existing data must never be treated as an empty pack.
+                value=copy.deepcopy(payload.get('data')); self.validate(module,value)
+                value.pop('sourceVersion',None); value.pop('sourceName',None)
+                value['savedAt']=datetime.now(timezone.utc).isoformat()
+                if payload.get('dryRun'): return {'ok':True,'dryRun':True,'version':self.version(module)}
+                recovery=self.transaction({profile_store.PROFILE_PATH:encoded(value)})
+                return {'ok':True,'version':self.version(module),'data':self.read(module),'recovery':recovery}
             if module in ('settings','drafts'):
                 if action not in ('replace','import') or 'data' not in payload or payload.get('files'): raise ValueError('settings/drafts require replace or import without material files')
                 # Validate existing data first: damaged files are never replaced as an empty default.
                 self.read(module)
                 value=copy.deepcopy(payload['data']); self.validate(module,value)
+                if payload.get('dryRun'): return {'ok':True,'dryRun':True,'version':self.version(module)}
                 atomic_write(self.path(MODULES[module][0]),encoded(value))
                 return {'ok':True,'version':self.version(module),'data':value}
             if module=='trash' and action=='restore':
@@ -291,6 +313,7 @@ class Workbench:
                     if not relative.startswith(('面试准备/','岗位探查/','复盘/')): raise ValueError('attachments must be bounded materials')
                     remote_files.check_content(relative,content,validate_records); self.path(relative); changes[relative]=content
             self.check_references(changes)
+            if payload.get('dryRun'): return {'ok':True,'dryRun':True,'version':self.version(module)}
             recovery=self.transaction(changes)
             return {'ok':True,'version':self.version(module),'data':self.view(module) if module in MODULES else {},'recovery':recovery,**({'keys':runtime_keys(value)} if module=='records' else {})}
     def check_references(self,changes):
@@ -349,6 +372,17 @@ class Workbench:
         item=copy.deepcopy(item)
         item['attachments']=[{k:v for k,v in a.items() if k!='contentBase64'} for a in item.get('attachments',[])]
         text=item['markdown']; mod=parser('9_面试准备导入.py')
+        if item.pop('structured',False):
+            company=str(item.get('company','')).strip(); position=str(item.get('position','')).strip()
+            cohort=str(item.get('cohort') or '求职').strip()
+            if not company: raise ValueError('请填写公司名称。')
+            if any('\n' in value or '\r' in value for value in (company,position,cohort)) or any(ch in cohort for ch in '（）'):
+                raise ValueError('公司、岗位和批次请使用单行文字。')
+            text=f'# {company}{position}（{cohort}）面试准备\n\n'+text
+        if not re.search(r'^#\s+(.+?)（([^）]+)）(.*?)准备\s*$',text,re.M):
+            raise ValueError('准备稿标题格式不正确：请使用“# 公司岗位（批次）面试准备”，或通过新建表单生成。')
+        if not re.search(r'^##\s+.+$',text,re.M):
+            raise ValueError('准备稿至少需要一个“## 章节名称”；章节下填写正文。')
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/(ident+'.md'); path.write_text(text)
             try: _,title,cohort,mid,note,sections=mod.parse_doc(path,[])
@@ -382,7 +416,7 @@ class Workbench:
         return result
     def backup(self):
         with data_lock(self.data):
-            self.recover_pending(); self.check_references({}); files=self.inventory(); manifest={'schemaVersion':1,'files':{k:hashlib.sha256(v).hexdigest() for k,v in files.items()}}
+            self.recover_pending(); self.check_references({}); files=self.inventory(); manifest={'schemaVersion':1,'profileScope':1,'files':{k:hashlib.sha256(v).hexdigest() for k,v in files.items()}}
             output=io.BytesIO()
             with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr('manifest.json',encoded(manifest))
@@ -409,7 +443,14 @@ class Workbench:
             for relative,content in files.items():
                 if hashlib.sha256(content).hexdigest()!=manifest['files'][relative]: raise ValueError('backup checksum mismatch')
                 for module,(path,_) in MODULES.items():
-                    if path==relative: self.validate(module,json.loads(content))
+                    if path==relative:
+                        if module=='profile': profile_store.compatible_pack(json.loads(content))
+                        else: self.validate(module,json.loads(content))
+            if profile_store.LEGACY_PATH in files:
+                # Validate the archive candidate independently of current workspace data.
+                with tempfile.TemporaryDirectory(prefix='toudi-profile-check-') as temporary:
+                    Path(temporary, profile_store.LEGACY_PATH).write_bytes(files[profile_store.LEGACY_PATH])
+                    profile_store.read_data(temporary)
             for module,key,folder in [('preps','preps',''),('prospects','companies','岗位探查/')]:
                 data=json.loads(files.get(MODULES[module][0],encoded(MODULES[module][1])))
                 for row in [*data[key],*(data.get('archives',[]) if module=='prospects' else [])]:
@@ -433,11 +474,14 @@ class Workbench:
             self.__dict__.pop('_materials_override',None)
     def restore(self,raw,base,preview=False):
         files=self.inspect_backup(raw)
-        if preview: return {'ok':True,'files':[{'path':k,'size':len(v)} for k,v in files.items()]}
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            profile_scope=json.loads(archive.read('manifest.json')).get('profileScope') == 1
+        preserved=[] if profile_scope else [p for p in (profile_store.PROFILE_PATH,profile_store.LEGACY_PATH) if p not in files and self.path(p).exists()]
+        if preview: return {'ok':True,'files':[{'path':k,'size':len(v)} for k,v in files.items()], 'preserved':preserved}
         with data_lock(self.data):
             self.recover_pending()
             if base!=self.version(): raise Conflict('version_conflict')
-            changes={k:None for k in self.inventory() if k not in files}; changes.update(files)
+            changes={k:None for k in self.inventory() if k not in files and k not in preserved}; changes.update(files)
             self._materials_override=list(dict.fromkeys([*remote_files.registered_materials(self.root),*json.loads(files.get(MODULES['settings'][0],b'{}')).get('materialFiles',[])]))
             self.check_references(changes)
             recovery=self.transaction(changes)

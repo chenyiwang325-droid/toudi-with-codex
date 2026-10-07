@@ -1,0 +1,26 @@
+'use strict';
+// Real worker + real Python Native operation, wholly within a temporary workspace.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),os=require('node:os'),{execFileSync}=require('node:child_process'),{webcrypto}=require('node:crypto');
+const app=path.resolve(__dirname,'../app'),ext=path.join(app,'browser-extension'),workspace=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'toudi-sync-fixture-'));
+const env={...process.env,TOUDI_WORKSPACE:workspace,TOUDI_APP_HOME:path.join(workspace,'fixture-app-home'),PYTHONDONTWRITEBYTECODE:'1'};
+const bridge=`import sys,json\nsys.path.insert(0,sys.argv[1])\nimport browser_helper,profile_store\np=json.load(sys.stdin)\ntry:\n if p.pop('_app',False):\n  from pathlib import Path\n  root=Path(sys.argv[2])\n  if 'pack' in p: profile_store.write(root,profile_store.read(root)['version'],p['pack'],profile_store.workspace_key(root))\n  result=profile_store.read_data(root)\n else: result=browser_helper.operation(p)\n print(json.dumps({'value':result},ensure_ascii=False))\nexcept Exception as e: print(json.dumps({'error':str(e)},ensure_ascii=False))`;
+function python(payload){const result=JSON.parse(execFileSync('python3',['-c',bridge,app,workspace],{env,input:JSON.stringify(payload),encoding:'utf8'}));if(result.error)throw Error(result.error);return result.value;}
+const data={},session={};function store(value){return {async setAccessLevel(){},async get(k){return {[k]:value[k]};},async set(v){Object.assign(value,structuredClone(v));},async remove(k){for(const key of Array.isArray(k)?k:[k])delete value[key];}};}
+const context={structuredClone,TextEncoder,crypto:webcrypto,URL,setTimeout:()=>0,clearTimeout(){},console,chrome:{storage:{local:store(data),session:store(session)},runtime:{id:'fixture',onMessage:{addListener(){}}},tabs:{query:async()=>[]}}};vm.createContext(context);context.importScripts=(...names)=>names.forEach(n=>vm.runInContext(fs.readFileSync(path.join(ext,n),'utf8'),context));vm.runInContext(fs.readFileSync(path.join(ext,'worker.js'),'utf8'),context);
+vm.runInContext(fs.readFileSync(path.join(ext,'profile-library.js'),'utf8'),context);
+let collide=false,requestId=0;
+context.fixtureNative=async payload=>{
+ if(collide && payload.op==='profile-write'){collide=false;const concurrent=python({_app:true});concurrent.facts[0].value='合成App并发';python({_app:true,pack:concurrent});}
+ return python({...payload,requestId:++requestId});
+};vm.runInContext('native=fixtureNative',context);
+const op=m=>context.operation(m);
+const seed={schemaVersion:1,name:'合成集成资料',profiles:[{id:'general',label:'合成默认',extraProfile:{retained:true}}],facts:[{key:'personal.name',label:'姓名',value:'合成App初值',module:'personal',recordId:'personal',profiles:['general'],sourceFact:{ref:'fixture-only'}}],rules:['合成规则'],supplements:[{label:'合成补充',module:'personal',sourceKey:'fixture-source',extra:{keep:[1,2]}},{unrecognized:{preserve:true}}],unknownRoot:{futureSchema:{retained:true}}};
+(async()=>{try{
+ python({_app:true,pack:seed});await op({op:'profile-connect'});assert.equal(data.toudiWorkspaceProfileSync.status,'synced',data.toudiWorkspaceProfileSync.error);let local=data.toudiPrivateProfile;
+ assert.equal(local.facts[0].value,'合成App初值');assert.deepEqual(local.unknownRoot,seed.unknownRoot);assert.deepEqual(local.supplements,seed.supplements);assert.deepEqual(local.profiles[0].extraProfile,seed.profiles[0].extraProfile);
+ const sourceVersion=local.sourceVersion;assert.notEqual(sourceVersion,data.toudiWorkspaceProfileSync.version);const edited=context.TouDiProfileLibrary.saveRecord(local,'personal','personal',{name:'合成Chrome编辑'},{profileId:'general',profiles:['general']});assert.deepEqual(edited.supplements,seed.supplements);assert.deepEqual(edited.unknownRoot,seed.unknownRoot);await op({op:'profile-save',base:sourceVersion,pack:edited});assert.equal(data.toudiWorkspaceProfileSync.status,'synced',data.toudiWorkspaceProfileSync.error);
+ const appRead=python({_app:true});assert.equal(appRead.facts[0].value,'合成Chrome编辑');assert.deepEqual(appRead.supplements,seed.supplements);assert.deepEqual(appRead.unknownRoot,seed.unknownRoot);assert.deepEqual(appRead.facts[0].sourceFact,seed.facts[0].sourceFact);
+ const appUpdate=structuredClone(appRead);appUpdate.rules.push('App新增合成规则');python({_app:true,pack:appUpdate});await op({op:'profile-read'});assert.equal(data.toudiPrivateProfile.rules.length,2);
+ collide=true;const browserEdit=structuredClone(data.toudiPrivateProfile);browserEdit.facts[0].value='合成Chrome并发';await op({op:'profile-save',base:data.toudiPrivateProfile.sourceVersion,pack:browserEdit});assert.equal(data.toudiWorkspaceProfileSync.status,'pending');assert.equal(python({_app:true}).facts[0].value,'合成App并发');await op({op:'profile-read'});assert.equal(data.toudiWorkspaceProfileSync.status,'conflict');assert.equal(data.toudiWorkspaceProfileSync.review.local.facts[0].value,'合成Chrome并发');assert.equal(data.toudiWorkspaceProfileSync.review.remote.facts[0].value,'合成App并发');
+ console.log('PASS real Python Native/App ↔ worker: complete metadata retention, both directions, strict revisions and retained concurrent candidates');
+}finally{fs.rmSync(workspace,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1});

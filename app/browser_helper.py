@@ -1,4 +1,4 @@
-"""Chrome-native Codex bridge. No TouDi App, HTTP server or personal file access."""
+"""Chrome-native bridge for bounded workspace profiles and user-selected models."""
 import argparse
 import json
 import os
@@ -14,14 +14,22 @@ HOST='com.toudi.filling.codex'
 EXTENSION_ID='edfgnahdkpobmkhckjhadadnlbhpbpmd'
 ORIGIN='chrome-extension://'+EXTENSION_ID+'/'
 MAX_MESSAGE=512*1024
-VERSION='0.3.1'
+VERSION='0.4.0'
 
 
 def validate_request(request):
     if not isinstance(request,dict) or request.get('protocol')!=1 or type(request.get('requestId')) is not int:
         raise ValueError('本机连接请求无效。')
-    if request.get('op') in {'status','open-workbench'}:
+    if request.get('op') in {'status','open-workbench','profile-read'}:
         if set(request)-{'protocol','requestId','op'}:raise ValueError('不支持的连接请求。')
+        return request
+    if request.get('op') == 'profile-write':
+        if set(request)-{'protocol','requestId','op','workspaceKey','base','pack'}:
+            raise ValueError('资料同步不接受文件路径或其他操作。')
+        if any(not isinstance(request.get(k),str) or not re.fullmatch('[a-f0-9]{64}',request[k]) for k in ('workspaceKey','base')):
+            raise ValueError('请先读取当前工作区和资料版本。')
+        from profile_store import validate_pack
+        validate_pack(request.get('pack'))
         return request
     if request.get('op')!='map' or set(request)-{'protocol','requestId','op','model','fields','allowedFacts'}:
         raise ValueError('不支持的本机连接请求。')
@@ -52,6 +60,12 @@ def validate_request(request):
 
 def operation(request):
     validate_request(request)
+    if request['op'] in {'profile-read','profile-write'}:
+        import profile_store
+        from workspace_link import resolve_workspace, safe_directory
+        root=safe_directory(resolve_workspace())
+        if request['op']=='profile-read': return profile_store.read(root)
+        return profile_store.write(root,request['base'],request['pack'],request['workspaceKey'])
     if request['op']=='status':
         from codex_connection import codex_status
         return {**codex_status(refresh=True),'helperVersion':VERSION,'independent':True}
@@ -98,7 +112,7 @@ def serve(origin,stream_in=None,stream_out=None):
             request=json.loads(raw);ident=request.get('requestId') if isinstance(request,dict) else None
             result={'requestId':ident,'value':operation(request)}
         except ValueError as exc:result={'requestId':ident,'error':str(exc)}
-        except Exception:result={'requestId':ident,'error':'本机 Codex 核对未完成；原计划保留，可继续本地填写。'}
+        except Exception:result={'requestId':ident,'error':'本机连接操作未完成；当前资料与填写计划已保留，请检查连接后重试。'}
         encoded=json.dumps(result,ensure_ascii=False).encode('utf-8')
         outgoing.write(struct.pack('=I',len(encoded))+encoded);outgoing.flush()
 

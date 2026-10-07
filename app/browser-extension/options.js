@@ -3,6 +3,7 @@ const el=id=>document.getElementById(id);
 const esc=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const L=TouDiProfileLibrary,C=TouDiFillingCore;
 const modules=Object.fromEntries(Object.entries(L.templates).map(([key,t])=>[key,t.label]));
+let workspaceSync={status:"disconnected"};
 let currentPack=null,pref=TouDiAgentConfig.normalize(),editingKey=null,recordDraft=null,saving=false,recordInitialProfiles=[];
 const openRecords=new Set();let recordsInitialized=false;
 const pack=()=>currentPack || L.emptyPack();
@@ -32,7 +33,7 @@ function profileOptions(){
   const profiles=pack().profiles,selected=profiles.some(p=>p.id===pref.profile)?pref.profile:profiles[0].id;
   el('profile').replaceChildren(...profiles.map(p=>new Option(p.label,p.id)));el('profile').value=selected;
 }
-async function reload(){const value=await send('profile-read');currentPack=value.pack;pref=value.preferences;profileOptions();syncAgentSettings();render();}
+async function reload(){const value=await send('profile-read');currentPack=value.pack;workspaceSync=value.sync;renderSync();pref=value.preferences;profileOptions();syncAgentSettings();render();}
 async function save(candidate,imported=false){await send('profile-save',{pack:candidate,base:currentPack?.sourceVersion || null,imported});await reload();}
 function dateLabel(value){if(!value)return '未注明';if(/^\d{4}-\d{2}-\d{2}$/.test(value))return value;const date=new Date(value);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat('zh-CN',{dateStyle:'medium',timeStyle:'short'}).format(date);}
 function currentFacts(){return C.profile(pack(),el('profile').value).facts;}
@@ -228,3 +229,20 @@ el('newVersionForm').addEventListener('submit',event=>{event.preventDefault();ac
 el('editRules').addEventListener('click',()=>{el('rulesText').value=(currentPack?.rules || []).join('\n');el('rulesEditor').showModal();});el('closeRules').addEventListener('click',()=>el('rulesEditor').close());el('rulesForm').addEventListener('submit',event=>{event.preventDefault();action(async()=>{const candidate=structuredClone(pack());candidate.rules=el('rulesText').value.split('\n').map(s=>s.trim()).filter(Boolean);await save(candidate);el('rulesEditor').close();notice('填写规则已保存。');});});
 el('deleteProfile').addEventListener('click',()=>action(async()=>{if(!confirm('清除本浏览器的私人资料、字段匹配和最近核验？原始资料文件不会被修改。'))return;await send('profile-delete');openRecords.clear();recordsInitialized=false;await reload();el('lastReport').innerHTML='<p>尚无核验记录。</p>';notice('插件资料已清除。');}));
 action(async()=>{await reload();const value=await send('state');if(value.lastReport){const r=value.lastReport;el('lastReport').innerHTML=`<p>${esc(r.origin)}</p><p>${r.summary?.verified || 0} 项核验通过 · ${r.summary?.failed || 0} 项未通过</p><p class="hint">${esc(dateLabel(r.checkedAt))} · 网站保存未确认</p>`;}});
+
+function renderSync(){
+  const status=workspaceSync || {},labels={disconnected:'尚未连接工作区',synced:'已同步到当前工作区',pending:'本机资料已保存，等待同步',conflict:'双方资料不同，需要核对', 'workspace-changed':'工作区已切换，需要重新连接'};
+  el('workspaceSync').textContent=(labels[status.status] || '等待连接')+(status.lastSync?' · 最近同步 '+dateLabel(status.lastSync):'')+(status.error?' · '+status.error:'');
+  el('connectWorkspace').textContent=status.workspaceKey?'重新连接当前工作区':'连接当前工作区';el('disconnectWorkspace').disabled=!status.enabled;el('syncWorkspace').disabled=!status.enabled;
+  el('syncReview').hidden=!status.review;el('syncLocal').textContent=status.review?JSON.stringify(status.review.local,null,2):'';el('syncRemote').textContent=status.review?JSON.stringify(status.review.remote,null,2):'';
+  if(status.enabled && status.status!=='synced')notice(labels[status.status]+'。'+(status.error || '请到「资料管理」核对同步状态。'),true);
+}
+for(const [id,op] of [['connectWorkspace','profile-connect'],['syncWorkspace','profile-sync'],['disconnectWorkspace','profile-disconnect']])el(id).addEventListener('click',()=>action(async()=>{workspaceSync=await send(op);await reload();}));
+for(const button of document.querySelectorAll('[data-sync-choice]'))button.addEventListener('click',()=>action(async()=>{
+  const review=workspaceSync.review;if(!review)return;
+  if(!confirm('将所选资料保存为浏览器与当前工作区的共同资料？请确认已审阅双方，并按需下载备份。'))return;
+  await send('profile-resolve',{choice:button.dataset.syncChoice,workspaceKey:review.workspaceKey,reviewVersion:review.version,localVersion:review.localVersion});await reload();
+}));
+function downloadCandidate(value,name){const blob=new Blob([JSON.stringify(value,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+el('backupSyncLocal').addEventListener('click',()=>downloadCandidate(workspaceSync.review?.local,'TouDi-browser-candidate.json'));
+el('backupSyncRemote').addEventListener('click',()=>downloadCandidate(workspaceSync.review?.remote,'TouDi-workspace-candidate.json'));

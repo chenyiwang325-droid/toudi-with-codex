@@ -17,6 +17,7 @@ async function task(fn, text) {
   catch (e) { notice(e.message, true); }
   finally {busy = false;document.querySelectorAll('button,input,select,textarea').forEach(control => control.disabled = false);updateAgentControls();selection();}
 }
+function showSync(sync){const labels={pending:'资料已保存在本机，等待与中控台同步',conflict:'资料同步有冲突，请到资料与设置核对双方', 'workspace-changed':'中控台工作区已切换，请重新连接核对'};const text=labels[sync?.status] || '';el('workspaceSync').hidden=!text;el('workspaceSync').textContent=text;}
 function sourceLabel(){if(profileSummary)el('sourceStatus').textContent=`资料更新 ${String(profileSummary.savedAt || '未注明').slice(0,10)} · 当前版本 ${profileSummary.profiles.find(p=>p.id===el('profile').value)?.count || 0} 项`;}
 function available(value) {hasProfile=!!value;el('empty').hidden=hasProfile;el('controls').hidden=!hasProfile;}
 function selection() {
@@ -70,7 +71,7 @@ function updateAgentControls(){
 el('agentSettings').addEventListener('click',()=>send('settings',{section:'agent'}));
 el('openWorkbench').addEventListener('click',()=>task(async()=>{await send('open-workbench');notice('投递中控台已打开。');},'正在打开中控台…'));
 el('autoAgent').addEventListener('change',()=>task(async()=>{pref=await send('preferences',{preferences:{autoAgent:el('autoAgent').checked}});state=null;render();notice(pref.autoAgent?'自动核对已开启，使用你已选择的模型和 Codex 额度。':'自动核对已关闭。');},'正在保存偏好…'));
-el('scan').addEventListener('click', () => task(async () => {state=await send('scan',{profile:el('profile').value});render();notice(state.agentError || '计划已生成；勾选的字段会填写，已有内容默认保留。',!!state.agentError);},'正在识别字段并核对资料…'));
+el('scan').addEventListener('click', () => task(async () => {state=await send('scan',{profile:el('profile').value});showSync(state.sync);render();notice(state.agentError || '计划已生成；勾选的字段会填写，已有内容默认保留。',!!state.agentError);},'正在识别字段并核对资料…'));
 el('profile').addEventListener('change', () => task(async()=>{pref=await send('preferences',{preferences:{profile:el('profile').value}});state=null;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
 el('review').addEventListener('change', selection);
 el('review').addEventListener('click', event => {
@@ -94,4 +95,4 @@ el('agentCli').addEventListener('click',()=>task(async()=>{
   await checkCodex();state=await send('remap',{agent:true});render();notice('所选模型已返回匹配，请核对计划后填写。');
 },'正在核对歧义字段…'));
 el('fill').addEventListener('click',()=>task(async()=>{const inputs=[...document.querySelectorAll('#review input[data-field]:checked')];state=await send('fill',{selected:inputs.map(input=>input.dataset.field),overwrite:inputs.filter(input=>input.dataset.overwrite==='true').map(input=>input.dataset.field)});render();notice('所选字段已执行并读回核验，请查看逐项结果。');},'正在填写所选字段并读回核验…'));
-task(async()=>{const value=await send('state');available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=pref.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');
+task(async()=>{const value=await send('state');showSync(value.sync);available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=pref.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');

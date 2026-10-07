@@ -1,0 +1,32 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{webcrypto}=require('node:crypto');
+const root=path.join(__dirname,'../app/browser-extension'),Sync=require(root+'/sync-core.js');
+const a={schemaVersion:1,profiles:[{id:'general',label:'默认资料'}],facts:[{key:'name',label:'姓名',value:'合成甲',module:'personal',profiles:['general']}],rules:[]};
+const b=structuredClone(a);b.facts[0].value='合成乙';
+assert.equal(Sync.compare(a,{...a,sourceVersion:'local',sourceName:'浏览器资料编辑'}, {...a,savedAt:'later',sourceName:'填报资料/资料.json'}),'equal');
+assert(!Sync.same(a,{...a,name:'不同资料名'}));assert(!Sync.same(a,{...a,rules:['新规则']}));assert(!Sync.same(a,b));
+assert.equal(Sync.compare(a,b,a),'local');assert.equal(Sync.compare(a,a,b),'remote');
+const c=structuredClone(a);c.facts.push({key:'email',value:'fixture@example.invalid'});
+assert.equal(Sync.merge(a,b,c).conflicts.length,0);assert.equal(Sync.merge(a,b,c).pack.facts.length,2);
+assert.deepEqual(Sync.merge(a,b,{...a,facts:[]}).conflicts,['facts:name']);
+const local={},session={},writes=[];let remote={workspaceKey:'fixture-A',version:'v1',pack:null},offline=false;
+function storage(data){return {async get(key){return {[key]:data[key]};},async set(value){Object.assign(data,structuredClone(value));},async remove(keys){for(const k of Array.isArray(keys)?keys:[keys])delete data[k];},async setAccessLevel(){}};}
+const context={structuredClone,crypto:webcrypto,TextEncoder,URL,console,setTimeout:()=>0,clearTimeout(){},chrome:{storage:{local:storage(local),session:storage(session)},runtime:{onMessage:{addListener(){}},id:'fixture'},tabs:{query:async()=>[]}}};vm.createContext(context);context.importScripts=(...names)=>{for(const n of names)vm.runInContext(fs.readFileSync(root+'/'+n,'utf8'),context);};vm.runInContext(fs.readFileSync(root+'/worker.js','utf8'),context);
+context.fixtureNative=async payload=>{if(offline)throw Error('合成离线');if(payload.op==='profile-read')return structuredClone(remote);writes.push(structuredClone(payload));if(payload.workspaceKey!==remote.workspaceKey||payload.base!==remote.version)throw Error('合成版本冲突');remote={...remote,version:'v'+(Number(remote.version.slice(1))+1),pack:{...structuredClone(payload.pack),sourceName:'填报资料/资料.json',sourceVersion:'backend-sha-'+writes.length,savedAt:'2026-01-01T00:00:00Z'}};return structuredClone(remote);};
+vm.runInContext('native=fixtureNative',context);
+const op=message=>context.operation(message);
+(async()=>{
+ await op({op:'profile-connect'});assert.equal(writes.length,0);assert.equal(local.toudiWorkspaceProfileSync.status,'synced');await op({op:'profile-disconnect'});
+ await op({op:'profile-save',base:null,pack:a});await op({op:'profile-connect'});assert.equal(writes.length,1);assert.equal(local.toudiWorkspaceProfileSync.status,'synced');assert.equal(local.toudiPrivateProfile.sourceName,'填报资料/资料.json');
+ const sameVersion=local.toudiPrivateProfile.sourceVersion;session.toudiFillingSession={fixture:'plan'};remote.pack.savedAt='2026-02-02T00:00:00Z';await context.installPack(remote.pack);assert.equal(local.toudiPrivateProfile.sourceVersion,sameVersion);assert.equal(session.toudiFillingSession.fixture,'plan');
+ offline=true;const base=local.toudiPrivateProfile.sourceVersion;await op({op:'profile-save',base,pack:b});assert.equal(local.toudiWorkspaceProfileSync.status,'pending');assert.equal(local.toudiPrivateProfile.facts[0].value,'合成乙');
+ offline=false;remote.pack.facts[0].value='合成丙';remote.version='v3';await op({op:'profile-read'});assert.equal(local.toudiWorkspaceProfileSync.status,'conflict');assert.equal(writes.length,1);
+ const review=local.toudiWorkspaceProfileSync.review;remote.version='v4';await assert.rejects(()=>op({op:'profile-resolve',choice:'local',workspaceKey:review.workspaceKey,reviewVersion:review.version,localVersion:review.localVersion}),/审阅期间变化/);assert.equal(writes.length,1);
+ const next=local.toudiWorkspaceProfileSync.review;await op({op:'profile-resolve',choice:'local',workspaceKey:next.workspaceKey,reviewVersion:next.version,localVersion:next.localVersion});assert.equal(remote.pack.facts[0].value,'合成乙');assert.equal(writes[1].base,'v4');
+ remote.workspaceKey='fixture-B';remote.version='v1';await op({op:'profile-read'});assert.equal(local.toudiWorkspaceProfileSync.status,'workspace-changed');assert.equal(writes.length,2);await assert.rejects(()=>op({op:'scan'}),/请先断开同步/);
+ await op({op:'profile-save',base:local.toudiPrivateProfile.sourceVersion,pack:a});assert.equal(writes.length,2);assert.equal(local.toudiWorkspaceProfileSync.workspaceKey,'fixture-A');
+ await op({op:'profile-disconnect'});await op({op:'profile-read'});assert.equal(writes.length,2);
+ delete local.toudiPrivateProfile;delete local.toudiWorkspaceProfileSync;remote={workspaceKey:'fixture-C',version:'v1',pack:structuredClone(a)};await op({op:'profile-connect'});assert.equal(local.toudiPrivateProfile.facts[0].value,'合成甲');assert.equal(writes.length,2);
+ await op({op:'profile-disconnect'});await op({op:'profile-save',base:local.toudiPrivateProfile.sourceVersion,pack:b});await op({op:'profile-connect'});assert.equal(local.toudiWorkspaceProfileSync.status,'conflict');assert.equal(local.toudiWorkspaceProfileSync.review.local.facts[0].value,'合成乙');assert.equal(local.toudiWorkspaceProfileSync.review.remote.facts[0].value,'合成甲');assert.equal(writes.length,2);
+ console.log('PASS isolated profile sync: three-way merge, offline retention, reviewed-base conflict, workspace isolation, disconnect');
+})().catch(e=>{console.error(e);process.exitCode=1;});

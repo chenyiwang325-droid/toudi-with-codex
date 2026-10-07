@@ -29,6 +29,16 @@
     return [...groups.values()].sort((a,b)=>modules.indexOf(a[0].module)-modules.indexOf(b[0].module) || start(b)-start(a)).flat();
   }
   function validatePack(input) {
+    function jsonValue(value){
+      if(value===null || ['string','boolean'].includes(typeof value))return;
+      if(typeof value==='number' && Number.isFinite(value))return;
+      if(Array.isArray(value)){value.forEach(jsonValue);return;}
+      if(value && typeof value==='object' && Object.prototype.toString.call(value)==='[object Object]'){Object.values(value).forEach(jsonValue);return;}
+      throw Error('资料包只能包含合法 JSON 内容。');
+    }
+    jsonValue(input);
+    if(new TextEncoder().encode(JSON.stringify(input)).length>450*1024)throw Error('资料包超过 450 KB，请减少重复内容；附件单独保留。');
+    if(input && ((!Array.isArray(input.warnings ?? []) || (input.warnings || []).some(w=>typeof w!=='string')) || (!Array.isArray(input.supplements ?? []) || (input.supplements || []).some(s=>!s || typeof s!=='object' || Array.isArray(s)))))throw Error('资料补充信息格式无效。');
     if (!input || input.schemaVersion!==1 || !Array.isArray(input.facts) || input.facts.length>1500 || !Array.isArray(input.rules || []) || (input.rules || []).some(r=>!text(r,12000))) throw Error('资料包格式无效：需要 schemaVersion 1、facts 和 rules。');
     const inferred=[...new Set(['general',...input.facts.flatMap(f=>Array.isArray(f?.profiles)?f.profiles:[])])];
     const profiles=structuredClone(input.profiles ?? inferred.map((id,i)=>({id,label:id==='general'?'默认资料':'导入资料 '+i}))),ids=new Set();
@@ -57,7 +67,7 @@
       if(f.gpaScale && !['4','4.0','5','5.0'].includes(String(f.gpaScale)))throw Error('GPA 满分口径无效。');
       return f;
     });
-    return {schemaVersion:1,kind:'toudi-filling-profile',name:text(input.name,200)?input.name:'个人填报资料',savedAt:text(input.savedAt,80)?input.savedAt:null,sourceName:text(input.sourceName,300)?input.sourceName:'浏览器资料编辑',sourceVersion:text(input.sourceVersion,150)?input.sourceVersion:'',profiles,facts,rules:(input.rules || []).slice(),warnings:Array.isArray(input.warnings)?input.warnings.filter(w=>text(w,2000)).slice(0,100):[],supplements:Array.isArray(input.supplements)?input.supplements.filter(s=>s&&text(s.label)).map(s=>({label:s.label,module:s.module})):[]};
+    return {...structuredClone(input),schemaVersion:1,kind:'toudi-filling-profile',name:text(input.name,200)?input.name:'个人填报资料',savedAt:text(input.savedAt,80)?input.savedAt:null,sourceName:text(input.sourceName,300)?input.sourceName:'浏览器资料编辑',sourceVersion:text(input.sourceVersion,150)?input.sourceVersion:'',profiles,facts,rules:(input.rules || []).slice(),warnings:structuredClone(input.warnings || []),supplements:structuredClone(input.supplements || [])};
   }
   function profile(pack, id=pack.profiles[0].id) {
     if(!pack.profiles.some(p=>p.id===id))throw Error('请选择有效的资料版本。');

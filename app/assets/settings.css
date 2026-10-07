@@ -57,10 +57,10 @@ html[data-render-diagnostic="true"] *, html[data-render-diagnostic="true"] *::be
 #settingsView .settings-section + .settings-section { padding-top: 24px; }
 #settingsView .settings-section h3 { font-size: var(--setting-section-size); font-weight: 600; line-height: 24px; margin: 0 0 12px; }
 #settingsView .settings-section > p.settings-help { font-size: var(--setting-control-size); color: var(--text2); line-height: 20px; margin: 0 0 12px; }
-#settingsView .setting-row { display: grid; grid-template-columns: minmax(0,1fr) var(--setting-control-width); gap: var(--setting-gap); align-items: center; height: var(--setting-row-height); padding: 0; border-bottom: 1px solid var(--border-light); }
+#settingsView .setting-row { display: grid; grid-template-columns: minmax(0,1fr) var(--setting-control-width); gap: var(--setting-gap); align-items: center; min-height: var(--setting-row-height); height: auto; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
 #settingsView .setting-label { min-width: 0; }
 #settingsView .setting-label strong { display: block; font-size: var(--setting-label-size); font-weight: 600; line-height: 20px; }
-#settingsView .setting-label p { font-size: var(--setting-caption-size); color: var(--text2); line-height: 20px; margin: 4px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#settingsView .setting-label p { font-size: var(--setting-caption-size); color: var(--text2); line-height: 20px; margin: 4px 0 0; white-space: normal; overflow-wrap: anywhere; }
 #settingsView .settings-note { font-size: var(--setting-caption-size); color: var(--text2); line-height: 20px; margin: 12px 0 0; }
 #settingsView .setting-control { display: flex; align-items: center; gap: 8px; justify-content: flex-end; min-width: 0; }
 #settingsView .btn { display: inline-flex; align-items: center; justify-content: center; height: var(--setting-control-height); min-height: var(--setting-control-height); font: inherit; font-size: var(--setting-control-size); line-height: 20px; padding: 0 12px; white-space: nowrap; }
@@ -266,3 +266,6 @@ html[data-motion="off"] .disclosure-action svg { transition: none; }
 }
 .module-nav button.active:hover, .sb-item.active:hover { background: var(--primary-light); }
 .pref-options:has(> .pref-option:only-child) { grid-template-columns: minmax(0,1fr); }
+
+.management-form details>summary { color: var(--text); font-size: 13px; line-height: 1.7; text-decoration: underline; text-underline-offset: 3px; }
+.management-form label { font-size: 13px; line-height: 1.6; }

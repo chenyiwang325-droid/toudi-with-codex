@@ -51,8 +51,8 @@
   </section>
   <section id="panel-data" class="settings-panel" role="tabpanel" aria-labelledby="tab-data" hidden>
     <h2>资料管理</h2><p class="section-intro">资料保存在当前 Chrome 的扩展本地存储中。</p>
-    <div id="source"><p>尚未保存资料。</p></div>
-    <p class="hint section-note">Agent 更新原始资料后，再导入新版以更新插件副本。卸载插件前请导出备份。</p>
+    <div id="workspaceSyncSection" class="subsection"><h3>中控台工作区同步</h3><p id="workspaceSync" role="status">尚未连接工作区。</p><div class="buttons"><button id="connectWorkspace">连接当前工作区</button><button id="syncWorkspace">立即同步</button><button id="disconnectWorkspace">断开同步</button></div><p class="hint">启用后共享中控台的完整填报资料；离线修改保存在本机，恢复连接后核对同步，无新增模型 API 费用。连接后，Agent 通过中控台正式资料工具更新同一份母本；旧资料来源在首次保存时转入规范资料文件并保留原件。</p><div id="syncReview" hidden><p>双方资料不同，已保留双方。先展开核对或下载备份，再选择保存结果。</p><details><summary>浏览器资料</summary><pre id="syncLocal"></pre></details><details><summary>工作区资料</summary><pre id="syncRemote"></pre></details><div class="buttons"><button id="backupSyncLocal">下载浏览器候选</button><button id="backupSyncRemote">下载工作区候选</button></div><div class="buttons"><button data-sync-choice="local">采用浏览器资料</button><button data-sync-choice="remote">采用工作区资料</button><button data-sync-choice="merge">合并无冲突修改</button></div></div></div><div id="source"><p>尚未保存资料。</p></div>
+    <p class="hint section-note">连接工作区后自动核对更新；未连接时可导入资料包。卸载插件前请导出备份。</p>
     <div class="subsection"><h3>最近核验</h3><div id="lastReport"><p>尚无核验记录。</p></div></div>
     <details class="disclosure"><summary><span>清除本地资料</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><p>先导出备份。清除只影响这个浏览器中的插件副本。</p><button id="deleteProfile" class="danger" disabled>清除资料、匹配和核验记录</button></div></details>
   </section>

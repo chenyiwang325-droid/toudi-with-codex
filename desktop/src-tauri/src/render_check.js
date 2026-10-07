@@ -8,13 +8,27 @@
   if (target === 'filling' && typeof window.openFilling === 'function') {
     await window.__TOUDI_DESKTOP_READY__;
     await window.openFilling();
+    const frame=document.querySelector('.filling-profile-frame');
+    for(let i=0;i<60;i++) {
+      if(frame?.contentDocument?.querySelector('#facts') && frame.contentDocument.body.textContent.includes('个人资料')) break;
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    await new Promise(resolve=>setTimeout(resolve,500));
+    const doc=frame?.contentDocument;
+    for(const animation of doc?.getAnimations() || []) animation.finish();
     const summary = await (await fetch('/api/filling')).json();
     const extension = await fetch('/api/filling/extension');
     filling = {available:summary.available, counts:summary.counts,
       dialogOpen:document.querySelector('#fillingDialog')?.open,
       sidebarEntry:document.querySelector('.filling-nav #fillingEntry')?.textContent,
       extensionEntry:!!document.getElementById('fillingOpen'),
-      guide:document.querySelector('.filling-body a')?.href,
+      guide:document.querySelector('.filling-footer a')?.href,
+      sharedEditor:!!doc?.querySelector('#facts'),
+      editorText:doc?.querySelector('h1')?.textContent,
+      editorWidth:doc?.documentElement.clientWidth,
+      editorScrollWidth:doc?.documentElement.scrollWidth,
+      editorTheme:doc ? getComputedStyle(doc.body).backgroundColor : null,
+      editorStatus:doc?.querySelector('#notice')?.textContent,
       noLegacyConnection:!document.getElementById('fillingCopy'),
       extensionSize:(await extension.arrayBuffer()).byteLength};
   } else if (target && typeof switchView === 'function') {

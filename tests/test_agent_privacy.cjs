@@ -15,10 +15,17 @@ vm.createContext(context);vm.runInContext(bootstrap+copy,context);
 (async()=>{
   const general=context.agentBootstrapText();
   for(const value of Object.values(desktop))assert(!general.includes(value));
-  for(const step of ['我的信源','我的材料','本次任务','已有资料','workspace status','preference-catalog','read','validate','commit','刷新资料'])assert(general.includes(step));
+  for(const step of ['招聘信源（可选）','我的材料','接入后任务（可选）','已有资料','workspace status','preference-catalog','read','validate','commit','刷新资料'])assert(general.includes(step));
   await context.copyAgentBootstrap();assert.equal(copied,general);
   await context.copyAgentBootstrap('true');assert.equal(copied,general);
   await context.copyAgentBootstrap(true);assert.equal(copied,general);
+  for(const module of ['records','qbank','preps','prospects','reviews']) {
+    const task=context.agentTaskText(module);
+    await context.copyAgentBootstrap(module);assert.equal(copied,task);
+    assert(task.includes('本次范围'));assert(task.includes('本次材料'));
+    assert.equal(task.includes('preference-catalog'),module==='records');
+    for(const value of Object.values(desktop))assert(!task.includes(value));
+  }
   for(const value of Object.values(desktop))assert(!copied.includes(value));
   assert.equal(context.agentBootstrapText(),general);
   context.window.__TOUDI_DESKTOP__=null;assert.equal(context.agentBootstrapText(),general);
@@ -27,5 +34,5 @@ vm.createContext(context);vm.runInContext(bootstrap+copy,context);
   assert(!html.includes('copyAgentBootstrap(true)'));
   const guide=fs.readFileSync(path.join(__dirname,'../docs/开始与初始化.md'),'utf8');
   assert(guide.includes(general));
-  console.log('PASS Agent startup: one complete message matches the guide and never copies private directories');
+  console.log('PASS Agent startup: initialization matches the guide and each module has its own task and never copies private directories');
 })().catch(e=>{console.error(e);process.exitCode=1});

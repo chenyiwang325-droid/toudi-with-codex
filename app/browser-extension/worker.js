@@ -1,5 +1,5 @@
-// Facts and plans live in this extension. The native host is only a Codex bridge.
-importScripts('filling-aliases.js','filling-core.js','agent-config.js');
+// Local plans; explicitly connected profiles share the bound workspace via Native Messaging.
+importScripts('filling-aliases.js','filling-core.js','agent-config.js','sync-core.js');
 const Core=globalThis.TouDiFillingCore;
 const KEY='toudiFillingSession', PACK='toudiPrivateProfile', PREF='toudiFillingPreferences', MAPS='toudiFieldMappings';
 const HOST='com.toudi.filling.codex';
@@ -98,23 +98,79 @@ async function remap(state,message) {
   }
   return state;
 }
+const SYNC='toudiWorkspaceProfileSync', Sync=TouDiProfileSync;
+async function syncState(){return (await chrome.storage.local.get(SYNC))[SYNC] || {status:'disconnected'};}
+async function storeSync(value){await chrome.storage.local.set({[SYNC]:value});return value;}
+function validateRemote(value){
+  if(!value || typeof value.workspaceKey!=='string' || !value.workspaceKey || typeof value.version!=='string')throw Error('工作区返回的资料版本无效。');
+  if(value.pack!==null)value.pack={...value.pack,...Core.validatePack(value.pack)};return value;
+}
+async function installPack(value){
+  const old=(await chrome.storage.local.get(PACK))[PACK] || null,changed=!Sync.same(old,value);
+  if(value===null)await chrome.storage.local.remove(PACK);
+  else{const next={...value,...Core.validatePack(value)};next.sourceVersion=!changed && old?.sourceVersion?old.sourceVersion:await digest({...next,sourceVersion:''});await chrome.storage.local.set({[PACK]:next});}
+  if(changed)await chrome.storage.session.remove(KEY);
+}
+async function writeAndRead(workspaceKey,base,pack){
+  const written=validateRemote(await native({op:'profile-write',protocol:1,workspaceKey,base,pack}));
+  const readback=validateRemote(await native({op:'profile-read',protocol:1}));
+  if(written.workspaceKey!==workspaceKey || readback.workspaceKey!==workspaceKey || readback.version!==written.version || !Sync.same(readback.pack,pack))throw Error('保存后工作区资料已变化或读回不一致；本地候选保留，请重新核对。');
+  return readback;
+}
+async function synchronize(connect=false){
+  let state=await syncState();if(!connect && !state.enabled)return state;
+  const local=(await chrome.storage.local.get(PACK))[PACK] || null;
+  try{
+    const remote=validateRemote(await native({op:'profile-read',protocol:1}));
+    if(state.workspaceKey && state.workspaceKey!==remote.workspaceKey && !connect){await chrome.storage.session.remove(KEY);return storeSync({...state,status:'workspace-changed',error:'中控台已切换工作区。原资料保留；请重新连接并核对，避免写入其他工作区。'});}
+    const base=connect?null:state.basePack;
+    const type=local===null && remote.pack!==null?'remote':Sync.compare(base,local,remote.pack);
+    state={...state,enabled:true,workspaceKey:remote.workspaceKey,version:remote.version,error:null};
+    if(type==='conflict')return storeSync({...state,status:'conflict',review:{local,remote:remote.pack,version:remote.version,workspaceKey:remote.workspaceKey,localVersion:local?.sourceVersion || null,base}});
+    if(type==='remote')await installPack(remote.pack);
+    if(type==='local'){
+      const written=await writeAndRead(remote.workspaceKey,remote.version,local);
+      if(written.workspaceKey!==remote.workspaceKey || !Sync.same(written.pack,local))throw Error('工作区保存后的读回与提交不一致；本地资料已保留。');
+      state.version=written.version;remote.pack=written.pack;await installPack(written.pack);
+    }
+    return storeSync({...state,status:'synced',basePack:remote.pack,lastSync:new Date().toISOString(),review:null});
+  }catch(e){return storeSync({...state,status:state.review?'conflict':'pending',error:e.message});}
+}
+async function resolveSync(message){
+  const state=await syncState(),review=state.review,local=(await chrome.storage.local.get(PACK))[PACK] || null;
+  if(!review || message.workspaceKey!==review.workspaceKey || message.reviewVersion!==review.version || message.localVersion!==review.localVersion || (local?.sourceVersion || null)!==review.localVersion)throw Error('资料已变化，请重新同步后核对双方内容。');
+  let selected;if(message.choice==='local')selected=review.local;else if(message.choice==='remote')selected=review.remote;
+  else if(message.choice==='merge'){const merged=Sync.merge(review.base,review.local,review.remote);if(merged.conflicts.length)throw Error('相同资料有不同修改，无法自动合并。请选择保留哪一方，另一方可先下载备份。');selected=merged.pack;}
+  else throw Error('请选择已审阅的资料。');
+  if(selected!==null)Core.validatePack(selected);
+  // Read once to detect workspace changes; never replace the reviewed write base.
+  const latest=validateRemote(await native({op:'profile-read',protocol:1}));
+  if(latest.workspaceKey!==review.workspaceKey || latest.version!==review.version){await synchronize();throw Error('工作区在审阅期间变化，请重新核对。');}
+  const result=selected===null && review.remote===null ? latest : await writeAndRead(review.workspaceKey,review.version,selected);
+  if(result.workspaceKey!==review.workspaceKey || !Sync.same(result.pack,selected))throw Error('保存读回不一致，双方候选仍保留。');
+  await installPack(result.pack);return storeSync({...state,status:'synced',version:result.version,basePack:result.pack,review:null,error:null,lastSync:new Date().toISOString()});
+}
 async function operation(message) {
   await init;
   switch(message.op) {
-    case 'state':return {profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState()),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
-    case 'profile-read':return {pack:(await chrome.storage.local.get(PACK))[PACK] || null,preferences:await preferences()};
+    case 'state':await synchronize();return {sync:await syncState(),profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState()),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
+    case 'profile-sync':return synchronize();
+    case 'profile-connect':return synchronize(true);
+    case 'profile-resolve':return resolveSync(message);
+    case 'profile-disconnect':return storeSync({...await syncState(),enabled:false,status:'disconnected',review:null,error:null});
+    case 'profile-read':await synchronize();return {sync:await syncState(),pack:(await chrome.storage.local.get(PACK))[PACK] || null,preferences:await preferences()};
     case 'profile-save': {
       const old=(await chrome.storage.local.get(PACK))[PACK];
       if(message.base!== (old?.sourceVersion || null))throw Error('资料已被其他窗口更新；请重新载入后编辑。');
-      const next=Core.validatePack(message.pack);
+      const next={...message.pack,...Core.validatePack(message.pack)};
       next.importedAt=message.imported?new Date().toISOString():old?.importedAt || new Date().toISOString();
       next.editedAt=message.imported?null:new Date().toISOString();
       if(!message.imported)next.savedAt=next.editedAt;
       next.sourceVersion=await digest({...next,sourceVersion:''});
       await chrome.storage.local.set({[PACK]:next});await chrome.storage.session.remove(KEY);
-      return summary(next);
+      await synchronize();return summary(next);
     }
-    case 'profile-delete':await chrome.storage.local.remove([PACK,MAPS,'toudiLastReport']);await chrome.storage.session.remove(KEY);return {deleted:true};
+    case 'profile-delete':if((await syncState()).enabled)throw Error('请先断开工作区同步，再清除浏览器副本。');await chrome.storage.local.remove([PACK,MAPS,'toudiLastReport']);await chrome.storage.session.remove(KEY);return {deleted:true};
     case 'preferences': {
       const value={...await preferences(),...message.preferences};
       const current=(await chrome.storage.local.get(PACK))[PACK];
@@ -131,6 +187,8 @@ async function operation(message) {
     case 'clear-plan':await chrome.storage.session.remove(KEY);return {cleared:true};
     case 'codex-status':return native({op:'status',protocol:1});
     case 'scan': {
+      const sync=await synchronize();
+      if(sync.status==='workspace-changed')throw Error('中控台工作区已切换。请在资料与设置重新连接核对；若要继续使用原浏览器资料，请先断开同步。');
       const value=await pack(), pref=await preferences(), p=Core.profile(value,message.profile || pref.profile);
       const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.id)throw Error('没有可识别的当前网页。');
       const scan=Core.scanValid(await engine(tab.id,'scan'));
@@ -140,7 +198,7 @@ async function operation(message) {
       const allowed=new Set(p.facts.map(f=>f.key));state.mappings=Object.fromEntries(Object.entries(saved).filter(([id,key])=>scan.fields.some(f=>f.id===id) && allowed.has(key)));
       state.plan=Core.plan(p,scan,state.mappings);await putState(state);
       if(pref.autoAgent && state.plan.rows.some(r=>['missing','ambiguous'].includes(r.status)))try{await remap(state,{agent:true});}catch(e){state.agentError=e.message;}
-      return putState(state);
+      return {...await putState(state),sync:await syncState()};
     }
     case 'remap':return putState(await remap(await current(),message));
     case 'agent-task': {
@@ -149,6 +207,7 @@ async function operation(message) {
     }
     case 'highlight': {const state=await current();return engine(state.tabId,'highlight',message.fieldId);}
     case 'fill': {
+      await synchronize();
       const state=await current(), approved=Core.confirm(state.plan,message.selected,message.overwrite || []);
       const raw=await engine(state.tabId,'apply',approved);
       const report={...raw,results:raw.results.map(({actualValue,validationMessage,...row})=>row)};
@@ -160,10 +219,9 @@ async function operation(message) {
     default:throw Error('不支持的插件操作。');
   }
 }
-let working=false;
+let operationQueue=Promise.resolve();
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(sender.id!==chrome.runtime.id || !['popup.html','options.html'].some(name=>sender.url?.split('#')[0]===chrome.runtime.getURL(name)))return false;
-  if(working && !['state','profile-read'].includes(message.op)){respond({error:'上一步正在执行，请等待完成。'});return false;}
-  const exclusive=!['state','profile-read'].includes(message.op);if(exclusive)working=true;
-  operation(message).then(value=>respond({value})).catch(e=>respond({error:e.message})).finally(()=>{if(exclusive)working=false;});return true;
+  const run=operationQueue.then(()=>operation(message));operationQueue=run.catch(()=>{});
+  run.then(value=>respond({value})).catch(e=>respond({error:e.message}));return true;
 });

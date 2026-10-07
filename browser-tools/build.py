@@ -34,7 +34,11 @@ def main():
         hooks=build/'privacy-hooks';hooks.mkdir(exist_ok=True)
         config_name=subprocess.check_output([options.python,'-c',"import sysconfig; print(sysconfig._get_sysconfigdata_name())"],text=True).strip()
         shutil.copy2(ROOT/'desktop/scripts/sysconfig_hook.py',hooks/('hook-'+config_name+'.py'))
-        subprocess.run([options.python,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','toudi-browser-helper','--distpath',str(output/'native'),'--workpath',str(build/'pyinstaller'),'--specpath',str(build),'--paths',str(ROOT/'app'),'--additional-hooks-dir',str(hooks),str(ROOT/'app/browser_helper.py')],check=True,env=env)
+        sys.path.insert(0,str(ROOT/'desktop/scripts'))
+        from privacy import stage_resources
+        stage=build/'public-resources';stage_resources(ROOT,stage)
+        separator=';' if os.name=='nt' else ':'
+        subprocess.run([options.python,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','toudi-browser-helper','--distpath',str(output/'native'),'--workpath',str(build/'pyinstaller'),'--specpath',str(build),'--paths',str(stage/'app'),'--paths',str(stage/'app/脚本'),'--add-data',str(stage/'app/脚本')+separator+'脚本','--add-data',str(stage/'app/assets/preference-defaults.json')+separator+'assets','--additional-hooks-dir',str(hooks),str(stage/'app/browser_helper.py')],check=True,env=env)
         subprocess.run([options.python,str(ROOT/'desktop/scripts/privacy.py'),'--deny-root',str(ROOT),'--deny-root',str(Path.home()),str(output/'native/toudi-browser-helper')],check=True)
         if sys.platform=='darwin':
             app=output/'TouDi 浏览器连接.app'

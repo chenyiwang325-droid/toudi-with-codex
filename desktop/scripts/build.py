@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build the same HTML and its self-contained Python data component into TouDi."""
 import argparse
+import ast
 import os
 import shutil
 import subprocess
@@ -57,6 +58,20 @@ def main():
     if ui_assets.exists():
         shutil.rmtree(ui_assets)
     shutil.copytree(stage/'app/assets', ui_assets)
+    # Embed the same published standard form; no separately maintained App form.
+    extension_ui = DESKTOP/'ui/browser-extension'
+    if extension_ui.is_symlink():
+        raise ValueError('Generated profile resources must not be a symbolic link')
+    if extension_ui.exists():
+        shutil.rmtree(extension_ui)
+    extension_ui.mkdir(parents=True)
+    tree = ast.parse((stage/'app/filling_tools.py').read_text(encoding='utf-8'))
+    extension_files = next(ast.literal_eval(node.value) for node in tree.body
+                           if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == 'EXTENSION_FILES' for target in node.targets))
+    for name in extension_files:
+        shutil.copy2(stage/'app/browser-extension'/name, extension_ui/name)
+    for name in ('logo.svg', 'form-engine.js'):
+        shutil.copy2(stage/'app/assets'/('favicon.svg' if name == 'logo.svg' else name), extension_ui/name)
     prepare_frontend(ROOT)
     run([npx, 'tauri', 'icon', ROOT/'app/assets/favicon.svg', '--output', DESKTOP/'src-tauri/icons'], env=env)
     if not args.skip_runtime:
