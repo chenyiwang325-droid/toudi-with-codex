@@ -90,12 +90,16 @@
     const hint=normal(fact.recordLabel+' '+fact.recordHint);
     return fact.module!=='education' || qs.every(q=>hint.includes(normal(q.replace('研究生',''))));
   }
+  const sharedAliasIndex=new Map();
+  for(const [canonical,synonyms] of Object.entries(V.aliases)){
+    const keys=[canonical,...synonyms].map(normal);
+    for(const key of keys){if(!sharedAliasIndex.has(key))sharedAliasIndex.set(key,new Set());keys.forEach(value=>sharedAliasIndex.get(key).add(value));}
+  }
+  const scopedAliasIndex=Object.fromEntries(Object.entries(V.moduleAliases || {}).map(([mod,entries])=>[mod,new Map(Object.entries(entries).map(([canonical,synonyms])=>[normal(canonical),new Set(synonyms.map(normal))]))]));
   function labelMatches(fact,field) {
-    const label=semantic(field), aliases=[fact.label,...(fact.aliases || [])];
-    for(const [canonical,synonyms] of Object.entries(V.aliases)) {
-      if([canonical,...synonyms].some(a=>normal(a)===normal(fact.label)))aliases.push(...synonyms);
-    }
-    return aliases.some(a=>normal(a)===label) || (fact.label==='GPA' && V.aliases.GPA.some(a=>label.startsWith(normal(a))) && /4[.．]0|5[.．]0|满分|scale/i.test(field.label));
+    const label=semantic(field),factLabel=normal(fact.label);
+    if(scopedAliasIndex[moduleHint(field)]?.get(factLabel)?.has(label))return true;
+    return factLabel===label || sharedAliasIndex.get(factLabel)?.has(label) || (fact.aliases || []).some(a=>normal(a)===label) || (fact.label==='GPA' && V.aliases.GPA.some(a=>label.startsWith(normal(a))) && /4[.．]0|5[.．]0|满分|scale/i.test(field.label));
   }
   const personalGraduation = field => moduleHint(field)==='personal' && /^(毕业时间|毕业日期)$/.test(field.label || '');
   function highestEducationEnd(p,field) {
@@ -107,10 +111,28 @@
     if(records.size!==1)return [];
     return p.facts.filter(f=>f.module==='education' && records.has(f.recordId) && labelMatches(f,field) && recordMatches(f,field));
   }
+  function recordEvidence(p,field,mod) {
+    const rawHint=String(field.recordHint || ''),hint=normal(rawHint),identity=V.recordIdentityFields?.[mod];
+    const prefix=mod==='publications' && /…|\.{3,}/.test(rawHint)?normal(rawHint.split(/…|\.{3,}/)[0]):'';
+    if(!hint || !identity)return null;
+    const scores=new Map();
+    for(const fact of p.facts){
+      if(fact.module!==mod || !identity.includes(fact.label))continue;
+      const value=normal(fact.value);
+      if(value.length>=2 && (hint===value || hint.includes(value) || (mod!=='publications' && value.includes(hint)) || (prefix.length>=20 && value.startsWith(prefix)))){
+        const score=prefix.length>=20 && value.startsWith(prefix)?5000+prefix.length:Math.min(value.length,hint.length)+(hint===value?10000:0);
+        scores.set(fact.recordId,Math.max(scores.get(fact.recordId) || 0,score));
+      }
+    }
+    const best=Math.max(0,...scores.values());
+    return new Set([...scores].filter(([,score])=>score===best).map(([id])=>id));
+  }
   function candidates(p,field) {
     if(personalGraduation(field))return highestEducationEnd(p,field);
     const mod=moduleHint(field);
     let result=p.facts.filter(f=>(!mod || f.module===mod || (mod==='education' && f.label.startsWith('最高'))) && labelMatches(f,field) && recordMatches(f,field));
+    const evidence=recordEvidence(p,field,mod);
+    if(evidence!==null)result=result.filter(f=>evidence.has(f.recordId));
     const hint=normal([field.groupLabel,field.recordHint].join(' '));
     if(hint && new Set(result.map(f=>f.recordId)).size>1) {
       const selected=result.filter(f=>[f.recordLabel,f.recordHint,...qualifiers(f.recordHint)].some(t=>normal(t) && (hint.includes(normal(t)) || normal(t).includes(hint))));
@@ -123,6 +145,7 @@
     if(personalGraduation(field))return highestEducationEnd(p,field).some(f=>f.key===fact.key);
     const mod=moduleHint(field);
     if((mod && fact.module!==mod && !(mod==='education' && fact.label.startsWith('最高'))) || !recordMatches(fact,field))return false;
+    const evidence=recordEvidence(p,field,mod);if(evidence!==null && !evidence.has(fact.recordId))return false;
     const known=p.facts.some(f=>labelMatches(f,field)) || Object.values(V.aliases).flat().some(a=>normal(a)===semantic(field));
     if(known && !labelMatches(fact,field))return false;
     const eligible=candidates(p,field);
@@ -172,7 +195,12 @@
       if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length && !deferredSelect) || manualField(field))return {...row,status:'manual',reason:'上传、协议、家庭/联系人或复杂控件需要人工操作。'};
       const list=Object.hasOwn(mappings,field.id)?[facts.get(mappings[field.id])]:candidates(p,field);
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
-      if(!list.length)return row;
+      if(!list.length){
+        const outside=(p.facts || []).length===0 || !p.facts.some(f=>f.module===moduleHint(field));
+        if(outside && ['internship','project'].includes(moduleHint(field)))row.reason='当前资料版本没有该模块资料，请切换包含该经历的资料版本或补充事实。';
+        if(moduleHint(field)==='campus-role' && semantic(field)===normal('在校职务类别'))row.reason='资料未保存对应职务类别，需要依据网站候选选项人工确认；不能将职务名称当作类别。';
+        return row;
+      }
       const fact=list[0];let value=String(fact.value), reason='', valuePrecision=fact.precision;
       const format=field.dateFormat, deferredDate=field.adapter==='phoenix-date' && !format, dateKind=deferredDate?(valuePrecision==='month'?'month':valuePrecision==='day'?'date':''):field.datePart?'month':['date','month'].includes(kind)?kind:format?(format.includes('DD')?'date':'month'):'';
       Object.assign(row,{factKey:fact.key,value,displayValue:fact.sensitive?mask(value,row.label):value,sensitive:fact.sensitive});
@@ -249,9 +277,11 @@
     for(const [id,key] of Object.entries(mappings)) {
       const field=scan.fields.find(f=>f.id===id), fact=p.facts.find(f=>f.key===key);
       if(!field || !fact || !mappingMatches(p,field,fact)) {rejected.push(id);continue;}
+      const evidence=recordEvidence(p,field,moduleHint(field));
+      if(evidence!==null){if(evidence.size!==1 || !evidence.has(fact.recordId)){rejected.push(id);continue;}accepted[id]=key;continue;}
       // A model may not choose the first repeated education/work card by guesswork.
       const related=personalGraduation(field)?highestEducationEnd(p,field):p.facts.filter(f=>f.module===fact.module && f.label===fact.label && recordMatches(f,field));
-      if(['education','internship','project'].includes(fact.module) && new Set(related.map(f=>f.recordId)).size>1) {
+      if(['education','internship','project','campus-role','awards','publications'].includes(fact.module) && new Set(related.map(f=>f.recordId)).size>1) {
         const hint=normal([field.label,field.groupLabel,field.recordHint].join(' '));
         const matching=related.filter(f=>[f.recordLabel,f.recordHint,...qualifiers(f.recordHint)].some(t=>normal(t) && hint.includes(normal(t))));
         if(new Set(matching.map(f=>f.recordId)).size!==1 || !matching.some(f=>f.key===key)) {rejected.push(id);continue;}

@@ -58,6 +58,32 @@ class FillingProfileTests(unittest.TestCase):
         self.assertFalse(numeric_equivalent('554.00000','554','证件号码'))
         self.assertFalse(numeric_equivalent('3.8','38','GPA'))
 
+    def test_module_scoped_aliases_and_record_identity(self):
+        from filling_profile import matching_facts,mapping_matches
+        facts=[]
+        for rid,name in [('one','合成校园职务甲'),('two','合成校园职务乙')]:
+            for label,value in [('职务',name),('职责描述','合成职责'),('开始日期','2020-09')]:facts.append({'key':rid+label,'module':'campus-role','recordId':rid,'label':label,'value':value,'aliases':[label]})
+        profile={'facts':facts}
+        for label,key in [('在校职务名称','one职务'),('在校职务描述','one职责描述'),('开始时间','one开始日期')]:
+            field=self.field(label,module='campus-role',recordHint='合成校园职务甲')
+            self.assertEqual([f['key'] for f in matching_facts(profile,field)],[key])
+            self.assertFalse(mapping_matches(profile,field,next(f for f in facts if f['key']==key.replace('one','two'))))
+        self.assertEqual(matching_facts(profile,self.field('在校职务类别',module='campus-role')),[])
+        self.assertEqual(len(matching_facts(profile,self.field('开始时间',module='campus-role',groupLabel='在校职务 · 第2段'))),2)
+        self.assertEqual(matching_facts(profile,self.field('开始时间',module='campus-role',recordHint='不存在的职务')),[])
+        self.assertEqual(matching_facts(profile,self.field('在校职务名称',module='personal')),[])
+
+    def test_explicit_publication_prefix_requires_unique_long_evidence(self):
+        from filling_profile import matching_facts,mapping_matches
+        prefix='Synthetic Publication Long Identifiable Prefix'
+        facts=[{'key':'one.name','module':'publications','recordId':'one','label':'论文名称','value':prefix+' First Complete Title','aliases':['论文名称']},{'key':'one.date','module':'publications','recordId':'one','label':'发表日期','value':'2025-11','aliases':['发表日期']}]
+        field=self.field('发布时间',module='publications',recordHint=prefix+'…（示例期刊）')
+        self.assertEqual([f['key'] for f in matching_facts({'facts':facts},field)],['one.date'])
+        duplicate=facts+[{'key':'two.name','module':'publications','recordId':'two','label':'论文名称','value':prefix+' Second Complete Title','aliases':['论文名称']},{'key':'two.date','module':'publications','recordId':'two','label':'发表日期','value':'2026-01','aliases':['发表日期']}]
+        self.assertEqual(len(matching_facts({'facts':duplicate},field)),2)
+        for hint in ['Synthetic…',prefix]:self.assertEqual(matching_facts({'facts':facts},self.field('发布时间',module='publications',recordHint=hint)),[])
+        self.assertFalse(mapping_matches({'facts':facts},self.field('发布时间',module='publications',recordHint='Unknown Publication Title…'),facts[1]))
+
     def test_missing_source_and_summary_never_contain_personal_values(self):
         summary=profile_summary(load_profile(self.root)); rendered=json.dumps(summary)
         for private in ('Fixture User','12345678901','fixture@example.invalid','Private address','Graduate University'):self.assertNotIn(private,rendered)

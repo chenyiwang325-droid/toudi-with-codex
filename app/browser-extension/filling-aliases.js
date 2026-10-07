@@ -554,5 +554,61 @@
       "id": "general",
       "label": "默认资料"
     }
-  ]
+  ],
+  "moduleAliases": {
+    "campus-role": {
+      "职务类别": [
+        "在校职务类别",
+        "校园职务类别",
+        "任职类别"
+      ],
+      "职务": [
+        "在校职务名称",
+        "校园职务名称"
+      ],
+      "职责描述": [
+        "在校职务描述",
+        "校园职务描述"
+      ]
+    },
+    "project": {
+      "名称": [
+        "在校科研及实践项目",
+        "实践项目名称"
+      ],
+      "角色": [
+        "担任角色"
+      ],
+      "简述": [
+        "实践描述"
+      ]
+    },
+    "publications": {
+      "论文名称": [
+        "名称"
+      ],
+      "发表日期": [
+        "发布时间"
+      ]
+    }
+  },
+  "recordIdentityFields": {
+    "campus-role": [
+      "职务",
+      "组织名称"
+    ],
+    "project": [
+      "名称",
+      "项目名称"
+    ],
+    "awards": [
+      "奖项名称"
+    ],
+    "publications": [
+      "论文名称"
+    ],
+    "internship": [
+      "单位"
+    ]
+  }
 };if(typeof module==="object"&&module.exports)module.exports=value;else r.TouDiFillingVocabulary=value;})(globalThis);

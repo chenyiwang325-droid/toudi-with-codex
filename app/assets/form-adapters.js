@@ -87,7 +87,14 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
     const degree=[...record.querySelectorAll('.form-item--phoenix')].find(f=>/^(最高)?学历$/.test(phoenixTitle(f)));
     const level=degree?phoenixRead(degree.querySelector('.phoenix-select__input') || degree.querySelector('.phoenix-radio-group')):'';
     const module=moduleOf(title);
-    const result={module,groupLabel:title+(records.length>1?' · 第'+(records.indexOf(record)+1)+'段':''),groupPath:structuralPath(record),recordHint:module==='education'&&/^(博士研究生|硕士研究生|博士|硕士|大学本科|本科|专科|大专|高中)$/.test(level)?level:''};contexts.set(record,result);return result;
+    // Read an already-filled identity as record context, never as the field title.
+    const identityLabels={'campus-role':/^(在校职务名称|职务|岗位)$/,'projects':/^(在校科研及实践项目|项目名称|名称)$/,'awards':/^(奖项|奖项名称|获奖名称)$/,'publications':/^(名称|论文名称|论文题目)$/,'work':/^(单位名称|公司名称|实习单位|单位)$/};
+    let recordHint=module==='education'&&/^(博士研究生|硕士研究生|博士|硕士|大学本科|本科|专科|大专|高中)$/.test(level)?level:'';
+    if(identityLabels[module]){
+      const names=[...record.querySelectorAll('.form-item--phoenix')].filter(f=>identityLabels[module].test(phoenixTitle(f))).map(f=>phoenixRead(f.querySelector('.phoenix-select__input,input:not([type="hidden"]),textarea'))).filter(v=>v && !/^(请选择|请输入)$/.test(v));
+      const unique=[...new Set(names)];if(unique.length===1)recordHint=unique[0];
+    }
+    const result={module,groupLabel:title+(records.length>1?' · 第'+(records.indexOf(record)+1)+'段':''),groupPath:structuralPath(record),recordHint};contexts.set(record,result);return result;
   }
   function phoenixRead(node) {
     if(!node)return '';
@@ -253,6 +260,10 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
   function platforms(root){if(!platformCache.has(root))platformCache.set(root,registry.filter(a=>a.detect(root)));return platformCache.get(root);}
   return {
     reset(){descriptions=new WeakMap();platformCache=new WeakMap();contexts=new WeakMap();},
+    validationError:entry=>{
+      const field=phoenixField(entry.node);if(!field)return '';
+      return [...field.querySelectorAll('.form-item__error')].filter(error=>error.closest('.form-item--phoenix')===field&&visible(error)).map(error=>compact(error.textContent)).filter(Boolean).join('；');
+    },
     describe,disabled,deferred:id=>['moka-select','phoenix-select','phoenix-date'].includes(id),
     platforms:root=>{const found=platforms(root);return (found.length?found:[{id:'generic',label:'通用表单',version:'1'}]).map(({id,label,version})=>({id,label,version}));},
     includes:(node,root)=>platforms(root).some(p=>p.id==='zhiye-phoenix')?!!phoenixField(node):platforms(root).some(p=>p.id==='moka')?!!mokaField(node):true,

@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (adapterLibrary) {
   'use strict';
   let latest = null;
-  const ENGINE_VERSION = '0.5.3';
+  const ENGINE_VERSION = '0.5.4';
   let structureHints={};
   const wait=(milliseconds=100)=>new Promise(resolve=>setTimeout(resolve,milliseconds));
   const adapters=adapterLibrary?.create({compact:v=>compact(v),visible,structuralPath,labelText,wait,setNative});
@@ -290,6 +290,7 @@
       if(final.report.origin!==plan.origin || final.report.path!==plan.path) output[i]=result(item.fieldId,'failed','page-changed');
       else if(!entry) output[i]=result(item.fieldId,'failed','field-disappeared');
       else if(!retained(entry,applied.get(item.fieldId))) output[i]=result(item.fieldId,'failed','value-not-retained',entry);
+      else if(adapters?.validationError(entry)) output[i]={...result(item.fieldId,'failed','validation-failed',entry),validationMessage:adapters.validationError(entry)};
       else if(entry.node.validity && !entry.node.validity.valid) output[i]=result(item.fieldId,'failed','validation-failed',entry);
       else {
         output[i]=result(item.fieldId,'verified','readback-matched',entry);

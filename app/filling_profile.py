@@ -48,6 +48,9 @@ ALIASES={
 }
 ALIASES.update({'组织名称': ['组织名称', '组织', '社团名称', '学生组织', '所在组织', 'organization', 'organization name'], '职务': ['职务', '职位', '岗位', '担任职务', 'position', 'job title'], '职责描述': ['职责描述', '工作职责', '职责', '工作内容', '任职描述', '任职经历', '经历描述', 'responsibilities', 'description'], '成果': ['成果', '主要成果', '工作成果', 'achievement', 'achievements'], '奖项名称': ['奖项名称', '获奖名称', '奖励名称', '奖项', '荣誉名称', 'award name', 'award title'], '获奖等级': ['获奖等级', '奖励等级', '奖项等级', '获奖级别', 'award level'], '获奖日期': ['获奖日期', '获奖时间', '奖励日期', '奖励时间', 'award date'], '颁奖单位': ['颁奖单位', '授奖单位', '颁发机构', '颁奖机构', 'awarding organization'], '获奖说明': ['获奖说明', '获奖描述', '获奖情况', '奖励说明', 'award description'], '论文名称': ['论文名称', '论文题目', '论文标题', '成果名称', 'publication title', 'paper title'], '发表刊物': ['发表刊物', '期刊名称', '发表期刊', '刊物名称', '发表机构', 'journal', 'publication venue'], '发表日期': ['发表日期', '发表时间', 'publication date'], '作者排序': ['作者排序', '作者顺序', '本人排名', '作者位次', 'author order'], '论文摘要': ['论文摘要', '论文描述', '摘要', '研究内容', 'abstract'], '论文链接': ['论文链接', '论文网址', 'DOI', 'doi', 'publication url']})
 
+MODULE_ALIASES={'campus-role': {'职务类别': ['在校职务类别', '校园职务类别', '任职类别'], '职务': ['在校职务名称', '校园职务名称'], '职责描述': ['在校职务描述', '校园职务描述']}, 'project': {'名称': ['在校科研及实践项目', '实践项目名称'], '角色': ['担任角色'], '简述': ['实践描述']}, 'publications': {'论文名称': ['名称'], '发表日期': ['发布时间']}}
+RECORD_IDENTITY_FIELDS={'campus-role': ['职务', '组织名称'], 'project': ['名称', '项目名称'], 'awards': ['奖项名称'], 'publications': ['论文名称'], 'internship': ['单位']}
+
 MANUAL_TERMS=('验证码','verification code','captcha','协议','同意','承诺','agreement','consent','签名','signature','家庭成员','父亲','母亲','亲属','紧急联系人','证明人','上传','upload','照片','photo','father','mother','family','emergency contact','referee','reference contact')
 SENSITIVE_TERMS=('姓名','name','手机','电话','phone','邮箱','email','证件','身份证','id number','家庭地址','home address')
 MODULES={'campus-role': 'campus-role', '在校任职': 'campus-role', '校园任职': 'campus-role', '在校经历': 'campus-role', '校园经历': 'campus-role', '在校职务': 'campus-role', '学生工作': 'campus-role', '学生干部': 'campus-role', 'school posts': 'campus-role', 'school_posts': 'campus-role', 'campus posts': 'campus-role', 'campus_posts': 'campus-role', 'awards': 'awards', '获奖': 'awards', '奖励': 'awards', '荣誉': 'awards', 'publications': 'publications', '论文': 'publications', '发表': 'publications', '专著': 'publications'}
@@ -304,6 +307,9 @@ def record_matches(fact,field):
 
 def label_matches(fact,field):
     label,_=semantic_label(field)
+    scoped=MODULE_ALIASES.get(module_hint(field),{})
+    for canonical,synonyms in scoped.items():
+        if normalized(fact['label'])==normalized(canonical) and label in {normalized(a) for a in synonyms}:return True
     aliases=[fact['label'],*fact.get('aliases',[])]
     # Old packs may have custom or incomplete aliases. Shared synonyms remain live.
     fact_label=normalized(fact['label'])
@@ -326,6 +332,21 @@ def highest_education_end(profile,field):
     return [f for f in profile['facts'] if f['module']=='education' and f['recordId'] in records and label_matches(f,field) and record_matches(f,field)]
 
 
+def record_evidence(profile,field,module):
+    raw_hint=str(field.get('recordHint',''));hint=normalized(raw_hint)
+    prefix=normalized(re.split(r'…|\.{3,}',raw_hint)[0]) if module=='publications' and re.search(r'…|\.{3,}',raw_hint) else ''
+    if not hint or module not in RECORD_IDENTITY_FIELDS:return None
+    scores={}
+    for fact in profile['facts']:
+        if fact['module']!=module or fact['label'] not in RECORD_IDENTITY_FIELDS[module]:continue
+        value=normalized(fact['value'])
+        if len(value)>=2 and (hint==value or (module!='publications' and hint in value) or value in hint or (len(prefix)>=20 and value.startswith(prefix))):
+            score=5000+len(prefix) if len(prefix)>=20 and value.startswith(prefix) else min(len(value),len(hint))+(10000 if hint==value else 0)
+            scores[fact['recordId']]=max(scores.get(fact['recordId'],0),score)
+    best=max(scores.values(),default=0)
+    return {rid for rid,score in scores.items() if score==best}
+
+
 def matching_facts(profile,field):
     if personal_graduation(field):return highest_education_end(profile,field)
     module=module_hint(field); candidates=[]
@@ -333,6 +354,8 @@ def matching_facts(profile,field):
         if module and fact['module']!=module and not (module=='education' and fact['label'].startswith('最高')):continue
         if not label_matches(fact,field) or not record_matches(fact,field):continue
         candidates.append(fact)
+    evidence=record_evidence(profile,field,module)
+    if evidence is not None:candidates=[f for f in candidates if f['recordId'] in evidence]
     hint=normalized(' '.join(str(field.get(k,'')) for k in ('groupLabel','recordHint')))
     if hint and len({f['recordId'] for f in candidates})>1:
         selected=[]
@@ -350,6 +373,8 @@ def mapping_matches(profile,field,fact):
     module=module_hint(field)
     if module and fact['module']!=module and not (module=='education' and fact['label'].startswith('最高')):return False
     if not record_matches(fact,field):return False
+    evidence=record_evidence(profile,field,module)
+    if evidence is not None and fact['recordId'] not in evidence:return False
     # Known meanings stay binding even for a model-selected valid key. Truly unknown
     # labels can use an explicit mapping while all value/manual gates still apply.
     known=any(label_matches(other,field) for other in profile['facts'])
