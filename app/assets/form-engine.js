@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (adapterLibrary) {
   'use strict';
   let latest = null;
-  const ENGINE_VERSION = '0.5.1';
+  const ENGINE_VERSION = '0.5.2';
   let structureHints={};
   const wait=(milliseconds=100)=>new Promise(resolve=>setTimeout(resolve,milliseconds));
   const adapters=adapterLibrary?.create({compact:v=>compact(v),visible,structuralPath,labelText,wait,setNative});

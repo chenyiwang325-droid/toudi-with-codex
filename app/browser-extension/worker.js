@@ -345,13 +345,17 @@ async function agentOperation(message){
     active.autoAgentPending=false;
     if(error){active.agentError=error.message;active.agentReview={...active.agentReview,status:'failed',seconds:(Date.now()-reviewStarted)/1000,message:error.message};return putState(active);}
     const safe=Core.safeAgentMappings(p,active.scan,result.mappings);
+    const protocolRejected=new Map((result.provider?.mappingReview?.rejected || []).filter(item=>request.fields.some(f=>f.id===item.fieldId)).map(item=>[item.fieldId,item.reason]));
+    const rejectionText={'unknown-fact':'Agent 没有返回当前资料库中的有效资料键，此项保留待核对。','invalid-entry':'此项返回格式不符合要求，未采用。','conflicting-mappings':'Agent 对同一字段给出不同匹配，未自动选择。'};
+    const rejectedIds=new Set([...safe.rejected,...protocolRejected.keys()]);
+    delete active.agentError;
     await remap(active,{mappings:safe.accepted});
-    active.plan.provider={...result.provider,mapped:Object.keys(safe.accepted).length,rejected:safe.rejected.length};
+    active.plan.provider={...result.provider,mapped:Object.keys(safe.accepted).length,rejected:rejectedIds.size};
     const items=request.fields.map(field=>{
       const row=active.plan.rows.find(r=>r.fieldId===field.id),key=result.mappings?.[field.id],fact=p.facts.find(f=>f.key===key);
-      return {fieldId:field.id,label:field.label,groupLabel:field.groupLabel || '',factLabel:fact?[fact.recordLabel,fact.label].filter(Boolean).join(' · '):'',status:safe.rejected.includes(field.id)?'rejected':safe.accepted[field.id]?'matched':'unresolved',resultStatus:row?.status,reason:safe.rejected.includes(field.id)?'建议未通过字段含义、模块或经历归属校验，未采用。':safe.accepted[field.id]?row?.reason:'Agent 未给出可确认的对应资料；保留待核对。'};
+      return {fieldId:field.id,label:field.label,groupLabel:field.groupLabel || '',factLabel:fact?[fact.recordLabel,fact.label].filter(Boolean).join(' · '):'',status:rejectedIds.has(field.id)?'rejected':safe.accepted[field.id]?'matched':'unresolved',resultStatus:row?.status,reason:protocolRejected.has(field.id)?(rejectionText[protocolRejected.get(field.id)] || '此项返回未通过校验，保留待核对。'):safe.rejected.includes(field.id)?'建议未通过字段含义、模块或经历归属校验，未采用。':safe.accepted[field.id]?row?.reason:'Agent 未给出可确认的对应资料；保留待核对。'};
     });
-    active.agentReview={status:result.provider?.called?'completed':'skipped',model:result.provider?.model || pref.agentModel,requested:request.fields.length,returned:Object.keys(result.mappings || {}).length,accepted:Object.keys(safe.accepted).length,rejected:safe.rejected.length,unresolved:items.filter(i=>i.status==='unresolved').length,seconds:(Date.now()-reviewStarted)/1000,completedAt:Date.now(),items};
+    active.agentReview={status:result.provider?.called?'completed':'skipped',model:result.provider?.model || pref.agentModel,requested:request.fields.length,returned:result.provider?.mappingReview?.returned ?? Object.keys(result.mappings || {}).length,ignored:result.provider?.mappingReview?.ignored || 0,duplicates:result.provider?.mappingReview?.duplicates || 0,accepted:Object.keys(safe.accepted).length,rejected:rejectedIds.size,unresolved:items.filter(i=>i.status==='unresolved').length,seconds:(Date.now()-reviewStarted)/1000,completedAt:Date.now(),items};
     return putState(active);
   });
 }

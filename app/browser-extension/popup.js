@@ -31,7 +31,7 @@ function renderAgentFeedback() {
   const r=state?.agentReview,box=el('agentFeedback');box.hidden=!state?.plan;
   if(!state?.plan)return;
   const title={running:'Agent 正在核对',completed:'Agent 核对结果',failed:'Agent 核对未完成',skipped:'本次未调用 Agent',superseded:'Agent 结果未采用'}[r?.status] || 'Agent 核对';
-  const summary=r?.status==='completed'?`已核对 ${r.requested} 项 · 采纳 ${r.accepted} 项 · 未采用 ${r.rejected} 项 · 未确认 ${r.unresolved} 项`:r?.message || (state.autoAgentPending?'等待调用所选模型核对歧义字段。':'尚未调用；可在下方发起语义核对。');
+  const summary=r?.status==='completed'?`已核对 ${r.requested} 项 · 采纳 ${r.accepted} 项 · 未采用 ${r.rejected} 项 · 未确认 ${r.unresolved} 项${r.ignored?' · 忽略 '+r.ignored+' 条无效返回':''}${r.duplicates?' · 合并 '+r.duplicates+' 条重复返回':''}`:r?.message || (state.autoAgentPending?'等待调用所选模型核对歧义字段。':'尚未调用；可在下方发起语义核对。');
   box.innerHTML=`<h2>${escapeHtml(title)}</h2>${r?.model?`<p class="caption">${escapeHtml(r.model)}${Number.isFinite(r.seconds)?' · '+r.seconds.toFixed(1)+' 秒':''}</p>`:''}<p>${escapeHtml(summary)}</p>${r?.items?.length?`<details><summary>查看 ${r.items.length} 项核对明细</summary>${r.items.map(i=>`<div class="agent-item"><strong>${escapeHtml([i.groupLabel,i.label].filter(Boolean).join(' · '))}</strong><div>${escapeHtml(i.factLabel?'→ '+i.factLabel:'未确认对应资料')}</div><p class="reason">${escapeHtml(({matched:'已采纳匹配',rejected:'未采用建议',unresolved:'仍需核对'})[i.status])} · ${escapeHtml(i.reason)}</p></div>`).join('')}</details>`:''}`;
 }
 function renderStructureFeedback(){
