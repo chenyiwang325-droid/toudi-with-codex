@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (adapterLibrary) {
   'use strict';
   let latest = null;
-  const ENGINE_VERSION = '0.5.2';
+  const ENGINE_VERSION = '0.5.3';
   let structureHints={};
   const wait=(milliseconds=100)=>new Promise(resolve=>setTimeout(resolve,milliseconds));
   const adapters=adapterLibrary?.create({compact:v=>compact(v),visible,structuralPath,labelText,wait,setNative});
@@ -63,7 +63,7 @@
       if (title) { if (!group) { group = title; groupPath=structuralPath(p); } hint = compact(hint + ' ' + title); }
       if (p.tagName === 'FORM') break;
     }
-    const module = /教育|学历|学位|education/i.test(hint) ? 'education' : /实习|工作经历|任职|employment|work experience/i.test(hint) ? 'work' : /项目|project/i.test(hint) ? 'projects' : '';
+    const module = /在校职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部|campus-role|campus posts|school posts/i.test(hint) ? 'campus-role' : /获奖|荣誉|奖励|awards/i.test(hint) ? 'awards' : /论文|专著|发表|publications/i.test(hint) ? 'publications' : /教育|学历|学位|education/i.test(hint) ? 'education' : /实习|工作经历|任职|employment|work experience/i.test(hint) ? 'work' : /项目|project/i.test(hint) ? 'projects' : '';
     const generic=/^(教育经历|教育背景|学历信息|工作经历|实习经历|项目经历|education|work experience|projects)$/i.test(group);
     const recordHint = /本科|硕士|博士|大专|学士|master|bachelor|doctor/i.test(hint) ? hint : module && group && !generic ? group : '';
     return { groupLabel: group, recordHint, module, groupPath };
@@ -163,12 +163,12 @@
         const constraints=Object.fromEntries(['min','max','step','pattern'].filter(k=>node.hasAttribute(k)).map(k=>[k,node.getAttribute(k)]));
         const placeholder=(node.getAttribute('placeholder') || '').trim().toUpperCase();
         const dateFormat=adapted?.dateFormat || (['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'].includes(placeholder)?placeholder:undefined);
-        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!adapted?.required,maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
+        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),...(adapted?.datePrecision?{datePrecision:adapted.datePrecision}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!adapted?.required,maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
         // Record values can constrain matching, but never rename/reidentify a field.
         const signature = JSON.stringify({scope,path:structuralPath(node),type,name:node.name || ''}), index = counts.get(signature) || 0;
         counts.set(signature,index+1);
         const id = 'field-' + hash(signature + ':' + index);
-        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported && unsupported!=='unlabeled' ? '' : read({node,nodes:members,type,field:{options,adapter}}),options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{})};
+        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported && unsupported!=='unlabeled' ? '' : read({node,nodes:members,type,field:{options,adapter}}),options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),...(adapted?.datePrecision?{datePrecision:adapted.datePrecision}:{})};
         if (unsupported) field.unsupported = unsupported;
         entries.push({field,descriptor,node,nodes:members,type});
       }
@@ -291,7 +291,11 @@
       else if(!entry) output[i]=result(item.fieldId,'failed','field-disappeared');
       else if(!retained(entry,applied.get(item.fieldId))) output[i]=result(item.fieldId,'failed','value-not-retained',entry);
       else if(entry.node.validity && !entry.node.validity.valid) output[i]=result(item.fieldId,'failed','validation-failed',entry);
-      else output[i]=result(item.fieldId,'verified','readback-matched',entry);
+      else {
+        output[i]=result(item.fieldId,'verified','readback-matched',entry);
+        const action=actions.find(a=>a.fieldId===item.fieldId),target=String(action?.optionValue ?? action?.value ?? '');
+        if(entry.field.adapter==='phoenix-date' && /^\d{4}-\d{2}-\d{2}$/.test(target) && /^\d{4}-\d{2}$/.test(String(applied.get(item.fieldId))))Object.assign(output[i],{datePrecisionReduced:true,sourcePrecision:'day',writtenPrecision:'month',note:'网站只接受年月，已保留来源年月；具体日期仍保存在资料中。'});
+      }
     }
     const summary={verified:0,failed:0,conflict:0,manual:0};output.forEach(x=>summary[x.status]++);
     return {results:output,summary,submitted:false,saveState:'unconfirmed',warnings:final.report.fingerprint!==initial.report.fingerprint?[{code:'structure-changed',message:'页面字段结构发生变化，请重新扫描'}]:[]};

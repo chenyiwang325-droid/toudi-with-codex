@@ -2,7 +2,7 @@ const el = id => document.getElementById(id);
 const escapeHtml = text => String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const labels = {ready:'可填写',already:'已一致',conflict:'已有内容',manual:'人工核对',missing:'资料待补',ambiguous:'需选记录',unsupported:'需手动',verified:'核验通过',failed:'未通过'};
 const reasons = {'family-member':'家庭成员资料需单独确认，不套用本人信息','option-not-selected':'网站未选中目标选项，请手动检查','option-not-unique':'存在多个同名选项，需要手动确认','menu-not-unique':'出现多个选项面板，未继续操作','menu-not-associated':'未能确定当前字段对应的选项面板','selector-layout-unsupported':'该选项面板结构暂不支持，请手动选择','multiple-selection-unsupported':'多选集合需手动核对，未改变已有选择','option-confirm-unavailable':'未找到可用的确认按钮，请手动核对','date-precision-required':'资料需要精确到日，未补造日期','date-control-unsupported':'此日期控件需手动选择','date-not-retained':'日期未被控件保留，请手动核对','invalid-date':'日期不符合日历规则','readback-matched':'写入后读回一致','value-not-retained':'网站未保留填写值，请手动检查','validation-failed':'网站字段校验未通过','field-disappeared':'字段已隐藏或移除，请重新识别','page-changed':'网页已切换，请重新识别','structure-changed':'表单结构已变化，请重新识别','value-changed':'你已修改此字段，保留当前值','existing-value':'已有内容未覆盖','field-changed':'字段内容或控件已变化','disabled-or-readonly':'字段只读或已停用','option-not-found':'页面没有该选项','option-disabled':'对应选项不可用','maxlength-exceeded':'内容超过网站长度限制','scan-required':'需要重新识别当前页面'};
-let answerField;
+let answerField,copyLibrary;
 let state, busy = false, agentBusy = false, hasProfile = false, profileSummary;
 let pref = TouDiAgentConfig.normalize();
 async function send(op, data = {}) {
@@ -114,7 +114,7 @@ el('scan').addEventListener('click', async()=>{
   await task(async()=>{state=null;render();state=await send('scan',{profile:el('profile').value});showSync(state.sync);render();notice('本地计划已生成；已有内容默认保留。');},'正在识别当前页面…');
   if(state?.autoAgentPending){if(state.structurePending)await checkStructurePlan();if(state?.plan)checkAgentPlan();}
 });
-el('profile').addEventListener('change', () => task(async()=>{pref=await send('preferences',{preferences:{profile:el('profile').value}});state=null;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
+el('profile').addEventListener('change', () => task(async()=>{pref=await send('preferences',{preferences:{profile:el('profile').value}});state=null;copyLibrary=null;el('copyLibrary').hidden=true;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
 el('review').addEventListener('change', selection);
 el('review').addEventListener('click', event => {
   const answer=event.target.closest('[data-answer]');if(answer){answerField=answer.dataset.answer;renderAnswer();el('answerBox').scrollIntoView?.({block:'start',behavior:'smooth'});}
@@ -175,3 +175,12 @@ el('answerGenerate').addEventListener('click',()=>task(async()=>{state=await sen
 el('answerCopy').addEventListener('click',()=>task(async()=>{const value=await send('answer-task',{fieldId:answerField});await navigator.clipboard.writeText(value.task);notice('单题任务已复制，包含经过筛选的当前版本经历资料。');},'正在准备单题任务…'));
 el('answerImport').addEventListener('click',()=>task(async()=>{state=await send('answer-import',{fieldId:answerField,result:JSON.parse(el('answerImportText').value)});renderAnswer();notice('草稿已导入，请预览并采纳。');},'正在验证草稿来源和字数…'));
 el('answerApprove').addEventListener('click',()=>task(async()=>{state=await send('answer-approve',{fieldId:answerField,answer:el('answerText').value});render();renderAnswer();notice('草稿已采纳，请勾选对应字段再填入。');},'正在采纳草稿…'));
+
+const copyModuleLabels={personal:'个人信息',education:'教育经历',internship:'工作与实习',project:'项目经历',language:'语言能力','campus-role':'在校经历',awards:'荣誉获奖',publications:'论文发表'};
+function renderCopyLibrary(){
+ const module=el('copyModule').value,records=copyLibrary?.records.filter(r=>r.module===module) || [];
+ el('copyRecords').innerHTML=records.map(record=>`<details class="copy-record"><summary>${escapeHtml(record.title)} · ${record.facts.length} 项</summary><button data-copy-record="${escapeHtml(record.id)}">复制整段资料</button>${record.facts.map(f=>`<div class="copy-fact"><div><strong>${escapeHtml(f.label)}</strong><p>${escapeHtml(f.value)}</p></div><button data-copy-fact="${escapeHtml(f.key)}" aria-label="复制${escapeHtml(f.label)}">复制</button></div>`).join('')}</details>`).join('') || '<p>当前版本尚未填写这类资料，可到资料与设置补充。</p>';
+}
+el('openCopyLibrary').addEventListener('click',()=>task(async()=>{copyLibrary=await send('copy-library',{profile:el('profile').value});const mods=Object.keys(copyModuleLabels).filter(m=>copyLibrary.records.some(r=>r.module===m));el('copyModule').replaceChildren(...mods.map(m=>new Option(copyModuleLabels[m],m)));el('copyLibrary').hidden=false;renderCopyLibrary();el('copyLibrary').scrollIntoView?.({block:'start',behavior:'smooth'});notice('已读取本次版本资料，选择分类后可复制单项或整段。');},'正在读取可复制资料…'));
+el('copyModule').addEventListener('change',renderCopyLibrary);
+el('copyRecords').addEventListener('click',event=>{const button=event.target.closest('button');if(!button)return;const record=copyLibrary?.records.find(r=>r.id===button.dataset.copyRecord),fact=copyLibrary?.records.flatMap(r=>r.facts).find(f=>f.key===button.dataset.copyFact);const value=record?.text ?? fact?.value;if(value===undefined)return;task(async()=>{await navigator.clipboard.writeText(value);notice(record?'整段资料已复制，包含字段名称与内容。':'字段内容已复制，可直接粘贴。');},'正在复制…');});

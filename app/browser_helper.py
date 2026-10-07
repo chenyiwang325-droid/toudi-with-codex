@@ -14,7 +14,7 @@ HOST='com.toudi.filling.codex'
 EXTENSION_ID='edfgnahdkpobmkhckjhadadnlbhpbpmd'
 ORIGIN='chrome-extension://'+EXTENSION_ID+'/'
 MAX_MESSAGE=512*1024
-VERSION='0.5.2'
+VERSION='0.5.3'
 
 
 def validate_request(request):
@@ -68,7 +68,7 @@ def validate_request(request):
             else:
                 aliases=item.get('aliases',[])
                 if not isinstance(aliases,list) or len(aliases)>80 or any(not isinstance(a,str) or len(a)>1000 for a in aliases):raise ValueError('资料别名无效。')
-                if item.get('module') not in {'personal','education','internship','project','language'}:raise ValueError('资料模块无效。')
+                if item.get('module') not in {'personal','education','internship','project','language','campus-role','awards','publications'}:raise ValueError('资料模块无效。')
     checked(fields,'id',{'id','label','module','groupLabel','recordHint','type','options'})
     checked(facts,'key',{'key','label','module','recordId','recordLabel','recordHint','aliases'})
     return request

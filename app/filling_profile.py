@@ -46,9 +46,12 @@ ALIASES={
  '熟练程度':['熟练程度','语言水平','外语水平','proficiency'], '考试成绩':['考试成绩','考试分数','证书成绩','score'],
  '取得日期':['取得日期','获证日期','考试日期','issue date'],
 }
+ALIASES.update({'组织名称': ['组织名称', '组织', '社团名称', '学生组织', '所在组织', 'organization', 'organization name'], '职务': ['职务', '职位', '岗位', '担任职务', 'position', 'job title'], '职责描述': ['职责描述', '工作职责', '职责', '工作内容', '任职描述', '任职经历', '经历描述', 'responsibilities', 'description'], '成果': ['成果', '主要成果', '工作成果', 'achievement', 'achievements'], '奖项名称': ['奖项名称', '获奖名称', '奖励名称', '奖项', '荣誉名称', 'award name', 'award title'], '获奖等级': ['获奖等级', '奖励等级', '奖项等级', '获奖级别', 'award level'], '获奖日期': ['获奖日期', '获奖时间', '奖励日期', '奖励时间', 'award date'], '颁奖单位': ['颁奖单位', '授奖单位', '颁发机构', '颁奖机构', 'awarding organization'], '获奖说明': ['获奖说明', '获奖描述', '获奖情况', '奖励说明', 'award description'], '论文名称': ['论文名称', '论文题目', '论文标题', '成果名称', 'publication title', 'paper title'], '发表刊物': ['发表刊物', '期刊名称', '发表期刊', '刊物名称', '发表机构', 'journal', 'publication venue'], '发表日期': ['发表日期', '发表时间', 'publication date'], '作者排序': ['作者排序', '作者顺序', '本人排名', '作者位次', 'author order'], '论文摘要': ['论文摘要', '论文描述', '摘要', '研究内容', 'abstract'], '论文链接': ['论文链接', '论文网址', 'DOI', 'doi', 'publication url']})
+
 MANUAL_TERMS=('验证码','verification code','captcha','协议','同意','承诺','agreement','consent','签名','signature','家庭成员','父亲','母亲','亲属','紧急联系人','证明人','上传','upload','照片','photo','father','mother','family','emergency contact','referee','reference contact')
 SENSITIVE_TERMS=('姓名','name','手机','电话','phone','邮箱','email','证件','身份证','id number','家庭地址','home address')
-MODULES={'教育':'education','education':'education','学历':'education','实习':'internship','工作':'internship','internship':'internship','employment':'internship','项目':'project','project':'project','个人':'personal','personal':'personal','基本':'personal','语言':'language','language':'language','work':'internship','projects':'project'}
+MODULES={'campus-role': 'campus-role', '在校任职': 'campus-role', '校园任职': 'campus-role', '在校经历': 'campus-role', '校园经历': 'campus-role', '在校职务': 'campus-role', '学生工作': 'campus-role', '学生干部': 'campus-role', 'school posts': 'campus-role', 'school_posts': 'campus-role', 'campus posts': 'campus-role', 'campus_posts': 'campus-role', 'awards': 'awards', '获奖': 'awards', '奖励': 'awards', '荣誉': 'awards', 'publications': 'publications', '论文': 'publications', '发表': 'publications', '专著': 'publications'}
+MODULES.update({'教育':'education','education':'education','学历':'education','实习':'internship','工作':'internship','internship':'internship','employment':'internship','项目':'project','project':'project','个人':'personal','personal':'personal','基本':'personal','语言':'language','language':'language','work':'internship','projects':'project'})
 
 
 def normalized(value):
@@ -69,22 +72,22 @@ def precision(value):
 
 
 def ongoing_end(fact):
-    return fact.get('module') in ('project','internship') and fact.get('label') in ('结束','结束日期') and normalized(fact.get('value','')) in ('至今','present','ongoing','current')
+    return fact.get('module') in ('project','internship','campus-role') and fact.get('label') in ('结束','结束日期') and normalized(fact.get('value','')) in ('至今','present','ongoing','current')
 
 
 def validate_date_policy(fact):
     if 'ongoing' in fact and not isinstance(fact['ongoing'],bool):raise ValueError('ongoing must be boolean')
-    if fact.get('ongoing') and not ongoing_end(fact):raise ValueError('ongoing is only valid for a present project/work end date')
+    if fact.get('ongoing') and not ongoing_end(fact):raise ValueError('ongoing is only valid for a present project/work/campus end date')
     if fact.get('dateFallback') not in (None,'','today'):raise ValueError('unknown ongoing date fallback')
     if fact.get('dateFallback') and not (fact.get('ongoing') and ongoing_end(fact)):raise ValueError('date fallback requires an ongoing end date')
 
 
 def sort_facts(facts):
     """Order complete records by start date without changing stable fact/record IDs."""
-    groups={}; modules={'personal':0,'education':1,'internship':2,'project':3,'language':4}
+    groups={}; modules={'personal':0,'education':1,'internship':2,'project':3,'language':4,'campus-role':5,'awards':6,'publications':7}
     for fact in facts:groups.setdefault((fact['module'],fact.get('recordId','')),[]).append(fact)
     def start_date(group):
-        for label in ('开始日期','开始','时间'):
+        for label in ('开始日期','开始','时间','获奖日期','发表日期','取得日期'):
             value=next((str(f['value']) for f in group if f['label']==label),'')
             match=re.match(r'^(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2})(?!\d))?',value)
             if match:
@@ -147,7 +150,7 @@ def load_profile(workspace,profile_id=None):
         seen=set()
         for fact in data['facts']:
             if not isinstance(fact,dict) or not all(isinstance(fact.get(k),str) for k in ('key','label','module')) or not fact['key'] or not isinstance(fact.get('value'),(str,int,float)) or isinstance(fact.get('value'),bool):raise ValueError('invalid fact')
-            if fact['module'] not in {'education','internship','project','personal','language'}:raise ValueError('fact module must be education/internship/project/personal/language')
+            if fact['module'] not in {'education','internship','project','personal','language','campus-role','awards','publications'}:raise ValueError('fact module must be education/internship/project/personal/language')
             if fact['key'] in seen:raise ValueError('duplicate fact key')
             seen.add(fact['key'])
             profiles=fact.get('profiles',[p['id'] for p in definitions])
@@ -271,7 +274,9 @@ def module_hint(field):
     text=str(field.get('module','')).casefold()
     context=' '.join(str(field.get(key,'')) for key in ('module','groupLabel'))
     if manual_field(field):return 'manual'
-    if re.search(r'在校任职|校园任职|学生干部|获奖|奖励|论文|发表|出版|school[ _-]*posts|campus[ _-]*posts|awards|publications',context,re.I):return 'unsupported-module'
+    if re.search(r'campus-role|在校任职|校园任职|在校经历|校园经历|在校职务|学生工作|学生干部|school[ _-]*posts|campus[ _-]*posts',context,re.I):return 'campus-role'
+    if re.search(r'获奖|奖励|荣誉|awards',context,re.I):return 'awards'
+    if re.search(r'论文|发表|出版|专著|publications',context,re.I):return 'publications'
     if re.fullmatch(r'毕业院校|毕业学校|最近毕业专业',str(field.get('label',''))):return 'education'
     for alias,module in MODULES.items():
         if alias in text:return module
@@ -392,7 +397,7 @@ def plan_fields(profile,scan,mappings=None,today=None):
                 fact=candidates[0]; value=str(fact['value']);value_precision=fact.get('precision');row.update(factKey=fact['key'],value=value,displayValue=mask(value,label) if fact['sensitive'] else value,sensitive=fact['sensitive'])
                 date_format=field.get('dateFormat')
                 if date_format and date_format not in ('YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'):raise ValueError('invalid date format')
-                date_kind=kind if kind in ('date','month') else ('date' if 'DD' in date_format else 'month') if date_format else ''
+                date_kind=('month' if value_precision=='month' else 'date' if value_precision=='day' else '') if field.get('adapter')=='phoenix-date' and not date_format else kind if kind in ('date','month') else ('date' if 'DD' in date_format else 'month') if date_format else ''
                 reason=None
                 if field['id'] in mappings and not mapping_matches(profile,field,fact):reason='映射与字段的明确含义、模块或记录不符，不能跨记录填入。'
                 if not reason and fact.get('manual'):reason='此项资料必须人工确认，不使用自动填入。'

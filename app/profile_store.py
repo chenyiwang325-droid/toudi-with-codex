@@ -60,7 +60,7 @@ def validate_pack(value):
         if (isinstance(content, bool) or not isinstance(content, (str, int, float))
                 or isinstance(content, float) and not math.isfinite(content) or len(str(content)) > 24000):
             raise ValueError('填报字段内容无效。')
-        if fact.get('module') not in {'personal', 'education', 'internship', 'project', 'language'}:
+        if fact.get('module') not in {'personal', 'education', 'internship', 'project', 'language', 'campus-role', 'awards', 'publications'}:
             raise ValueError('填报资料模块无效。')
         members = fact.get('profiles')
         if not isinstance(members, list) or not members or any(not isinstance(p, str) or p not in ids for p in members):

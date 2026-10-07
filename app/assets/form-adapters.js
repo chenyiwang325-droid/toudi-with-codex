@@ -73,7 +73,7 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
   }
   const phoenixField=node=>node.closest('.form-item--phoenix');
   const phoenixTitle=field=>compact(field?.querySelector(':scope > .form-item__title .form-item__text')?.textContent);
-  const moduleOf=title=>/教育|学历/.test(title)?'education':/实习|工作经历|任职/.test(title)?'work':/在校职务|学生工作/.test(title)?'campus-role':/获奖|荣誉/.test(title)?'awards':/论文|专著|发表/.test(title)?'publications':/家庭|亲属/.test(title)?'family':/项目|科研|实践/.test(title)?'projects':/个人|基本|求职意向/.test(title)?'personal':/语言|外语|证书/.test(title)?'language':'other';
+  const moduleOf=title=>/教育|学历/.test(title)?'education':/在校职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部/.test(title)?'campus-role':/实习|工作经历|任职/.test(title)?'work':/获奖|荣誉/.test(title)?'awards':/论文|专著|发表/.test(title)?'publications':/家庭|亲属/.test(title)?'family':/项目|科研|实践/.test(title)?'projects':/个人|基本|求职意向/.test(title)?'personal':/语言|外语|证书/.test(title)?'language':'other';
   function phoenixContext(field) {
     const record=field.closest('.ux-standard-form') || field.closest('.form-part') || field.parentElement;
     if(contexts.has(record))return contexts.get(record);
@@ -107,7 +107,7 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
     }
     const p=phoenixField(node);if(!p)return null;
     const label=phoenixTitle(p),radio=node.matches('.phoenix-radio-group'),select=!!node.closest('.phoenix-select'),date=select&&dateLabel(label);
-    return {label,context:phoenixContext(p),adapter:radio?'phoenix-radio':date?'phoenix-date':select?'phoenix-select':'',...(radio?{type:'radio',options:[...node.querySelectorAll('.phoenix-radio')].map(n=>({text:compact(n.querySelector('.phoenix-radio__radio-text')?.textContent),value:compact(n.querySelector('.phoenix-radio__radio-text')?.textContent)}))}:select?{type:'combobox'}:{}),required:!!p.querySelector(':scope > .form-item__title .form-item__required'),allowReadonly:select,...(date?{dateFormat:'YYYY-MM-DD'}:{})};
+    return {label,context:phoenixContext(p),adapter:radio?'phoenix-radio':date?'phoenix-date':select?'phoenix-select':'',...(radio?{type:'radio',options:[...node.querySelectorAll('.phoenix-radio')].map(n=>({text:compact(n.querySelector('.phoenix-radio__radio-text')?.textContent),value:compact(n.querySelector('.phoenix-radio__radio-text')?.textContent)}))}:select?{type:'combobox'}:{}),required:!!p.querySelector(':scope > .form-item__title .form-item__required'),allowReadonly:select,...(date?{datePrecision:'deferred'}:{})};
   }
   function describe(node){if(!descriptions.has(node))descriptions.set(node,describeRaw(node));return descriptions.get(node);}
   const disabled=node=>!!node.closest('[class*="--disabled"],[class*="--statusDisable"],[aria-disabled="true"],fieldset[disabled]');
@@ -136,16 +136,55 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       if(disabledOption(matches[0]))throw Error('option-disabled');matches[0].click();return compact(matches[0].querySelector('.phoenix-radio__radio-text')?.textContent);
     }
     if(entry.field.adapter==='phoenix-date'){
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(target))throw Error('date-precision-required');
-      const [y,m,d]=target.split('-').map(Number),check=new Date(Date.UTC(y,m-1,d));
-      if(check.getUTCFullYear()!==y || check.getUTCMonth()!==m-1 || check.getUTCDate()!==d)throw Error('invalid-date');
+      if(!/^\d{4}-\d{2}(?:-\d{2})?$/.test(target))throw Error('date-precision-required');
+      const [y,m,sourceDay]=target.split('-').map(Number),d=sourceDay || 1,check=new Date(Date.UTC(y,m-1,d));
+      if(y<100 || check.getUTCFullYear()!==y || check.getUTCMonth()!==m-1 || check.getUTCDate()!==d)throw Error('invalid-date');
     }
     if(entry.node.closest('.phoenix-select--multiple,[aria-multiselectable="true"]'))throw Error('multiple-selection-unsupported');
     const layer=await openPhoenix(entry);let confirmed=false;
     try {
       if(entry.field.adapter==='phoenix-date'){
+        const monthCalendar=layer.querySelector('.phoenix-date-picker .phoenix-calendar.phoenix-calendar-month-calendar');
+        if(monthCalendar){
+          const [year,month]=target.split('-').map(Number),expected=target.slice(0,7);
+          const displayedYear=()=>Number(compact(layer.querySelector('.phoenix-calendar-month-panel-year-select-content')?.textContent));
+          if(!Number.isInteger(displayedYear()) || displayedYear()<100)throw Error('date-year-unavailable');
+          if(displayedYear()!==year){
+            const yearSelect=monthCalendar.querySelector('.phoenix-calendar-month-panel-year-select');
+            if(yearSelect){
+              yearSelect.click();await wait(80);
+              let selected=false;
+              for(let attempt=0;attempt<100;attempt++){
+                const panel=[...layer.querySelectorAll('.phoenix-calendar-year-panel')].find(visible);if(!panel)throw Error('date-year-panel-unavailable');
+                const years=[...panel.querySelectorAll('.phoenix-calendar-year-panel-year')].filter(visible).filter(n=>compact(n.textContent)===String(year));
+                if(years.length>1)throw Error('date-year-not-unique');
+                if(years.length===1){if(disabledOption(years[0]))throw Error('date-year-disabled');years[0].click();await wait(80);if(![...layer.querySelectorAll('.phoenix-calendar-year-panel')].some(visible) && displayedYear()===year){selected=true;break;}continue;}
+                const decade=compact(panel.querySelector('.phoenix-calendar-year-panel-decade-select')?.textContent),range=decade.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
+                if(!range)throw Error('date-decade-unavailable');
+                const direction=year<Number(range[1])?'prev':year>Number(range[2])?'next':'';if(!direction)throw Error('date-year-not-found');
+                const button=panel.querySelector('.phoenix-calendar-year-panel-'+direction+'-decade-btn');if(!button || disabledOption(button))throw Error('date-year-navigation-unavailable');
+                button.click();await wait(80);
+                if(compact(layer.querySelector('.phoenix-calendar-year-panel-decade-select')?.textContent)===decade)throw Error('date-year-navigation-stalled');
+              }
+              if(!selected)throw Error('date-year-navigation-limit');
+            } else {
+              for(let attempt=0;displayedYear()!==year && attempt<100;attempt++){
+                const before=displayedYear(),button=layer.querySelector('.phoenix-calendar-month-panel-'+(year<before?'prev':'next')+'-year-btn');
+                if(!button || disabledOption(button))throw Error('date-year-navigation-unavailable');button.click();await wait(80);
+                if(displayedYear()!==before+(year<before?-1:1))throw Error('date-year-navigation-stalled');
+              }
+            }
+          }
+          if(displayedYear()!==year)throw Error('date-year-not-retained');
+          const months=[...layer.querySelectorAll('.phoenix-calendar-month-calendar .phoenix-calendar-month-panel-month')].filter(visible).filter(n=>compact(n.textContent)===month+'月');
+          if(months.length!==1)throw Error(months.length?'date-month-not-unique':'date-month-not-found');
+          if(disabledOption(months[0]))throw Error('date-month-disabled');months[0].click();await wait(100);
+          if(dateValue(phoenixRead(entry.node))!==expected)throw Error('date-not-retained');
+          confirmed=true;return expected;
+        }
+        // A month-only source never gains an invented day when the real picker needs one.
         if(!/^\d{4}-\d{2}-\d{2}$/.test(target))throw Error('date-precision-required');
-        const inputs=[...layer.querySelectorAll('.phoenix-calendar-input')].filter(visible);
+        const inputs=[...layer.querySelectorAll('.phoenix-calendar-input')].filter(visible).filter(n=>!n.disabled && !n.readOnly);
         if(inputs.length!==1)throw Error('date-control-unsupported');
         setNative(inputs[0],target);
         const win=inputs[0].ownerDocument.defaultView;

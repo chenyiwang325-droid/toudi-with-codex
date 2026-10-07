@@ -35,6 +35,9 @@
       field('end','结束日期','date',{ongoing:true}),field('description','项目描述','textarea',{labels:['简述']}),
       field('tasks','本人职责','textarea'),field('results','项目成果','textarea',{optional:true}),
       field('url','项目链接','url',{optional:true})]},
+    'campus-role': {label:'在校经历',action:'添加在校经历',fields:[field('organization','组织名称'),field('role','职务'),field('start','开始日期','date'),field('end','结束日期','date',{ongoing:true}),field('tasks','职责描述','textarea'),field('results','成果','textarea',{optional:true})]},
+    awards: {label:'荣誉获奖',action:'添加获奖记录',fields:[field('name','奖项名称'),field('level','获奖等级'),field('date','获奖日期','date'),field('issuer','颁奖单位'),field('description','获奖说明','textarea',{optional:true})]},
+    publications: {label:'论文发表',action:'添加论文记录',fields:[field('name','论文名称'),field('venue','发表刊物'),field('date','发表日期','date'),field('order','作者排序'),field('abstract','论文摘要','textarea',{optional:true}),field('url','论文链接','url',{optional:true})]},
     language: {label:'语言能力', action:'添加语言／证书', fields:[
       field('name','语言／证书名称'),field('level','熟练程度','choice',{choices:['基础','日常交流','熟练','母语']}),
       field('score','考试成绩'),field('date','取得日期','date',{optional:true})]}
@@ -87,8 +90,8 @@
       const a=String(start),b=String(end),width=Math.min(a.length,b.length);
       if(a.slice(0,width)>b.slice(0,width))throw Error('结束日期不能早于开始日期。');
     }
-    const naming=mod==='education'?['学历','学校']:mod==='internship'?['单位','岗位']:mod==='project'?['名称']:mod==='language'?['语言／证书名称']:[];
-    const primary=mod==='education'?'学校':mod==='internship'?'单位':mod==='project'?'名称':mod==='language'?'语言／证书名称':null;
+    const naming=mod==='education'?['学历','学校']:mod==='internship'?['单位','岗位']:mod==='project'?['名称']:mod==='language'?['语言／证书名称']:mod==='campus-role'?['组织名称','职务']:mod==='awards'?['奖项名称']:mod==='publications'?['论文名称']:[];
+    const primary=mod==='education'?'学校':mod==='internship'?'单位':mod==='project'?'名称':mod==='language'?'语言／证书名称':mod==='campus-role'?'组织名称':mod==='awards'?'奖项名称':mod==='publications'?'论文名称':null;
     const namingChanged=!old.length || ((!primary || get(primary)) && naming.some(label=>get(label)!==String(boundFact(old,template.fields.find(d=>d.label===label) || {label})?.value || '')));
     const title=naming.map(get).filter(Boolean).join(' · ') || old[0]?.recordLabel || template.label;
     current.forEach(f=>{
@@ -139,5 +142,10 @@
     candidate.facts=candidate.facts.flatMap(f=>{f.profiles=f.profiles.filter(p=>p!==id);return f.profiles.length?[f]:[];});
     return C.validatePack(candidate);
   }
-  return {templates,emptyPack,group,recordDraft,saveRecord,addField,addVersion,removeVersion,dateValid};
+  function copyRecords(pack,profileId){
+    const p=C.profile(C.validatePack(pack),profileId),groups=new Map();
+    for(const f of p.facts){const key=f.module+'|'+f.recordId;if(!groups.has(key))groups.set(key,{id:key,module:f.module,title:f.recordLabel || templates[f.module].label,facts:[]});groups.get(key).facts.push({key:f.key,label:f.label,value:String(f.value)});}
+    return [...groups.values()].map(record=>({...record,text:[record.title,...record.facts.map(f=>f.label+'：'+f.value)].join('\n')}));
+  }
+  return {copyRecords,templates,emptyPack,group,recordDraft,saveRecord,addField,addVersion,removeVersion,dateValid};
 });

@@ -211,6 +211,7 @@
       "职务",
       "职位",
       "岗位",
+      "担任职务",
       "position",
       "job title"
     ],
@@ -359,6 +360,113 @@
       "获证日期",
       "考试日期",
       "issue date"
+    ],
+    "组织名称": [
+      "组织名称",
+      "组织",
+      "社团名称",
+      "学生组织",
+      "所在组织",
+      "organization",
+      "organization name"
+    ],
+    "职责描述": [
+      "职责描述",
+      "工作职责",
+      "职责",
+      "工作内容",
+      "任职描述",
+      "任职经历",
+      "经历描述",
+      "responsibilities",
+      "description"
+    ],
+    "成果": [
+      "成果",
+      "主要成果",
+      "工作成果",
+      "achievement",
+      "achievements"
+    ],
+    "奖项名称": [
+      "奖项名称",
+      "获奖名称",
+      "奖励名称",
+      "奖项",
+      "荣誉名称",
+      "award name",
+      "award title"
+    ],
+    "获奖等级": [
+      "获奖等级",
+      "奖励等级",
+      "奖项等级",
+      "获奖级别",
+      "award level"
+    ],
+    "获奖日期": [
+      "获奖日期",
+      "获奖时间",
+      "奖励日期",
+      "奖励时间",
+      "award date"
+    ],
+    "颁奖单位": [
+      "颁奖单位",
+      "授奖单位",
+      "颁发机构",
+      "颁奖机构",
+      "awarding organization"
+    ],
+    "获奖说明": [
+      "获奖说明",
+      "获奖描述",
+      "获奖情况",
+      "奖励说明",
+      "award description"
+    ],
+    "论文名称": [
+      "论文名称",
+      "论文题目",
+      "论文标题",
+      "成果名称",
+      "publication title",
+      "paper title"
+    ],
+    "发表刊物": [
+      "发表刊物",
+      "期刊名称",
+      "发表期刊",
+      "刊物名称",
+      "发表机构",
+      "journal",
+      "publication venue"
+    ],
+    "发表日期": [
+      "发表日期",
+      "发表时间",
+      "publication date"
+    ],
+    "作者排序": [
+      "作者排序",
+      "作者顺序",
+      "本人排名",
+      "作者位次",
+      "author order"
+    ],
+    "论文摘要": [
+      "论文摘要",
+      "论文描述",
+      "摘要",
+      "研究内容",
+      "abstract"
+    ],
+    "论文链接": [
+      "论文链接",
+      "论文网址",
+      "DOI",
+      "doi",
+      "publication url"
     ]
   },
   "manualTerms": [
@@ -404,6 +512,26 @@
     "home address"
   ],
   "modules": {
+    "campus-role": "campus-role",
+    "在校任职": "campus-role",
+    "校园任职": "campus-role",
+    "在校经历": "campus-role",
+    "校园经历": "campus-role",
+    "在校职务": "campus-role",
+    "学生工作": "campus-role",
+    "学生干部": "campus-role",
+    "school posts": "campus-role",
+    "school_posts": "campus-role",
+    "campus posts": "campus-role",
+    "campus_posts": "campus-role",
+    "awards": "awards",
+    "获奖": "awards",
+    "奖励": "awards",
+    "荣誉": "awards",
+    "publications": "publications",
+    "论文": "publications",
+    "发表": "publications",
+    "专著": "publications",
     "教育": "education",
     "education": "education",
     "学历": "education",

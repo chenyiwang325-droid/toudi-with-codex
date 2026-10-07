@@ -5,7 +5,7 @@
   else root.TouDiFillingCore = core;
 })(globalThis, function (V) {
   'use strict';
-  const modules = ['personal','education','internship','project','language'];
+  const modules = ['personal','education','internship','project','language','campus-role','awards','publications'];
   const profileIds = V.profiles.map(p=>p.id);
   const normal = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'');
   const manual = label => V.manualTerms.some(term=>String(label).toLowerCase().includes(term));
@@ -13,14 +13,14 @@
   const qualifiers = value => String(value).match(/博士研究生|硕士研究生|博士|硕士|本科|专科/g) || [];
   const text = (value, cap=1000) => typeof value==='string' && value.length<=cap;
   const precision = value => /^\d{4}[-/.年]\d{1,2}月?$/.test(String(value)) ? 'month' : /^\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?$/.test(String(value)) ? 'day' : null;
-  const ongoingEnd = f => ['project','internship'].includes(f.module) && ['结束','结束日期'].includes(f.label) && ['至今','present','ongoing','current'].includes(normal(f.value));
+  const ongoingEnd = f => ['project','internship','campus-role'].includes(f.module) && ['结束','结束日期'].includes(f.label) && ['至今','present','ongoing','current'].includes(normal(f.value));
   const localToday = (now=new Date()) => [now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
   const dateFormats = ['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'];
   function sortFacts(facts) {
     const groups=new Map();
     for(const f of facts){const key=f.module+'|'+f.recordId;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(f);}
     const start=group=>{
-      for(const label of ['开始日期','开始','时间']) {
+      for(const label of ['开始日期','开始','时间','获奖日期','发表日期','取得日期']) {
         const m=String(group.find(f=>f.label===label)?.value || '').match(/^(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2})(?!\d))?/);
         if(m){const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3] || 1),check=new Date(Date.UTC(y,mo-1,d));if(y>=100 && check.getUTCFullYear()===y && check.getUTCMonth()===mo-1 && check.getUTCDate()===d)return y*10000+mo*100+d;}
       }
@@ -62,7 +62,7 @@
       f.precision=f.precision || precision(f.value);
       if(f.precision && !['month','day'].includes(f.precision))throw Error('日期精度只能为 month 或 day。');
       if(Object.hasOwn(f,'ongoing') && typeof f.ongoing!=='boolean')throw Error('进行中状态需要为布尔值。');
-      if(f.ongoing && !ongoingEnd(f))throw Error('进行中状态仅适用于内容为「至今」的项目或实习结束日期。');
+      if(f.ongoing && !ongoingEnd(f))throw Error('进行中状态仅适用于内容为「至今」的项目、工作或在校经历结束日期。');
       if(f.dateFallback && (f.dateFallback!=='today' || !f.ongoing || !ongoingEnd(f)))throw Error('日期兜底需要先确认经历仍在进行，仅支持使用填写当天。');
       if(f.gpaScale && !['4','4.0','5','5.0'].includes(String(f.gpaScale)))throw Error('GPA 满分口径无效。');
       return f;
@@ -77,7 +77,9 @@
   function moduleHint(field) {
     if(manualField(field))return 'manual';
     const context=[field.module,field.groupLabel].join(' ');
-    if(/在校任职|校园任职|学生干部|获奖|奖励|论文|发表|出版|school[ _-]*posts|campus[ _-]*posts|awards|publications/i.test(context))return 'unsupported-module';
+    if(/campus-role|在校任职|校园任职|在校经历|校园经历|在校职务|学生工作|学生干部|school[ _-]*posts|campus[ _-]*posts/i.test(context))return 'campus-role';
+    if(/获奖|奖励|荣誉|awards/i.test(context))return 'awards';
+    if(/论文|发表|出版|专著|publications/i.test(context))return 'publications';
     if(/^(毕业院校|毕业学校|最近毕业专业)$/.test(field.label || ''))return 'education';
     const value=String(field.module || '').toLowerCase();
     return Object.entries(V.modules).find(([alias])=>value.includes(alias))?.[1] || (value.trim()?'unsupported-module':'');
@@ -172,7 +174,7 @@
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
       if(!list.length)return row;
       const fact=list[0];let value=String(fact.value), reason='', valuePrecision=fact.precision;
-      const format=field.dateFormat, dateKind=field.datePart?'month':['date','month'].includes(kind)?kind:format?(format.includes('DD')?'date':'month'):'';
+      const format=field.dateFormat, deferredDate=field.adapter==='phoenix-date' && !format, dateKind=deferredDate?(valuePrecision==='month'?'month':valuePrecision==='day'?'date':''):field.datePart?'month':['date','month'].includes(kind)?kind:format?(format.includes('DD')?'date':'month'):'';
       Object.assign(row,{factKey:fact.key,value,displayValue:fact.sensitive?mask(value,row.label):value,sensitive:fact.sensitive});
       if(Object.hasOwn(mappings,field.id) && !mappingMatches(p,field,fact))reason='映射与字段的明确含义、模块或记录不符，不能跨记录填入。';
       if(!reason && fact.manual)reason='此项资料必须人工确认，不使用自动填入。';
@@ -189,6 +191,7 @@
       }
       if(!reason && /待确认|冲突|不确定/.test(value))reason='资料包含待确认的时间或事实表述，需要人工确认。';
       if(!reason && /至今/.test(value) && !fact.ongoing)reason='资料包含至今的时间表述，需要人工确认。';
+      if(!reason && deferredDate && !['month','day'].includes(valuePrecision))reason='资料日期精度不明确，需先核对。';
       if(!reason && dateKind==='date' && valuePrecision!=='day')reason='资料没有精确到日，不能自行补为每月一号。';
       if(!reason && dateKind==='month' && !['month','day'].includes(valuePrecision))reason='资料年月精度不明确。';
       if(!reason && kind==='number') {
@@ -239,7 +242,7 @@
   function agentRequest(p,scan,plan,model='') {
     const pending=new Set(plan.rows.filter(r=>['missing','ambiguous'].includes(r.status)).map(r=>r.fieldId));
     const pick=(item,keys)=>Object.fromEntries(keys.filter(k=>item[k]!==undefined).map(k=>[k,item[k]]));
-    return {protocol:1,op:'map',model,fields:scan.fields.filter(f=>pending.has(f.id) && !manualField(f) && moduleHint(f)!=='unsupported-module').map(f=>pick(f,['id','label','module','groupLabel','recordHint','type','options'])),allowedFacts:p.facts.filter(f=>!f.manual).map(f=>pick(f,['key','label','module','recordId','recordLabel','recordHint','aliases']))};
+    return {protocol:1,op:'map',model,fields:scan.fields.filter(f=>pending.has(f.id) && !manualField(f) && moduleHint(f)!=='unsupported-module' && (!['campus-role','awards','publications'].includes(moduleHint(f)) || p.facts.some(fact=>fact.module===moduleHint(f)))).map(f=>pick(f,['id','label','module','groupLabel','recordHint','type','options'])),allowedFacts:p.facts.filter(f=>!f.manual).map(f=>pick(f,['key','label','module','recordId','recordLabel','recordHint','aliases']))};
   }
   function safeAgentMappings(p,scan,mappings) {
     const accepted={}, rejected=[];

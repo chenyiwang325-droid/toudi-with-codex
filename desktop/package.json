@@ -1,7 +1,7 @@
 {
   "name": "toudi-desktop",
   "private": true,
-  "version": "0.5.2",
+  "version": "0.5.3",
   "scripts": {
     "tauri": "tauri",
     "build": "python3 scripts/build.py"

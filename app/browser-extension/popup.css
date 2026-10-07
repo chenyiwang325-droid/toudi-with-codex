@@ -10,3 +10,5 @@ html{width:440px;min-width:440px}#agent{margin-top:20px;padding-top:16px;border-
 #structureFeedback{border-left:3px solid #7a9b82;padding-left:12px}#structureFeedback p{margin:6px 0}
 
 #answerBox{scroll-margin-top:80px;margin:18px 0;padding:16px;border:1px solid var(--line);border-radius:6px;background:var(--card)}#answerEvidence{overflow-wrap:anywhere}#answerBox .buttons{flex-wrap:wrap}
+
+#openCopyLibrary{width:100%;margin-top:8px}#copyLibrary{scroll-margin-top:80px;margin:18px 0;padding:14px;border:1px solid var(--line);border-radius:6px;background:var(--card)}.copy-record summary{overflow-wrap:anywhere}.copy-record>button{margin:10px 0}.copy-fact{display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding:10px 0}.copy-fact>div{flex:1;min-width:0}.copy-fact p{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0}.copy-fact button{flex:none}
