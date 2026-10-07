@@ -5,6 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   let latest = null;
+  const ENGINE_VERSION = '0.4.3';
   const compact = value => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 240);
   function hash(text) {
     let n = 2166136261;
@@ -18,13 +19,18 @@
   }
   function labelText(node) {
     const copy=node.cloneNode(true);
-    copy.querySelectorAll('input,select,textarea,[role="combobox"]').forEach(x=>x.remove());
+    copy.querySelectorAll('input,select,textarea,[role="combobox"],[role="option"],[role="alert"],[class*="display-value"],[class*="Input-message"],[class*="Input-addon"]').forEach(x=>x.remove());
     return compact(copy.textContent);
   }
   // Moka's label wraps the selected value and validation message, not the question.
   // Anchor to the field/block structure; CSS-module hash suffixes are not stable.
   const mokaField = node => node.closest('[class^="apply-field-"],[class*=" apply-field-"]');
-  const mokaTitle = field => compact(field?.querySelector(':scope > [class^="title-"] > span:first-child')?.textContent);
+  const classPart = (prefix) => `[class^="${prefix}"],[class*=" ${prefix}"]`;
+  const directPart = (node,prefix) => [...(node?.children || [])].find(n=>[...n.classList].some(c=>c.startsWith(prefix)));
+  const mokaTitle = field => {
+    const title=directPart(field,'title-');
+    return title?labelText(title).replace(/[＊*]\s*$/,'').trim():'';
+  };
   const mokaSelect = node => node?.closest('[class*="sd-Select-container-"]');
   function mokaValue(node) {
     return compact(mokaSelect(node)?.querySelector('[class*="sd-Input-display-value-"]')?.textContent);
@@ -42,30 +48,37 @@
     return title;
   }
   function mokaContext(node, field) {
-    const block=field.closest('[class^="apply-block-"]'), record=field.closest('[class^="apply-fields-"]');
+    const block=field.closest(classPart('apply-block-')), record=field.closest(classPart('apply-fields-'));
     if(!block || !record)return null;
-    const title=compact(block.querySelector(':scope > [class^="blockTitle-"] [class^="text-"] > span')?.textContent);
+    const heading=directPart(block,'blockTitle-');
+    const title=compact(heading?.querySelector(classPart('text-'))?.textContent);
     if(!title)return null;
     const module=/教育/.test(title)?'education':/实习|工作经历/.test(title)?'work':/项目/.test(title)?'projects':/个人|求职意向/.test(title)?'personal':'other';
     // Only an explicit education-level value identifies a record; never infer by order.
-    const degree=[...record.querySelectorAll('[class^="apply-field-"]')].find(f=>mokaTitle(f)==='学历');
+    const degree=[...record.querySelectorAll(classPart('apply-field-'))].find(f=>mokaTitle(f)==='学历');
     const level=degree?mokaValue(degree.querySelector('input')):'';
     const recordHint=module==='education' && /^(博士研究生|硕士研究生|博士|硕士|本科|专科|大专|高中)$/.test(level)?level:'';
-    return {groupLabel:title+(recordHint?' · '+recordHint:''),recordHint,module,groupPath:structuralPath(record)};
+    const records=[...block.children].filter(n=>n.matches(classPart('apply-fields-')));
+    return {groupLabel:title+(records.length>1?' · 第'+(records.indexOf(record)+1)+'段':''),recordHint,module,groupPath:structuralPath(record)};
+  }
+  function questionText(text) {
+    const value=compact(text);
+    // A selected year/month/value is not a question, even if exposed as an ARIA name.
+    return !value || /^\d+(?:[-/.年]\d+)*(?:月|日|年)?$/.test(value) || /^(请选择|请输入|必填项未填写)$/.test(value)?'':value;
   }
   function named(node) {
     const field=mokaField(node);
-    if(field && !['checkbox','radio'].includes(node.type)) {const title=mokaLabel(node,field);if(title)return title;}
+    if(field && !['checkbox','radio'].includes(node.type))return questionText(mokaLabel(node,field)) || questionText(node.getAttribute('placeholder'));
     const ids = node.getAttribute('aria-labelledby');
-    if (ids) return compact(ids.split(/\s+/).map(id => node.getRootNode().getElementById?.(id)?.textContent || '').join(' '));
-    const explicit=compact(node.getAttribute('aria-label') || [...(node.labels || [])].map(labelText).join(' '));
+    if (ids) {const title=questionText(ids.split(/\s+/).map(id => node.getRootNode().getElementById?.(id)?.textContent || '').join(' '));if(title)return title;}
+    const explicit=questionText(node.getAttribute('aria-label') || [...(node.labels || [])].map(labelText).join(' '));
     if(explicit) return explicit;
     for(let p=node.parentElement,depth=0;p && depth<3;p=p.parentElement,depth++) {
       if(p.querySelectorAll('input,textarea,select,[role="combobox"]').length!==1) break;
       const near=p.querySelector(':scope > label,:scope > .field-label,:scope > .form-label');
       if(near && (!near.htmlFor || near.htmlFor===node.id)) return labelText(near);
     }
-    return compact(node.getAttribute('placeholder'));
+    return questionText(node.getAttribute('placeholder'));
   }
   function structuralPath(node) {
     const parts=[];
@@ -123,7 +136,7 @@
     const entries = [], warnings = [], counts = new Map();
     function walk(root, scope) {
       const nodes = [...root.querySelectorAll('input,textarea,select,[role="combobox"]')];
-      const application=root.querySelector('[class^="apply-block-"] [class^="apply-field-"]');
+      const application=[...root.querySelectorAll(classPart('apply-block-'))].some(n=>n.querySelector(classPart('apply-field-')));
       const radios = new Set();
       for (const node of nodes) {
         if(application && !mokaField(node))continue; // Ignore the surrounding job-search form.
@@ -132,10 +145,13 @@
         let label = named(node);
         if (!label) {
           const parent = node.closest('label');
-          label = parent ? labelText(parent) : '';
+          label = !mokaField(node) && parent ? questionText(labelText(parent)) : '';
         }
         if (/password|token|secret|密码|口令|令牌/i.test(label + ' ' + node.name + ' ' + node.id)) continue;
         const moka=mokaField(node), adapter=moka && mokaSelect(node)?'moka-select':'';
+        const dateInputs=moka && /date_info-/.test(moka.className)?[...moka.querySelectorAll('input:not([type="hidden"])')]:[];
+        const dateIndex=dateInputs.length===4?dateInputs.indexOf(node):-1;
+        const dateMeta=dateIndex>=0?{datePart:dateIndex%2?'month':'year',semanticLabel:dateIndex<2?'开始日期':'结束日期'}:{};
         const type = rawType === 'radio' ? 'radio' : rawType === 'checkbox' ? 'checkbox' : rawType === 'file' ? 'file' : node.tagName === 'SELECT' ? 'select' : node.tagName === 'TEXTAREA' ? 'textarea' : adapter || node.getAttribute('role') === 'combobox' ? 'combobox' : rawType || 'text';
         const ctx = context(node);
         let members = [node], options = [];
@@ -157,18 +173,19 @@
         else if (/验证码|校验码|安全验证|captcha|verification code|one.time code/i.test(label)) unsupported = 'verification-code';
         else if (['checkbox','radio'].includes(type) && /同意|声明|隐私|条款|协议|我已阅读|本人确认|agree|consent|terms|declaration/i.test(label)) unsupported = 'consent';
         else if (type === 'combobox' && !adapter && (!options.length || options.some(x => !x.value))) unsupported = 'custom-selector';
-        else if(adapter && /date_info-/.test(moka.className))unsupported='split-date';
+        else if(adapter && /date_info-/.test(moka.className) && dateIndex<0)unsupported='split-date';
         else if(moka && /day_info-/.test(moka.className))unsupported='custom-date';
         else if (!label) unsupported = 'unlabeled';
         else if (members.some(n=>n.disabled || n.readOnly || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) unsupported='disabled-or-readonly';
         const constraints=Object.fromEntries(['min','max','step','pattern'].filter(k=>node.hasAttribute(k)).map(k=>[k,node.getAttribute(k)]));
         const placeholder=(node.getAttribute('placeholder') || '').trim().toUpperCase();
         const dateFormat=['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'].includes(placeholder)?placeholder:undefined;
-        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!moka?.querySelector('[class*="required-asterisk-"]'),maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
-        const signature = JSON.stringify(descriptor), index = counts.get(signature) || 0;
+        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!moka?.querySelector('[class*="required-asterisk-"]'),maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
+        // Record values can constrain matching, but never rename/reidentify a field.
+        const signature = JSON.stringify({...descriptor,...(moka?{recordHint:''}:{})}), index = counts.get(signature) || 0;
         counts.set(signature,index+1);
         const id = 'field-' + hash(signature + ':' + index);
-        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported ? '' : read({node,nodes:members,type,field:{options,adapter}}),options,constraints,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{})};
+        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported ? '' : read({node,nodes:members,type,field:{options,adapter}}),options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{})};
         if (unsupported) field.unsupported = unsupported;
         entries.push({field,descriptor,node,nodes:members,type});
       }
@@ -185,14 +202,18 @@
     walk(document,'document');
     const origin = location.origin, path = location.pathname;
     const fingerprint = hash(JSON.stringify({origin,path,structure:entries.map(x=>({id:x.field.id,...x.descriptor}))}));
-    return {entries,report:{protocol:1,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),warnings}};
+    return {entries,report:{protocol:1,engineVersion:ENGINE_VERSION,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),warnings}};
   }
   async function scan() { const state = collect(); latest = state; return state.report; }
   const wait = (milliseconds=100) => new Promise(resolve => setTimeout(resolve,milliseconds));
   async function selectMoka(entry,target) {
     const container=entry.node.closest('[class*="sd-Dropdown-container-"]');
     if(!container)throw Error('option-unavailable');
-    const norm=v=>String(v).normalize('NFKC').trim();
+    const norm=v=>{
+      const text=String(v).normalize('NFKC').trim();
+      const aliases=/^(最高)?学历$/.test(entry.field.label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:{};
+      return aliases[text] || text;
+    };
     entry.node.click();
     try {
       let choices=[];
@@ -207,9 +228,10 @@
       const option=matches[0];
       if(option.closest('a[href],button[type="submit"],[aria-disabled="true"],[class*="disabled"],[class*="Disabled"]'))throw Error('option-disabled');
       option.click();
+      return String(option.textContent).trim();
     } finally {
       // Close without choosing another value or triggering a form submission.
-      const title=mokaField(entry.node)?.querySelector(':scope > [class^="title-"]');
+      const title=directPart(mokaField(entry.node),'title-');
       title?.click();
     }
   }
@@ -260,12 +282,13 @@
       if (['select','radio','combobox'].includes(entry.type) && entry.field.adapter!=='moka-select' && !entry.field.options.some(x=>x.value===String(target))) {output.push(result(action.fieldId,'failed','option-not-found',entry));continue;}
       if (entry.type==='select' && [...entry.node.options].some(x=>x.value===String(target) && (x.disabled || x.parentElement?.disabled))) {output.push(result(action.fieldId,'manual','option-disabled',entry));continue;}
       try {
+        let expected=entry.type==='checkbox'?action.value:String(target);
         if (entry.type==='checkbox') { if(entry.node.checked!==action.value) entry.node.click(); }
         else if (entry.type==='radio') {
           const selected=entry.nodes.find(n=>n.value===String(target));
           if(!selected.checked) selected.click();
         }
-        else if(entry.field.adapter==='moka-select') await selectMoka(entry,String(target));
+        else if(entry.field.adapter==='moka-select') expected=await selectMoka(entry,String(target));
         else if (entry.type==='combobox') {
           const box=entry.node.getRootNode().getElementById(entry.node.getAttribute('aria-controls'));
           const option=[...box.querySelectorAll('[role="option"]')].find(n=>(n.getAttribute('data-value')||n.getAttribute('value'))===String(target));
@@ -275,7 +298,7 @@
           if (option.getAttribute('aria-disabled')==='true' || option.disabled) throw Error('option-disabled');
           option.click();
         } else setNative(entry.node,String(target));
-        applied.set(action.fieldId,entry.type==='checkbox'?action.value:String(target));
+        applied.set(action.fieldId,expected);
         output.push(result(action.fieldId,'verified','pending-readback',entry));
       } catch (error) {output.push(result(action.fieldId,'failed',error.message,entry));}
       await wait();

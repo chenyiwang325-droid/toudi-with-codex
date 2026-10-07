@@ -73,8 +73,8 @@
     if(!pack.profiles.some(p=>p.id===id))throw Error('请选择有效的资料版本。');
     return {...pack,profileId:id,facts:sortFacts(pack.facts.filter(f=>f.profiles.includes(id)))};
   }
-  function moduleHint(field) { const value=String(field.module || '').toLowerCase(); return Object.entries(V.modules).find(([alias])=>value.includes(alias))?.[1] || ''; }
-  function semantic(field) { return normal(String(field.label || '').replace(/博士研究生|硕士研究生|博士|硕士|本科|专科/g,'')); }
+  function moduleHint(field) { if(/^(毕业院校|毕业学校|最近毕业专业)$/.test(field.label || ''))return 'education'; const value=String(field.module || '').toLowerCase(); return Object.entries(V.modules).find(([alias])=>value.includes(alias))?.[1] || ''; }
+  function semantic(field) { return normal(String(field.semanticLabel || field.label || '').replace(/博士研究生|硕士研究生|博士|硕士|本科|专科/g,'')); }
   function recordMatches(fact,field) {
     const qs=qualifiers([field.label,field.groupLabel,field.recordHint].join(' '));
     const hint=normal(fact.recordLabel+' '+fact.recordHint);
@@ -123,6 +123,7 @@
       for(const k of ['label','groupLabel','recordHint'])if(!text(f[k] || ''))throw Error('网页字段说明过长。');
       if(f.options && (!Array.isArray(f.options) || f.options.length>1000 || f.options.some(o=>!o || !text(o.text) || !text(o.value,2000))))throw Error('网页选项结构无效。');
       if(f.dateFormat && !dateFormats.includes(f.dateFormat))throw Error('网页日期格式无效。');
+      if(f.datePart && (!['year','month'].includes(f.datePart) || !['开始日期','结束日期'].includes(f.semanticLabel) || f.adapter!=='moka-select'))throw Error('拆分日期结构无效。');
       seen.add(f.id);
     }
     return scan;
@@ -142,7 +143,7 @@
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
       if(!list.length)return row;
       const fact=list[0];let value=String(fact.value), reason='', valuePrecision=fact.precision;
-      const format=field.dateFormat, dateKind=['date','month'].includes(kind)?kind:format?(format.includes('DD')?'date':'month'):'';
+      const format=field.dateFormat, dateKind=field.datePart?'month':['date','month'].includes(kind)?kind:format?(format.includes('DD')?'date':'month'):'';
       Object.assign(row,{factKey:fact.key,value,displayValue:fact.sensitive?mask(value,row.label):value,sensitive:fact.sensitive});
       if(Object.hasOwn(mappings,field.id) && !mappingMatches(p,field,fact))reason='映射与字段的明确含义、模块或记录不符，不能跨记录填入。';
       if(!reason && fact.manual)reason='此项资料必须人工确认，不使用自动填入。';
@@ -173,6 +174,7 @@
           value=String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+(dateKind==='date'?'-'+String(day).padStart(2,'0'):'');
           if((constraints.min && value<constraints.min) || (constraints.max && value>constraints.max))reason='日期超出字段明确范围，需人工核对；未截断或修改日期。';
           if(format)value=value.replaceAll('-',format.includes('/')?'/':format.includes('.')?'.':'-');
+          if(field.datePart)value=field.datePart==='year'?String(year):String(month);
           row.value=value;row.displayValue=value;
         }
       }
@@ -186,7 +188,7 @@
       if(reason)return {...row,status:'manual',reason};
       const existing=String(field.value ?? ''), proposed=String(row.optionValue ?? value);
       const note=row.dateFallbackUsed?' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。':'';
-      if(existing && (existing===proposed || existing===value))return {...row,status:'already',reason:'已有值与资料相同。'+note};
+      if(existing && (existing===proposed || existing===value || (['select','radio','combobox'].includes(kind) && optionEquivalent(existing,fact.label)===optionEquivalent(value,fact.label))))return {...row,status:'already',reason:existing===value?'已有值与资料相同。'+note:'已有选项与资料语义一致，无需覆盖。'+note};
       if(existing)return {...row,status:'conflict',reason:'已有值与资料不同，保留现值，需明确选择覆盖。'+note};
       return {...row,status:'ready',reason:(deferredSelect?'资料已匹配；填写时展开此字段菜单，仅选择唯一同名选项，未找到则保留原值。':'事实、记录及控件约束已确认。')+note};
     });

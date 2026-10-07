@@ -26,8 +26,16 @@ function selection() {
   el('selectionCount').textContent = `选择 ${selected.length} 项` + (overwritten ? ` · 覆盖 ${overwritten} 项` : '');
   el('fill').disabled = busy || !selected.length;
 }
+function renderAgentFeedback() {
+  const r=state?.agentReview,box=el('agentFeedback');box.hidden=!state?.plan;
+  if(!state?.plan)return;
+  const title={running:'Agent 正在核对',completed:'Agent 核对结果',failed:'Agent 核对未完成',skipped:'本次未调用 Agent',superseded:'Agent 结果未采用'}[r?.status] || 'Agent 核对';
+  const summary=r?.status==='completed'?`已核对 ${r.requested} 项 · 采纳 ${r.accepted} 项 · 未采用 ${r.rejected} 项 · 未确认 ${r.unresolved} 项`:r?.message || (state.autoAgentPending?'等待调用所选模型核对歧义字段。':'尚未调用；可在下方发起语义核对。');
+  box.innerHTML=`<h2>${escapeHtml(title)}</h2>${r?.model?`<p class="caption">${escapeHtml(r.model)}${Number.isFinite(r.seconds)?' · '+r.seconds.toFixed(1)+' 秒':''}</p>`:''}<p>${escapeHtml(summary)}</p>${r?.items?.length?`<details><summary>查看 ${r.items.length} 项核对明细</summary>${r.items.map(i=>`<div class="agent-item"><strong>${escapeHtml([i.groupLabel,i.label].filter(Boolean).join(' · '))}</strong><div>${escapeHtml(i.factLabel?'→ '+i.factLabel:'未确认对应资料')}</div><p class="reason">${escapeHtml(({matched:'已采纳匹配',rejected:'未采用建议',unresolved:'仍需核对'})[i.status])} · ${escapeHtml(i.reason)}</p></div>`).join('')}</details>`:''}`;
+}
 function render() {
   const plan = state?.plan;
+  renderAgentFeedback();
   el('review').hidden = !plan;el('agent').hidden = !plan;el('actions').hidden = !plan;el('result').hidden = !state?.report;
   if (plan) {
     const counts = plan.statusCounts || {};
@@ -35,14 +43,14 @@ function render() {
     const groups = new Map();
     for (const row of plan.rows) {const key = row.groupLabel || ({personal:'个人信息',education:'教育经历',work:'工作经历',projects:'项目经历'}[row.module] || '其他字段');if (!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
     el('profile').value = plan.profileId;
-    el('review').innerHTML = `<h2>核对本页填写计划</h2><div class="site">${escapeHtml(plan.origin + plan.path)}</div>${state.timings?`<p class="caption">页面扫描 ${(state.timings.scanMs/1000).toFixed(2)} 秒 · 本地计划 ${(state.timings.totalMs/1000).toFixed(2)} 秒</p>`:''}<div class="summary"><span><b>${plan.rows.length}</b>识别字段</span><span><b>${counts.ready || 0}</b>可填写</span><span><b>${counts.already || 0}</b>已有一致</span><span><b>${pending}</b>待核对</span></div>` + [...groups].map(([group, rows]) => `<h3>${escapeHtml(group)}</h3>` + rows.map(row => {
+    el('review').innerHTML = `<h2>核对本页填写计划</h2><div class="site">${escapeHtml(plan.origin + plan.path)}</div>${state.timings?`<p class="caption">引擎 ${escapeHtml(state.engineVersion || '未知')} · 页面扫描 ${(state.timings.scanMs/1000).toFixed(2)} 秒 · 本地计划 ${(state.timings.totalMs/1000).toFixed(2)} 秒</p>`:''}<div class="summary"><span><b>${plan.rows.length}</b>识别字段</span><span><b>${counts.ready || 0}</b>可填写</span><span><b>${counts.already || 0}</b>已有一致</span><span><b>${pending}</b>待核对</span></div>` + [...groups].map(([group, rows]) => `<h3>${escapeHtml(group)}</h3>` + rows.map(row => {
       const selectable = ['ready','conflict'].includes(row.status) && row.factKey;
       const choices = ['missing','ambiguous'].includes(row.status) ? `<select data-map="${escapeHtml(row.fieldId)}" aria-label="为${escapeHtml(row.label)}选择资料字段"><option value="">选择已确认资料…</option>${plan.choices.map(choice => `<option value="${escapeHtml(choice.key)}">${escapeHtml(choice.label)}</option>`).join('')}</select>` : '';
       const value = row.displayValue;
       return `<div class="field"><div class="field-top">${selectable ? `<input type="checkbox" data-field="${escapeHtml(row.fieldId)}" data-overwrite="${row.status === 'conflict'}" aria-label="${row.status === 'conflict' ? '覆盖已有' : '填写'}${escapeHtml(row.label)}" ${row.status === 'ready' ? 'checked' : ''}>` : ''}<button class="field-title" data-jump="${escapeHtml(row.fieldId)}" title="定位网页字段">${escapeHtml(row.label || '未命名字段')}</button><span class="state ${row.status}">${labels[row.status] || row.status}</span></div>${value ? `<div class="value">${escapeHtml(value)}</div>` : ''}<div class="reason">${escapeHtml(row.reason)}</div>${choices}</div>`;
     }).join('')).join('');
     if (document.querySelector('[data-map]')) el('review').insertAdjacentHTML('beforeend','<label class="check"><input id="rememberSelections" type="checkbox">记住本页所选匹配</label><button id="applyChoices">应用所选匹配并重新核对</button>');
-    if (plan.provider?.called) notice(`Agent 已匹配 ${plan.provider.mapped || 0} 个字段；请核对更新后的计划。`);
+
     selection();
   }
   if (state?.report) {
@@ -63,7 +71,7 @@ function updateAgentControls(){
   el('autoAgentRow').hidden=!direct;el('autoAgent').checked=pref.autoAgent;
   el('agentCli').hidden=pref.agentMode==='external';
   el('agentCli').textContent=direct?'用 '+pref.agentModel+' 核对':'配置 Agent 协作';
-  el('agentCli').disabled=busy || agentBusy || (direct && !state?.plan?.rows.some(row=>['missing','ambiguous'].includes(row.status)));
+  el('agentCli').disabled=busy || agentBusy || state?.agentReview?.status==='running' || (direct && !state?.plan?.rows.some(row=>['missing','ambiguous'].includes(row.status)));
   el('agentCheck').hidden=!direct;
   el('agentTransfer').open=pref.agentMode==='external';
   el('agentConnectionStatus').textContent=direct?'当前模型：'+pref.agentModel+' · 现有 Codex 额度。仅核对歧义，不自动替换模型。':pref.agentMode==='external'?'当前方式：自己的 Agent。复制任务后，导入返回的 JSON。':'尚未接入 Agent；明确字段和手动选择资料仍可使用。';
@@ -74,19 +82,19 @@ el('autoAgent').addEventListener('change',()=>task(async()=>{pref=await send('pr
 async function checkAgentPlan(){
   if(agentBusy || !state?.plan)return;
   const startedAt=state.startedAt;
-  agentBusy=true;updateAgentControls();notice('本地计划已显示；Agent 正在核对歧义字段，你可以先填写已确认的项目。');
+  agentBusy=true;state.agentReview={status:'running',model:pref.agentModel,message:'正在核对字段含义与已有资料。'};renderAgentFeedback();updateAgentControls();notice('本地计划已显示；Agent 正在核对歧义字段，你可以先填写已确认的项目。');
   try{
     const next=await send('remap',{agent:true,startedAt});
     if(state?.startedAt!==startedAt || !state?.plan)return;
     // Preserve user checkbox/manual choices while the model was running.
-    if(busy || document.querySelector('[data-map]:focus')){notice('Agent 核对完成；重新打开插件可查看更新后的计划。');return;}
+    if(busy || document.querySelector('[data-map]:focus')){state.agentReview=next.agentReview;renderAgentFeedback();notice('核对反馈已更新；重新打开插件可查看新计划，当前选择保留。');return;}
     const selected=new Map([...document.querySelectorAll('[data-field]')].map(n=>[n.dataset.field,n.checked]));
     const choices=new Map([...document.querySelectorAll('[data-map]')].map(n=>[n.dataset.map,n.value]));
     state=next;render();
     document.querySelectorAll('[data-field]').forEach(n=>{if(selected.has(n.dataset.field))n.checked=selected.get(n.dataset.field);});
     document.querySelectorAll('[data-map]').forEach(n=>{if(choices.has(n.dataset.map))n.value=choices.get(n.dataset.map);});selection();
-    notice(state.agentError || 'Agent 核对完成，请查阅匹配结果。',!!state.agentError);
-  }catch(e){if(state?.startedAt===startedAt && state?.plan)notice(e.message,true);}
+    notice(state.agentError || (state.agentReview?.status==='completed'?`Agent 核对完成：采纳 ${state.agentReview.accepted} 项，${state.agentReview.unresolved} 项仍未确认。`:'Agent 未完成匹配，请查看核对反馈。'),!!state.agentError);
+  }catch(e){if(state?.startedAt===startedAt && state?.plan){state.agentReview={...state.agentReview,status:'failed',message:e.message};renderAgentFeedback();notice(e.message,true);}}
   finally{agentBusy=false;updateAgentControls();}
 }
 el('scan').addEventListener('click', async()=>{
@@ -116,4 +124,16 @@ el('agentCli').addEventListener('click',()=>{
   checkAgentPlan();
 });
 el('fill').addEventListener('click',()=>task(async()=>{const inputs=[...document.querySelectorAll('#review input[data-field]:checked')];state=await send('fill',{selected:inputs.map(input=>input.dataset.field),overwrite:inputs.filter(input=>input.dataset.overwrite==='true').map(input=>input.dataset.field)});render();notice('所选字段已执行并读回核验，请查看逐项结果。');},'正在填写所选字段并读回核验…'));
-task(async()=>{const value=await send('state');showSync(value.sync);available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=pref.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');
+task(async()=>{const value=await send('state');el('runtimeVersion').textContent='扩展 '+(value.extensionVersion || '未知版本')+' · 本地资料';showSync(value.sync);available(value.profile?.count);el('profile').value=value.preferences.profile;pref=value.preferences;updateAgentControls();profileSummary=value.profile;el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=pref.profile;sourceLabel();state=value.state;render();notice(state?.agentError || '',!!state?.agentError);},'正在读取本地资料…');
+
+// A popup can be closed while the worker continues; show its durable outcome on reopen.
+const agentPoll=setInterval(async()=>{
+  if(busy || agentBusy || state?.agentReview?.status!=='running')return;
+  try{const next=(await send('state')).state;if(!next || next.startedAt!==state.startedAt)return;
+    if(next.agentReview?.status==='running'){state.agentReview=next.agentReview;renderAgentFeedback();return;}
+    const selected=new Map([...document.querySelectorAll('[data-field]')].map(n=>[n.dataset.field,n.checked]));
+    const choices=new Map([...document.querySelectorAll('[data-map]')].map(n=>[n.dataset.map,n.value]));
+    state=next;render();document.querySelectorAll('[data-field]').forEach(n=>{if(selected.has(n.dataset.field))n.checked=selected.get(n.dataset.field)});document.querySelectorAll('[data-map]').forEach(n=>{if(choices.has(n.dataset.map))n.value=choices.get(n.dataset.map)});selection();
+  }catch(_){}
+},1200);
+window.addEventListener('unload',()=>clearInterval(agentPoll));

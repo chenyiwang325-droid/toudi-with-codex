@@ -11,13 +11,13 @@ const root=path.resolve(__dirname,'../app/browser-extension');let browser;
   window.chrome={runtime:{sendMessage:async message=>{
    if(message.op==='state')return {value:{profile:{count:2,profiles:[{id:'general',label:'合成资料',count:2}]},preferences,sync:{status:'disconnected'}}};
    if(message.op==='scan')return {value:{startedAt:1,plan,autoAgentPending:true,timings:{scanMs:20,totalMs:50}}};
-   if(message.op==='remap')return new Promise(resolve=>{window.finishModel=()=>resolve({value:{startedAt:1,plan:{...plan,rows:rows.map(r=>r.fieldId==='unknown'?{...r,status:'ready',factKey:'height',displayValue:'175'}:r),statusCounts:{ready:2},provider:{called:true,mapped:1}}}})});
+   if(message.op==='remap')return new Promise(resolve=>{window.finishModel=()=>resolve({value:{startedAt:1,plan:{...plan,rows:rows.map(r=>r.fieldId==='unknown'?{...r,status:'ready',factKey:'height',displayValue:'175'}:r),statusCounts:{ready:2},provider:{called:true,mapped:1}},agentReview:{status:'completed',model:'fixture-user-model',requested:1,accepted:1,rejected:0,unresolved:0,seconds:1.2,items:[{label:'补充项',factLabel:'身高',status:'matched',reason:'已匹配合成资料'}]}}})});
    if(message.op==='fill')return {value:{startedAt:2,report:{summary:{verified:1},results:[{fieldId:'height',status:'verified',reason:'readback-matched'}]},labels:{height:{label:'身高'}}}};
    return {value:{}};
   }}};
  });
  await page.goto('https://fixture.invalid/popup.html');await page.locator('#scan').click();await page.locator('#review').waitFor({state:'visible'});assert.equal(await page.locator('#fill').isEnabled(),true);assert.match(await page.locator('#notice').innerText(),/正在核对歧义/);assert(await page.locator('#agentCli').isDisabled());
- await page.locator('[data-field="height"]').uncheck();await page.evaluate(()=>finishModel());await page.getByText('Agent 核对完成，请查阅匹配结果。',{exact:true}).waitFor();assert.equal(await page.locator('[data-field="height"]').isChecked(),false);
+ await page.locator('[data-field="height"]').uncheck();await page.evaluate(()=>finishModel());await page.getByText('Agent 核对完成：采纳 1 项，0 项仍未确认。',{exact:true}).waitFor();assert.match(await page.locator('#agentFeedback').innerText(),/fixture-user-model/);assert.match(await page.locator('#agentFeedback').innerText(),/采纳 1 项/);await page.locator('#agentFeedback summary').click();assert.match(await page.locator('#agentFeedback').innerText(),/补充项/);assert.equal(await page.locator('[data-field="height"]').isChecked(),false);
  await page.locator('#scan').click();await page.locator('#fill').click();await page.locator('#result').waitFor({state:'visible'});await page.evaluate(()=>finishModel());assert(await page.locator('#review').isHidden());assert.match(await page.locator('#result').innerText(),/1 项核验通过/);assert.deepEqual(errors,[]);
  console.log('PASS rendered popup: immediate local plan and enabled fill while model pending, preserved checkboxes, late model cannot replace completed report, zero page errors');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{await browser?.close()});

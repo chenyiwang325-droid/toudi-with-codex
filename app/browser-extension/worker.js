@@ -3,6 +3,7 @@ importScripts('filling-aliases.js','filling-core.js','agent-config.js','sync-cor
 const Core=globalThis.TouDiFillingCore;
 const KEY='toudiFillingSession', PACK='toudiPrivateProfile', PREF='toudiFillingPreferences', MAPS='toudiFieldMappings';
 const HOST='com.toudi.filling.codex';
+const EXTENSION_VERSION=chrome.runtime.getManifest?.().version || 'development';
 const init=(async()=>{
   await chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
   await chrome.storage.session.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
@@ -19,7 +20,7 @@ async function preferences() {
 function summary(value) {return value?{name:value.name,revision:value.sourceVersion,savedAt:value.savedAt,importedAt:value.importedAt,editedAt:value.editedAt,count:value.facts.length,profiles:value.profiles.map(p=>({...p,count:value.facts.filter(f=>f.profiles.includes(p.id)).length})),rules:value.rules,warnings:value.warnings}:null;}
 async function loadState() {
   const state=(await chrome.storage.session.get(KEY))[KEY];
-  if(state && Date.now()-state.startedAt<600000) {
+  if(state && (EXTENSION_VERSION==='development' || state.extensionVersion===EXTENSION_VERSION) && Date.now()-state.startedAt<600000) {
     const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
     const source=(await chrome.storage.local.get(PACK))[PACK];
     let url;try{url=new URL(tab?.url);}catch(_){}
@@ -27,8 +28,8 @@ async function loadState() {
   }
   await chrome.storage.session.remove(KEY);return null;
 }
-const publicState=state=>state?{startedAt:state.startedAt,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,timings:state.timings,autoAgentPending:state.autoAgentPending,agentError:state.agentError || state.lunaError}:null;
-async function putState(state) {await chrome.storage.session.set({[KEY]:state});return publicState(state);}
+const publicState=state=>state?{startedAt:state.startedAt,extensionVersion:state.extensionVersion,engineVersion:state.scan?.engineVersion,agentReview:state.agentReview,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,timings:state.timings,autoAgentPending:state.autoAgentPending,agentError:state.agentError || state.lunaError}:null;
+async function putState(state) {state.extensionVersion=EXTENSION_VERSION;await chrome.storage.session.set({[KEY]:state});return publicState(state);}
 let nativePort, nativeTimer, nextId=0;
 const nativeRequests=new Map();
 function nativeFailure() {return Error('本机 Codex 连接工具尚未安装或不可用；请在「资料与设置」查看安装步骤。本地识别和填写仍可使用。');}
@@ -90,7 +91,8 @@ async function current() {const state=await loadState();if(!state?.plan)throw Er
 const scope=state=>digest([state.origin,state.path,state.scan.fingerprint,state.plan.profileId]);
 async function remap(state,message) {
   const p=Core.profile(await pack(),state.plan.profileId);
-  let mappings=message.mappings || {}, provider={called:false};
+  let mappings=message.mappings || {}, provider=state.plan.provider || {called:false};
+  if(!message.agent && state.agentReview?.status==='running')state.agentReview={...state.agentReview,status:'superseded',message:'你已调整匹配，正在进行的 Agent 结果不会覆盖这次修改。'};
   if(message.agent) {
     const pref=await preferences();
     if(pref.agentMode!=='codex' || !pref.agentModel)throw Error('请先在「资料与设置 → Agent 协作」选择连接方式与模型。');
@@ -169,7 +171,7 @@ async function resolveSync(message){
 async function operation(message) {
   await init;
   switch(message.op) {
-    case 'state':return {sync:await syncState(),profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState()),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
+    case 'state':return {extensionVersion:EXTENSION_VERSION,sync:await syncState(),profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState()),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
     case 'profile-sync':return synchronize();
     case 'profile-connect':return synchronize(true);
     case 'profile-resolve':return resolveSync(message);
@@ -204,13 +206,15 @@ async function operation(message) {
     case 'codex-status':return native({op:'status',protocol:1});
     case 'scan': {
       const started=Date.now();
-      const sync=await synchronize(false,3500);
+      if((await syncState()).status==='workspace-changed')throw Error('中控台工作区已切换。请重新连接核对；若继续使用原浏览器资料，请先断开同步。');
+      const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.id)throw Error('没有可识别的当前网页。');
+      // DOM discovery does not depend on profile I/O. Run both phases concurrently.
+      let scanMs;
+      const [sync,scan]=await Promise.all([synchronize(false,1500),(async()=>{const t=Date.now();const s=Core.scanValid(await engine(tab.id,'scan'));scanMs=Date.now()-t;return s;})()]);
       if(sync.status==='workspace-changed')throw Error('中控台工作区已切换。请在资料与设置重新连接核对；若要继续使用原浏览器资料，请先断开同步。');
       const value=await pack(), pref=await preferences(), p=Core.profile(value,message.profile || pref.profile);
-      const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab?.id)throw Error('没有可识别的当前网页。');
-      const scanStarted=Date.now(), scan=Core.scanValid(await engine(tab.id,'scan'));
       if(!scan.fields.length)throw Error('当前页面没有可见填写字段；请先打开网申表单。');
-      const state={startedAt:Date.now(),tabId:tab.id,origin:scan.origin,path:scan.path,sourceVersion:value.sourceVersion,scan,mappings:{},plan:Core.plan(p,scan),timings:{syncMs:scanStarted-started,scanMs:Date.now()-scanStarted}};
+      const state={startedAt:Date.now(),tabId:tab.id,origin:scan.origin,path:scan.path,sourceVersion:value.sourceVersion,scan,mappings:{},plan:{profileId:p.profileId},timings:{syncMs:Date.now()-started,scanMs}};
       const saved=(await chrome.storage.local.get(MAPS))[MAPS]?.[await scope(state)]?.mappings || {};
       const allowed=new Set(p.facts.map(f=>f.key));state.mappings=Object.fromEntries(Object.entries(saved).filter(([id,key])=>scan.fields.some(f=>f.id===id) && allowed.has(key)));
       state.plan=Core.plan(p,scan,state.mappings);await putState(state);
@@ -242,11 +246,15 @@ function enqueue(fn){const run=operationQueue.then(fn);operationQueue=run.catch(
 async function agentOperation(message){
   const state=await enqueue(()=>current());
   if(message.startedAt && message.startedAt!==state.startedAt)throw Error('计划已变化，请重新核对。');
+  if(state.agentReview?.status==='running')return publicState(state);
   const pref=await preferences(),p=Core.profile(await pack(),state.plan.profileId);
   if(pref.agentMode!=='codex' || !pref.agentModel)throw Error('请先在协作设置选择本机 Codex 与模型。');
   if(message.model && message.model!==pref.agentModel)throw Error('模型与已保存的配置不一致，请先更新 Agent 协作设置。');
   const request=Core.agentRequest(p,state.scan,state.plan,pref.agentModel);
-  if(!request.fields.length)return publicState(state);
+  if(!request.fields.length){state.agentReview={status:'skipped',model:pref.agentModel,requested:0,message:'没有需要语义匹配的字段，本次未调用 Agent。'};return putState(state);}
+  const reviewStarted=Date.now();
+  state.agentReview={status:'running',model:pref.agentModel,requested:request.fields.length,startedAt:reviewStarted,message:'正在核对字段含义与已有资料，不影响本地计划使用。'};
+  await enqueue(()=>putState(state));
   // Do not hold the mutation queue while waiting for a model response.
   let result,error;
   try{result=await native(request);}catch(e){error=e;}
@@ -254,10 +262,15 @@ async function agentOperation(message){
     const active=await current();
     if(active.startedAt!==state.startedAt || active.sourceVersion!==state.sourceVersion || JSON.stringify(active.mappings)!==JSON.stringify(state.mappings))throw Error('核对期间页面、资料或手动匹配已变化；本次模型结果未采用。');
     active.autoAgentPending=false;
-    if(error){active.agentError=error.message;return putState(active);}
+    if(error){active.agentError=error.message;active.agentReview={...active.agentReview,status:'failed',seconds:(Date.now()-reviewStarted)/1000,message:error.message};return putState(active);}
     const safe=Core.safeAgentMappings(p,active.scan,result.mappings);
     await remap(active,{mappings:safe.accepted});
     active.plan.provider={...result.provider,mapped:Object.keys(safe.accepted).length,rejected:safe.rejected.length};
+    const items=request.fields.map(field=>{
+      const row=active.plan.rows.find(r=>r.fieldId===field.id),key=result.mappings?.[field.id],fact=p.facts.find(f=>f.key===key);
+      return {fieldId:field.id,label:field.label,groupLabel:field.groupLabel || '',factLabel:fact?[fact.recordLabel,fact.label].filter(Boolean).join(' · '):'',status:safe.rejected.includes(field.id)?'rejected':safe.accepted[field.id]?'matched':'unresolved',resultStatus:row?.status,reason:safe.rejected.includes(field.id)?'建议未通过字段含义、模块或经历归属校验，未采用。':safe.accepted[field.id]?row?.reason:'Agent 未给出可确认的对应资料；保留待核对。'};
+    });
+    active.agentReview={status:result.provider?.called?'completed':'skipped',model:result.provider?.model || pref.agentModel,requested:request.fields.length,returned:Object.keys(result.mappings || {}).length,accepted:Object.keys(safe.accepted).length,rejected:safe.rejected.length,unresolved:items.filter(i=>i.status==='unresolved').length,seconds:(Date.now()-reviewStarted)/1000,completedAt:Date.now(),items};
     return putState(active);
   });
 }
