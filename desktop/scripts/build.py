@@ -70,7 +70,7 @@ def main():
                            if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == 'EXTENSION_FILES' for target in node.targets))
     for name in extension_files:
         shutil.copy2(stage/'app/browser-extension'/name, extension_ui/name)
-    for name in ('logo.svg', 'form-engine.js'):
+    for name in ('logo.svg', 'form-engine.js', 'form-adapters.js'):
         shutil.copy2(stage/'app/assets'/('favicon.svg' if name == 'logo.svg' else name), extension_ui/name)
     prepare_frontend(ROOT)
     run([npx, 'tauri', 'icon', ROOT/'app/assets/favicon.svg', '--output', DESKTOP/'src-tauri/icons'], env=env)

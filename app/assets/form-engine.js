@@ -1,11 +1,14 @@
 (function (root, factory) {
-  const engine = factory();
+  const engine = factory(typeof module==='object'&&module.exports?require('./form-adapters.js'):root.TouDiFormAdapters);
   if (typeof module === 'object' && module.exports) module.exports = engine;
   else root.TouDiFormEngine = engine;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (adapterLibrary) {
   'use strict';
   let latest = null;
-  const ENGINE_VERSION = '0.4.3';
+  const ENGINE_VERSION = '0.5.0';
+  let structureHints={};
+  const wait=(milliseconds=100)=>new Promise(resolve=>setTimeout(resolve,milliseconds));
+  const adapters=adapterLibrary?.create({compact:v=>compact(v),visible,structuralPath,labelText,wait,setNative});
   const compact = value => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 240);
   function hash(text) {
     let n = 2166136261;
@@ -22,53 +25,14 @@
     copy.querySelectorAll('input,select,textarea,[role="combobox"],[role="option"],[role="alert"],[class*="display-value"],[class*="Input-message"],[class*="Input-addon"]').forEach(x=>x.remove());
     return compact(copy.textContent);
   }
-  // Moka's label wraps the selected value and validation message, not the question.
-  // Anchor to the field/block structure; CSS-module hash suffixes are not stable.
-  const mokaField = node => node.closest('[class^="apply-field-"],[class*=" apply-field-"]');
-  const classPart = (prefix) => `[class^="${prefix}"],[class*=" ${prefix}"]`;
-  const directPart = (node,prefix) => [...(node?.children || [])].find(n=>[...n.classList].some(c=>c.startsWith(prefix)));
-  const mokaTitle = field => {
-    const title=directPart(field,'title-');
-    return title?labelText(title).replace(/[＊*]\s*$/,'').trim():'';
-  };
-  const mokaSelect = node => node?.closest('[class*="sd-Select-container-"]');
-  function mokaValue(node) {
-    return compact(mokaSelect(node)?.querySelector('[class*="sd-Input-display-value-"]')?.textContent);
-  }
-  function mokaLabel(node, field) {
-    let title=mokaTitle(field);
-    const inputs=[...field.querySelectorAll('input:not([type="hidden"]),textarea,select')];
-    if(inputs.length>1 && mokaSelect(node)) {
-      if(/证件号码/.test(title))return '证件类型';
-      if(/手机/.test(title))return '电话区号';
-      if(/date_info-/.test(field.className) && inputs.length===4)
-        return title+' · '+['开始年份','开始月份','结束年份','结束月份'][inputs.indexOf(node)];
-      return title+' · 子选项 '+(inputs.indexOf(node)+1);
-    }
-    return title;
-  }
-  function mokaContext(node, field) {
-    const block=field.closest(classPart('apply-block-')), record=field.closest(classPart('apply-fields-'));
-    if(!block || !record)return null;
-    const heading=directPart(block,'blockTitle-');
-    const title=compact(heading?.querySelector(classPart('text-'))?.textContent);
-    if(!title)return null;
-    const module=/教育/.test(title)?'education':/实习|工作经历/.test(title)?'work':/项目/.test(title)?'projects':/个人|求职意向/.test(title)?'personal':'other';
-    // Only an explicit education-level value identifies a record; never infer by order.
-    const degree=[...record.querySelectorAll(classPart('apply-field-'))].find(f=>mokaTitle(f)==='学历');
-    const level=degree?mokaValue(degree.querySelector('input')):'';
-    const recordHint=module==='education' && /^(博士研究生|硕士研究生|博士|硕士|本科|专科|大专|高中)$/.test(level)?level:'';
-    const records=[...block.children].filter(n=>n.matches(classPart('apply-fields-')));
-    return {groupLabel:title+(records.length>1?' · 第'+(records.indexOf(record)+1)+'段':''),recordHint,module,groupPath:structuralPath(record)};
-  }
   function questionText(text) {
     const value=compact(text);
     // A selected year/month/value is not a question, even if exposed as an ARIA name.
     return !value || /^\d+(?:[-/.年]\d+)*(?:月|日|年)?$/.test(value) || /^(请选择|请输入|必填项未填写)$/.test(value)?'':value;
   }
   function named(node) {
-    const field=mokaField(node);
-    if(field && !['checkbox','radio'].includes(node.type))return questionText(mokaLabel(node,field)) || questionText(node.getAttribute('placeholder'));
+    const adapted=adapters?.describe(node);
+    if(adapted)return questionText(adapted.label);
     const ids = node.getAttribute('aria-labelledby');
     if (ids) {const title=questionText(ids.split(/\s+/).map(id => node.getRootNode().getElementById?.(id)?.textContent || '').join(' '));if(title)return title;}
     const explicit=questionText(node.getAttribute('aria-label') || [...(node.labels || [])].map(labelText).join(' '));
@@ -89,8 +53,8 @@
     return parts.join('/');
   }
   function context(node) {
-    const field=mokaField(node), adapted=field && mokaContext(node,field);
-    if(adapted)return adapted;
+    const adapted=adapters?.describe(node);
+    if(adapted)return adapted.context;
     let group = '', hint = '', groupPath = '';
     for (let p = node.parentElement, depth = 0; p && depth < 7; p = p.parentElement, depth++) {
       const legend = p.tagName === 'FIELDSET' ? p.querySelector(':scope > legend') : null;
@@ -106,7 +70,7 @@
   }
   function read(entry) {
     const n = entry.node;
-    if(entry.field?.adapter==='moka-select')return mokaValue(n);
+    if(entry.field?.adapter)return adapters.read(entry);
     if (entry.type === 'radio') return entry.nodes.find(x => x.checked)?.value || '';
     if (entry.type === 'checkbox') return !!n.checked;
     if (entry.type === 'combobox') {
@@ -132,30 +96,49 @@
     }
     return {container:node.form || root,label:''};
   }
+  // Candidates come from nearby title nodes, never input values or arbitrary page text.
+  function structureCandidates(entry) {
+    const {node,field}=entry,labels=[],groups=[],refs=new Map();
+    const controls='input,textarea,select,[role="combobox"],.phoenix-radio-group';
+    const candidate=(el,kind,container)=>{
+      if(!el || el.matches(controls) || el.querySelector(controls) || !visible(el))return;
+      if(el.closest('[role="option"],[role="listbox"],[class*="display-value"],.phoenix-select'))return;
+      const text=questionText(el.textContent);if(!text || text.length>60)return;
+      const id=kind+'-'+hash(structuralPath(el)),items=kind==='label'?labels:groups;
+      if(items.some(x=>x.id===id))return;
+      items.push({id,text});refs.set(id,{text,path:structuralPath(container)});
+    };
+    for(let p=node.parentElement,depth=0;p&&depth<5;p=p.parentElement,depth++) {
+      const count=p.querySelectorAll(controls).length;
+      if(!field.label && count===1)for(const el of p.querySelectorAll(':scope > label,:scope > [class*="label"],:scope > [class*="title"]'))candidate(el,'label',p);
+      if(!field.groupLabel)for(const el of p.querySelectorAll(':scope > legend,:scope > h2,:scope > h3,:scope > h4,:scope > [role="heading"],:scope > .section-title,:scope > .group-title'))candidate(el,'group',p);
+      if(p.tagName==='FORM')break;
+    }
+    return {fieldId:field.id,labels:labels.slice(0,6),groups:groups.slice(0,4),refs};
+  }
   function collect() {
+    adapters?.reset();
     const entries = [], warnings = [], counts = new Map();
     function walk(root, scope) {
-      const nodes = [...root.querySelectorAll('input,textarea,select,[role="combobox"]')];
-      const application=[...root.querySelectorAll(classPart('apply-block-'))].some(n=>n.querySelector(classPart('apply-field-')));
+      const nodes = adapters?adapters.nodes(root):[...root.querySelectorAll('input,textarea,select,[role="combobox"]')];
       const radios = new Set();
       for (const node of nodes) {
-        if(application && !mokaField(node))continue; // Ignore the surrounding job-search form.
+        if(adapters && !adapters.includes(node,root))continue;
         const rawType = (node.getAttribute('type') || '').toLowerCase();
         if (['hidden','password','submit','reset','button','image'].includes(rawType) || !visible(node)) continue;
         let label = named(node);
         if (!label) {
           const parent = node.closest('label');
-          label = !mokaField(node) && parent ? questionText(labelText(parent)) : '';
+          label = !adapters?.describe(node) && parent ? questionText(labelText(parent)) : '';
         }
         if (/password|token|secret|密码|口令|令牌/i.test(label + ' ' + node.name + ' ' + node.id)) continue;
-        const moka=mokaField(node), adapter=moka && mokaSelect(node)?'moka-select':'';
-        const dateInputs=moka && /date_info-/.test(moka.className)?[...moka.querySelectorAll('input:not([type="hidden"])')]:[];
-        const dateIndex=dateInputs.length===4?dateInputs.indexOf(node):-1;
-        const dateMeta=dateIndex>=0?{datePart:dateIndex%2?'month':'year',semanticLabel:dateIndex<2?'开始日期':'结束日期'}:{};
-        const type = rawType === 'radio' ? 'radio' : rawType === 'checkbox' ? 'checkbox' : rawType === 'file' ? 'file' : node.tagName === 'SELECT' ? 'select' : node.tagName === 'TEXTAREA' ? 'textarea' : adapter || node.getAttribute('role') === 'combobox' ? 'combobox' : rawType || 'text';
-        const ctx = context(node);
+        const adapted=adapters?.describe(node),adapter=adapted?.adapter || '';
+        const dateMeta=adapted?.dateMeta || {};
+        const type=adapted?.type || (rawType==='radio'?'radio':rawType==='checkbox'?'checkbox':rawType==='file'?'file':node.tagName==='SELECT'?'select':node.tagName==='TEXTAREA'?'textarea':node.getAttribute('role')==='combobox'?'combobox':rawType||'text');
+        let ctx=context(node);
         let members = [node], options = [];
-        if (type === 'radio') {
+        if (adapter==='phoenix-radio') {options=adapted.options;}
+        else if (type === 'radio') {
           const local = radioContext(node,root), container=local.container;
           members = [...container.querySelectorAll('input[type="radio"]')].filter(x => x.name === node.name && visible(x) && radioContext(x,root).container===container);
           if (members.some(x => radios.has(x))) continue;
@@ -173,19 +156,18 @@
         else if (/验证码|校验码|安全验证|captcha|verification code|one.time code/i.test(label)) unsupported = 'verification-code';
         else if (['checkbox','radio'].includes(type) && /同意|声明|隐私|条款|协议|我已阅读|本人确认|agree|consent|terms|declaration/i.test(label)) unsupported = 'consent';
         else if (type === 'combobox' && !adapter && (!options.length || options.some(x => !x.value))) unsupported = 'custom-selector';
-        else if(adapter && /date_info-/.test(moka.className) && dateIndex<0)unsupported='split-date';
-        else if(moka && /day_info-/.test(moka.className))unsupported='custom-date';
+        else if(adapted?.unsupported)unsupported=adapted.unsupported;
+        else if (members.some(n=>adapters?.disabled(n) || n.disabled || (n.readOnly && !adapted?.allowReadonly) || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) unsupported='disabled-or-readonly';
         else if (!label) unsupported = 'unlabeled';
-        else if (members.some(n=>n.disabled || n.readOnly || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) unsupported='disabled-or-readonly';
         const constraints=Object.fromEntries(['min','max','step','pattern'].filter(k=>node.hasAttribute(k)).map(k=>[k,node.getAttribute(k)]));
         const placeholder=(node.getAttribute('placeholder') || '').trim().toUpperCase();
-        const dateFormat=['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'].includes(placeholder)?placeholder:undefined;
-        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!moka?.querySelector('[class*="required-asterisk-"]'),maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
+        const dateFormat=adapted?.dateFormat || (['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'].includes(placeholder)?placeholder:undefined);
+        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!adapted?.required,maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
         // Record values can constrain matching, but never rename/reidentify a field.
-        const signature = JSON.stringify({...descriptor,...(moka?{recordHint:''}:{})}), index = counts.get(signature) || 0;
+        const signature = JSON.stringify({scope,path:structuralPath(node),type,name:node.name || ''}), index = counts.get(signature) || 0;
         counts.set(signature,index+1);
         const id = 'field-' + hash(signature + ':' + index);
-        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported ? '' : read({node,nodes:members,type,field:{options,adapter}}),options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{})};
+        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported && unsupported!=='unlabeled' ? '' : read({node,nodes:members,type,field:{options,adapter}}),options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{})};
         if (unsupported) field.unsupported = unsupported;
         entries.push({field,descriptor,node,nodes:members,type});
       }
@@ -201,40 +183,30 @@
     }
     walk(document,'document');
     const origin = location.origin, path = location.pathname;
-    const fingerprint = hash(JSON.stringify({origin,path,structure:entries.map(x=>({id:x.field.id,...x.descriptor}))}));
-    return {entries,report:{protocol:1,engineVersion:ENGINE_VERSION,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),warnings}};
-  }
-  async function scan() { const state = collect(); latest = state; return state.report; }
-  const wait = (milliseconds=100) => new Promise(resolve => setTimeout(resolve,milliseconds));
-  async function selectMoka(entry,target) {
-    const container=entry.node.closest('[class*="sd-Dropdown-container-"]');
-    if(!container)throw Error('option-unavailable');
-    const norm=v=>{
-      const text=String(v).normalize('NFKC').trim();
-      const aliases=/^(最高)?学历$/.test(entry.field.label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:{};
-      return aliases[text] || text;
-    };
-    entry.node.click();
-    try {
-      let choices=[];
-      // Read the clicked control's own menu only; no page-wide first-option heuristic.
-      for(let attempt=0;attempt<12;attempt++) {
-        choices=[...container.querySelectorAll('[class*="sd-Menu-content-item-"]')].filter(visible);
-        if(choices.length)break;
-        await wait(50);
+    const candidates=entries.filter(e=>(!e.field.label || !e.field.groupLabel) && (!e.field.unsupported || e.field.unsupported==='unlabeled')).map(structureCandidates).filter(c=>c.labels.length||c.groups.length).slice(0,100);
+    const publicCandidates=candidates.map(({refs,...candidate})=>candidate);
+    const structureFingerprint=hash(JSON.stringify({origin,path,engineVersion:ENGINE_VERSION,fields:entries.map(e=>({id:e.field.id,label:e.field.label,type:e.field.type,groupId:e.field.groupId})),candidates:publicCandidates}));
+    const applied=[],rejected=[];
+    for(const [id,hint] of Object.entries(structureHints)) {
+      const c=candidates.find(c=>c.fieldId===id),entry=entries.find(e=>e.field.id===id);
+      const keys=hint && typeof hint==='object'&&!Array.isArray(hint)?Object.keys(hint):[];
+      if(!c || !keys.length || keys.some(k=>!['labelId','groupId'].includes(k) || typeof hint[k]!=='string') || (hint.labelId && !c.labels.some(x=>x.id===hint.labelId)) || (hint.groupId && !c.groups.some(x=>x.id===hint.groupId)) || keys.some(k=>!hint[k])){rejected.push(id);continue;}
+      const f=entry.field,d=entry.descriptor;
+      if(hint.labelId) {
+        f.label=d.label=c.refs.get(hint.labelId).text;
+        if(/password|token|secret|密码|口令|令牌|验证码|校验码|captcha|verification code/i.test(f.label)){f.unsupported=d.unsupported='verification-code';}
+        else if(['checkbox','radio'].includes(f.type)&&/同意|声明|隐私|条款|协议|本人确认|agree|consent|terms/i.test(f.label)){f.unsupported=d.unsupported='consent';}
+        else if(f.unsupported==='unlabeled'){delete f.unsupported;d.unsupported='';f.value=read(entry);}
       }
-      const matches=choices.filter(n=>norm(n.textContent)===norm(target));
-      if(matches.length!==1)throw Error(matches.length?'option-not-unique':'option-not-found');
-      const option=matches[0];
-      if(option.closest('a[href],button[type="submit"],[aria-disabled="true"],[class*="disabled"],[class*="Disabled"]'))throw Error('option-disabled');
-      option.click();
-      return String(option.textContent).trim();
-    } finally {
-      // Close without choosing another value or triggering a form submission.
-      const title=directPart(mokaField(entry.node),'title-');
-      title?.click();
+      if(hint.groupId){const ref=c.refs.get(hint.groupId);f.groupLabel=d.groupLabel=ref.text;d.groupPath=ref.path;f.groupId='group-'+hash(d.scope+ref.path+ref.text);}
+      const title=f.groupLabel;
+      f.module=d.module=/教育|学历|education/i.test(title)?'education':/实习|工作经历|employment|work experience/i.test(title)?'work':/项目|project/i.test(title)?'projects':/个人|基本信息|姓名|性别|出生|手机|电话|邮箱|证件|地址|name|email|phone/i.test(title+' '+f.label)?'personal':f.module;
+      applied.push(id);
     }
+    const fingerprint = hash(JSON.stringify({origin,path,structure:entries.map(x=>({id:x.field.id,...x.descriptor}))}));
+    return {entries,report:{protocol:1,engineVersion:ENGINE_VERSION,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),platforms:adapters?.platforms(document)||[{id:"generic",label:"通用表单",version:"1"}],structure:{fingerprint:structureFingerprint,candidates:publicCandidates,applied,rejected},warnings}};
   }
+  async function scan(options={}) { structureHints=options?.structureHints && typeof options.structureHints==='object'&&!Array.isArray(options.structureHints)?options.structureHints:{}; const state = collect(); latest = state; return state.report; }
   function result(fieldId,status,reason,entry) {
     const out = {fieldId,status,reason};
     if (entry && !entry.field.unsupported) out.actualValue = read(entry);
@@ -265,7 +237,7 @@
       if (!entry || !original || JSON.stringify(entry.descriptor)!==JSON.stringify(original.descriptor)) { output.push(result(action.fieldId,'conflict','field-changed'));continue; }
       const value=read(entry), empty=value==='' || value===false;
       if (entry.field.unsupported) {output.push(result(action.fieldId,'manual',entry.field.unsupported));continue;}
-      if (entry.nodes.some(n=>n.disabled || n.readOnly || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) {output.push(result(action.fieldId,'manual','disabled-or-readonly',entry));continue;}
+      if (entry.nodes.some(n=>adapters?.disabled(n) || n.disabled || (n.readOnly && !adapters?.describe(n)?.allowReadonly) || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) {output.push(result(action.fieldId,'manual','disabled-or-readonly',entry));continue;}
       if (!Object.hasOwn(action,'expectedValue') || value!==action.expectedValue || value!==original.field.value) {output.push(result(action.fieldId,'conflict','value-changed',entry));continue;}
       if (!empty && !action.overwrite) {output.push(result(action.fieldId,'conflict','existing-value',entry));continue;}
       const target=action.optionValue ?? action.value;
@@ -279,16 +251,16 @@
         if (['date','month','number'].includes(entry.type) && probe.value!==String(target)) {output.push(result(action.fieldId,'failed','invalid-value',entry));continue;}
         if (!probe.checkValidity()) {output.push(result(action.fieldId,'failed','validation-failed',entry));continue;}
       }
-      if (['select','radio','combobox'].includes(entry.type) && entry.field.adapter!=='moka-select' && !entry.field.options.some(x=>x.value===String(target))) {output.push(result(action.fieldId,'failed','option-not-found',entry));continue;}
+      if (['select','radio','combobox'].includes(entry.type) && !adapters?.deferred(entry.field.adapter) && !entry.field.options.some(x=>x.value===String(target))) {output.push(result(action.fieldId,'failed','option-not-found',entry));continue;}
       if (entry.type==='select' && [...entry.node.options].some(x=>x.value===String(target) && (x.disabled || x.parentElement?.disabled))) {output.push(result(action.fieldId,'manual','option-disabled',entry));continue;}
       try {
         let expected=entry.type==='checkbox'?action.value:String(target);
-        if (entry.type==='checkbox') { if(entry.node.checked!==action.value) entry.node.click(); }
+        if(entry.field.adapter) expected=await adapters.write(entry,String(target));
+        else if (entry.type==='checkbox') { if(entry.node.checked!==action.value) entry.node.click(); }
         else if (entry.type==='radio') {
           const selected=entry.nodes.find(n=>n.value===String(target));
           if(!selected.checked) selected.click();
         }
-        else if(entry.field.adapter==='moka-select') expected=await selectMoka(entry,String(target));
         else if (entry.type==='combobox') {
           const box=entry.node.getRootNode().getElementById(entry.node.getAttribute('aria-controls'));
           const option=[...box.querySelectorAll('[role="option"]')].find(n=>(n.getAttribute('data-value')||n.getAttribute('value'))===String(target));

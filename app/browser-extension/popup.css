@@ -6,3 +6,5 @@ html{width:440px;min-width:440px}#agent{margin-top:20px;padding-top:16px;border-
 .extension-links a { color:var(--accent,#416a70); font-size:12px; text-underline-offset:3px; }
 
 #agentFeedback{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:6px;background:var(--card)}#agentFeedback p{margin:5px 0}#agentFeedback details{margin-top:10px;padding-top:9px}.agent-item{padding:9px 0;border-bottom:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}.agent-item:last-child{border-bottom:0}
+
+#structureFeedback{border-left:3px solid #7a9b82;padding-left:12px}#structureFeedback p{margin:6px 0}

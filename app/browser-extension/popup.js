@@ -1,7 +1,7 @@
 const el = id => document.getElementById(id);
 const escapeHtml = text => String(text ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const labels = {ready:'可填写',already:'已一致',conflict:'已有内容',manual:'人工核对',missing:'资料待补',ambiguous:'需选记录',unsupported:'需手动',verified:'核验通过',failed:'未通过'};
-const reasons = {'readback-matched':'写入后读回一致','value-not-retained':'网站未保留填写值，请手动检查','validation-failed':'网站字段校验未通过','field-disappeared':'字段已隐藏或移除，请重新识别','page-changed':'网页已切换，请重新识别','structure-changed':'表单结构已变化，请重新识别','value-changed':'你已修改此字段，保留当前值','existing-value':'已有内容未覆盖','field-changed':'字段内容或控件已变化','disabled-or-readonly':'字段只读或已停用','option-not-found':'页面没有该选项','option-disabled':'对应选项不可用','maxlength-exceeded':'内容超过网站长度限制','scan-required':'需要重新识别当前页面'};
+const reasons = {'option-not-unique':'存在多个同名选项，需要手动确认','menu-not-unique':'出现多个选项面板，未继续操作','menu-not-associated':'未能确定当前字段对应的选项面板','selector-layout-unsupported':'该选项面板结构暂不支持，请手动选择','multiple-selection-unsupported':'多选集合需手动核对，未改变已有选择','option-confirm-unavailable':'未找到可用的确认按钮，请手动核对','date-precision-required':'资料需要精确到日，未补造日期','date-control-unsupported':'此日期控件需手动选择','date-not-retained':'日期未被控件保留，请手动核对','invalid-date':'日期不符合日历规则','readback-matched':'写入后读回一致','value-not-retained':'网站未保留填写值，请手动检查','validation-failed':'网站字段校验未通过','field-disappeared':'字段已隐藏或移除，请重新识别','page-changed':'网页已切换，请重新识别','structure-changed':'表单结构已变化，请重新识别','value-changed':'你已修改此字段，保留当前值','existing-value':'已有内容未覆盖','field-changed':'字段内容或控件已变化','disabled-or-readonly':'字段只读或已停用','option-not-found':'页面没有该选项','option-disabled':'对应选项不可用','maxlength-exceeded':'内容超过网站长度限制','scan-required':'需要重新识别当前页面'};
 let state, busy = false, agentBusy = false, hasProfile = false, profileSummary;
 let pref = TouDiAgentConfig.normalize();
 async function send(op, data = {}) {
@@ -33,9 +33,17 @@ function renderAgentFeedback() {
   const summary=r?.status==='completed'?`已核对 ${r.requested} 项 · 采纳 ${r.accepted} 项 · 未采用 ${r.rejected} 项 · 未确认 ${r.unresolved} 项`:r?.message || (state.autoAgentPending?'等待调用所选模型核对歧义字段。':'尚未调用；可在下方发起语义核对。');
   box.innerHTML=`<h2>${escapeHtml(title)}</h2>${r?.model?`<p class="caption">${escapeHtml(r.model)}${Number.isFinite(r.seconds)?' · '+r.seconds.toFixed(1)+' 秒':''}</p>`:''}<p>${escapeHtml(summary)}</p>${r?.items?.length?`<details><summary>查看 ${r.items.length} 项核对明细</summary>${r.items.map(i=>`<div class="agent-item"><strong>${escapeHtml([i.groupLabel,i.label].filter(Boolean).join(' · '))}</strong><div>${escapeHtml(i.factLabel?'→ '+i.factLabel:'未确认对应资料')}</div><p class="reason">${escapeHtml(({matched:'已采纳匹配',rejected:'未采用建议',unresolved:'仍需核对'})[i.status])} · ${escapeHtml(i.reason)}</p></div>`).join('')}</details>`:''}`;
 }
+function renderStructureFeedback(){
+  const r=state?.structureReview,box=el('structureFeedback');box.hidden=!state?.plan;
+  if(!state?.plan)return;
+  const platform=Array.isArray(state.platform)?state.platform.map(p=>p.label || p.id).join(' · '):typeof state.platform==='string'?state.platform:state.platform?.name || state.platform?.id || '通用识别';
+  const title={running:'正在补充页面结构',completed:'页面结构辅助结果',cached:'已复用页面结构',failed:'页面结构辅助未完成',superseded:'结构结果未采用'}[r?.status] || '页面结构识别';
+  const summary=r && ['completed','cached'].includes(r.status)?`应用 ${r.accepted || 0} 项 · 拒绝 ${r.rejected || 0} 项${Number.isFinite(r.unresolved)?' · 未确认 '+r.unresolved+' 项':''}`:r?.message || (state.structurePending?'存在未知标题或分组，可由 Agent 选择本页结构候选。':'当前字段已由通用或平台规则识别，无需结构模型调用。');
+  box.innerHTML=`<h2>${escapeHtml(title)}</h2><p class="caption">${escapeHtml(platform)}${r?.model?' · '+escapeHtml(r.model):''}${Number.isFinite(r?.seconds)?' · '+r.seconds.toFixed(1)+' 秒':''}</p><p>${escapeHtml(summary)}</p>`;
+}
 function render() {
   const plan = state?.plan;
-  renderAgentFeedback();
+  renderAgentFeedback();renderStructureFeedback();
   el('review').hidden = !plan;el('agent').hidden = !plan;el('actions').hidden = !plan;el('result').hidden = !state?.report;
   if (plan) {
     const counts = plan.statusCounts || {};
@@ -72,6 +80,9 @@ function updateAgentControls(){
   el('agentCli').hidden=pref.agentMode==='external';
   el('agentCli').textContent=direct?'用 '+pref.agentModel+' 核对':'配置 Agent 协作';
   el('agentCli').disabled=busy || agentBusy || state?.agentReview?.status==='running' || (direct && !state?.plan?.rows.some(row=>['missing','ambiguous'].includes(row.status)));
+  el('structureCli').hidden=!direct;el('structureCli').textContent='用 '+pref.agentModel+' 补充结构';
+  el('structureCli').disabled=busy || agentBusy || !state?.structurePending || state?.structureReview?.status==='running';
+  el('structureCopy').disabled=busy || !state?.structurePending;el('structureImport').disabled=busy || agentBusy || !state?.structurePending;
   el('agentCheck').hidden=!direct;
   el('agentTransfer').open=pref.agentMode==='external';
   el('agentConnectionStatus').textContent=direct?'当前模型：'+pref.agentModel+' · 现有 Codex 额度。仅核对歧义，不自动替换模型。':pref.agentMode==='external'?'当前方式：自己的 Agent。复制任务后，导入返回的 JSON。':'尚未接入 Agent；明确字段和手动选择资料仍可使用。';
@@ -99,7 +110,7 @@ async function checkAgentPlan(){
 }
 el('scan').addEventListener('click', async()=>{
   await task(async()=>{state=null;render();state=await send('scan',{profile:el('profile').value});showSync(state.sync);render();notice('本地计划已生成；已有内容默认保留。');},'正在识别当前页面…');
-  if(state?.autoAgentPending)checkAgentPlan();
+  if(state?.autoAgentPending){if(state.structurePending)await checkStructurePlan();if(state?.plan)checkAgentPlan();}
 });
 el('profile').addEventListener('change', () => task(async()=>{pref=await send('preferences',{preferences:{profile:el('profile').value}});state=null;sourceLabel();render();notice('已更改口径，请重新识别当前页面。');},'正在切换简历口径…'));
 el('review').addEventListener('change', selection);
@@ -108,6 +119,24 @@ el('review').addEventListener('click', event => {
   if(jump)task(()=>send('highlight',{fieldId:jump.dataset.jump}),'正在定位网页字段…');
   if(event.target.id==='applyChoices')task(async()=>{const mappings=Object.fromEntries([...document.querySelectorAll('[data-map]')].filter(select=>select.value).map(select=>[select.dataset.map,select.value]));state=await send('remap',{mappings,remember:el('rememberSelections').checked});render();notice('匹配已应用，请再次核对计划。');},'正在核对所选资料…');
 });
+async function checkStructurePlan(){
+  if(agentBusy || !state?.plan || !state.structurePending)return;
+  const startedAt=state.startedAt;agentBusy=true;
+  state.structureReview={status:'running',model:pref.agentModel,message:'正在补充字段标题与分组。'};renderStructureFeedback();updateAgentControls();
+  try{
+    const selected=new Map([...document.querySelectorAll('[data-field]')].map(n=>[n.dataset.field,n.checked]));
+    const next=await send('adapt',{agent:true,startedAt});
+    if(state?.startedAt!==startedAt || !state?.plan)return;
+    if(busy || document.querySelector('[data-map]:focus')){state.structureReview=next.structureReview;renderStructureFeedback();return;}
+    const choices=new Map([...document.querySelectorAll('[data-map]')].map(n=>[n.dataset.map,n.value]));
+    state=next;render();document.querySelectorAll('[data-field]').forEach(n=>{if(selected.has(n.dataset.field))n.checked=selected.get(n.dataset.field)});document.querySelectorAll('[data-map]').forEach(n=>{if(choices.has(n.dataset.map))n.value=choices.get(n.dataset.map)});selection();
+    notice(state.structureReview?.message || '结构核对完成。',state.structureReview?.status==='failed');
+  }catch(e){if(state?.startedAt===startedAt && state?.plan){state.structureReview={status:'failed',message:e.message};renderStructureFeedback();notice(e.message,true);}}
+  finally{agentBusy=false;updateAgentControls();}
+}
+el('structureCli').addEventListener('click',()=>checkStructurePlan());
+el('structureCopy').addEventListener('click',()=>task(async()=>{const value=await send('structure-task');await navigator.clipboard.writeText(value.task);notice('结构任务已复制；只返回已有候选 ID，随后导入结构适配 JSON。');},'正在生成结构适配任务…'));
+el('structureImport').addEventListener('click',()=>task(async()=>{state=await send('adapt',{hints:JSON.parse(el('agentResult').value),startedAt:state.startedAt});render();notice(state.structureReview?.message || '结构结果已验证。',state.structureReview?.status==='failed');},'正在验证结构适配…'));
 el('agentCopy').addEventListener('click',()=>task(async()=>{const value=await send('agent-task');await navigator.clipboard.writeText(value.task);notice('匹配任务已复制；交给你正在使用的 Agent，再粘贴它返回的 JSON。');},'正在生成 Agent 匹配任务…'));
 el('agentImport').addEventListener('click',()=>task(async()=>{const mappings=JSON.parse(el('agentResult').value);state=await send('remap',{mappings,remember:el('remember').checked});render();notice('Agent 匹配已导入；约束和已有内容保护仍生效。');},'正在验证 Agent 匹配…'));
 async function checkCodex() {
@@ -128,9 +157,9 @@ task(async()=>{const value=await send('state');el('runtimeVersion').textContent=
 
 // A popup can be closed while the worker continues; show its durable outcome on reopen.
 const agentPoll=setInterval(async()=>{
-  if(busy || agentBusy || state?.agentReview?.status!=='running')return;
+  if(busy || agentBusy || (state?.agentReview?.status!=='running' && state?.structureReview?.status!=='running'))return;
   try{const next=(await send('state')).state;if(!next || next.startedAt!==state.startedAt)return;
-    if(next.agentReview?.status==='running'){state.agentReview=next.agentReview;renderAgentFeedback();return;}
+    if(next.agentReview?.status==='running' || next.structureReview?.status==='running'){state.agentReview=next.agentReview;state.structureReview=next.structureReview;renderAgentFeedback();renderStructureFeedback();return;}
     const selected=new Map([...document.querySelectorAll('[data-field]')].map(n=>[n.dataset.field,n.checked]));
     const choices=new Map([...document.querySelectorAll('[data-map]')].map(n=>[n.dataset.map,n.value]));
     state=next;render();document.querySelectorAll('[data-field]').forEach(n=>{if(selected.has(n.dataset.field))n.checked=selected.get(n.dataset.field)});document.querySelectorAll('[data-map]').forEach(n=>{if(choices.has(n.dataset.map))n.value=choices.get(n.dataset.map)});selection();

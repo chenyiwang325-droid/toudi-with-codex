@@ -29,7 +29,7 @@ def extension_bundle():
             if path.is_symlink():
                 raise ValueError('Extension source must not be a symbolic link')
             bundle.writestr('TouDi-filling/' + name, path.read_bytes())
-        for name, source in [('form-engine.js', 'form-engine.js'), ('logo.svg', 'favicon.svg')]:
+        for name, source in [('form-adapters.js', 'form-adapters.js'), ('form-engine.js', 'form-engine.js'), ('logo.svg', 'favicon.svg')]:
             bundle.writestr('TouDi-filling/' + name, (root / 'assets' / source).read_bytes())
     return output.getvalue()
 

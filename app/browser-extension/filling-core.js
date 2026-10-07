@@ -137,7 +137,7 @@
       const kind=field.type || 'text';
       const unsupportedReasons={'disabled-or-readonly':'网站锁定了此字段，请先在网站中解除或修改关联记录。','custom-date':'已识别日期字段；此网站的日历控件需手动选择。','split-date':'已识别分开的年月选项；请按对应经历手动选择，避免混填日期。','unlabeled':'未找到可靠的字段标题，请在网页中确认。','custom-selector':'已识别下拉字段，但暂不能可靠读取选项，请手动选择。'};
       if(field.unsupported || !['text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'].includes(kind))return {...row,status:'unsupported',reason:unsupportedReasons[field.unsupported] || '控件尚不支持可靠填入。'};
-      const deferredSelect=kind==='combobox' && field.adapter==='moka-select';
+      const deferredSelect=kind==='combobox' && ['moka-select','phoenix-select','phoenix-date'].includes(field.adapter);
       if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length && !deferredSelect) || manual(row.label))return {...row,status:'manual',reason:'上传、协议、家庭/联系人或复杂控件需要人工操作。'};
       const list=Object.hasOwn(mappings,field.id)?[facts.get(mappings[field.id])]:candidates(p,field);
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
@@ -190,7 +190,7 @@
       const note=row.dateFallbackUsed?' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。':'';
       if(existing && (existing===proposed || existing===value || (['select','radio','combobox'].includes(kind) && optionEquivalent(existing,fact.label)===optionEquivalent(value,fact.label))))return {...row,status:'already',reason:existing===value?'已有值与资料相同。'+note:'已有选项与资料语义一致，无需覆盖。'+note};
       if(existing)return {...row,status:'conflict',reason:'已有值与资料不同，保留现值，需明确选择覆盖。'+note};
-      return {...row,status:'ready',reason:(deferredSelect?'资料已匹配；填写时展开此字段菜单，仅选择唯一同名选项，未找到则保留原值。':'事实、记录及控件约束已确认。')+note};
+      return {...row,status:'ready',reason:(deferredSelect?'资料已匹配；填写时展开此字段菜单，仅选择唯一对应选项，未找到则保留原值。':'事实、记录及控件约束已确认。')+note};
     });
     const statusCounts={};for(const row of rows)statusCounts[row.status]=(statusCounts[row.status] || 0)+1;
     return {protocol:1,sourceVersion:p.sourceVersion,profileId:p.profileId,origin:scan.origin,path:scan.path,fingerprint:scan.fingerprint,rows,statusCounts,warnings:[...p.warnings,...(scan.warnings || [])],choices:p.facts.filter(f=>!f.manual).map(f=>({key:f.key,label:[f.recordLabel,f.label].filter(Boolean).join(' · ')}))};

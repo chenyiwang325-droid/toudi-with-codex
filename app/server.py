@@ -127,9 +127,9 @@ class Handler(SimpleHTTPRequestHandler):
         if route.startswith('/browser-extension/'):
             from filling_tools import EXTENSION_FILES
             name = route.removeprefix('/browser-extension/')
-            if name in EXTENSION_FILES or name in ('logo.svg','form-engine.js'):
+            if name in EXTENSION_FILES or name in ('logo.svg','form-engine.js','form-adapters.js'):
                 source = Path(CODE_DIR) / 'browser-extension' / name
-                if name in ('logo.svg','form-engine.js'): source=Path(CODE_DIR)/'assets'/('favicon.svg' if name=='logo.svg' else name)
+                if name in ('logo.svg','form-engine.js','form-adapters.js'): source=Path(CODE_DIR)/'assets'/('favicon.svg' if name=='logo.svg' else name)
                 body=source.read_bytes()
                 self.send_response(200); self.send_header('Content-Type', self.guess_type(str(source)))
                 self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body); return

@@ -14,7 +14,7 @@ HOST='com.toudi.filling.codex'
 EXTENSION_ID='edfgnahdkpobmkhckjhadadnlbhpbpmd'
 ORIGIN='chrome-extension://'+EXTENSION_ID+'/'
 MAX_MESSAGE=512*1024
-VERSION='0.4.0'
+VERSION='0.5.0'
 
 
 def validate_request(request):
@@ -30,6 +30,14 @@ def validate_request(request):
             raise ValueError('请先读取当前工作区和资料版本。')
         from profile_store import validate_pack
         validate_pack(request.get('pack'))
+        return request
+    if request.get('op') == 'adapt':
+        if set(request) != {'protocol', 'requestId', 'op', 'model', 'candidates'}:
+            raise ValueError('结构辅助不接受事实值、路径或任意操作。')
+        if not isinstance(request.get('model'), str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}', request['model']):
+            raise ValueError('请明确选择有效的 Codex 模型。')
+        from codex_mapping import validate_structure_candidates
+        validate_structure_candidates(request['candidates'])
         return request
     if request.get('op')!='map' or set(request)-{'protocol','requestId','op','model','fields','allowedFacts'}:
         raise ValueError('不支持的本机连接请求。')
@@ -77,6 +85,10 @@ def operation(request):
                 result=subprocess.run(['open',str(app)],capture_output=True,timeout=10)
                 if not result.returncode:return {'opened':True}
         raise ValueError('未找到已安装的 TouDi App，请通过「中控台安装与使用」安装后打开。')
+    if request['op'] == 'adapt':
+        from codex_mapping import adapt_with_codex
+        hints, provider = adapt_with_codex(request['candidates'], model=request['model'])
+        return {'hints': hints, 'provider': provider, 'helperVersion': VERSION}
     from codex_mapping import map_with_codex
     profile={'facts':[dict(f,manual=False) for f in request['allowedFacts']]}
     scan={'fields':request['fields']}

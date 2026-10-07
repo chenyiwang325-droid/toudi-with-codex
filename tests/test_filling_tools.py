@@ -120,7 +120,8 @@ class FillingToolsTests(unittest.TestCase):
     def test_extension_bundle_contains_only_code_and_shared_engine(self):
         with zipfile.ZipFile(io.BytesIO(extension_bundle())) as bundle:
             names=bundle.namelist()
-            self.assertEqual(len(names),15)
+            self.assertEqual(len(names),16)
+            self.assertIn('TouDi-filling/form-adapters.js',names)
             self.assertIn('TouDi-filling/sync-core.js',names)
             self.assertIn('TouDi-filling/profile-library.js',names)
             self.assertIn('TouDi-filling/form-engine.js',names)
