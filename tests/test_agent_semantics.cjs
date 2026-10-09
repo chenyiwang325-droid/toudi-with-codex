@@ -7,16 +7,17 @@ const p=C.profile(C.validatePack({schemaVersion:1,profiles:[{id:'general',label:
   {key:'b.school',label:'学校',value:'示例本科大学',module:'education',recordId:'b',recordHint:'本科'}
 ],rules:[]}));
 const scan={protocol:1,origin:'https://fixture.invalid',path:'/apply',fingerprint:'fixture',fields:[
-  {id:'mode',label:'学制',module:'education',recordHint:'硕士',type:'text',value:''},
+  {id:'mode',label:'培养模式',module:'education',recordHint:'硕士',type:'text',value:''},
   {id:'school',label:'毕业院校',module:'personal',type:'text',value:''}
 ]};
 let plan=C.plan(p,scan);assert.equal(plan.rows[0].status,'missing');assert.equal(plan.rows[1].status,'ambiguous');
-const request=C.agentRequest(p,scan,plan,'fixture-user-model');assert(!JSON.stringify(request).includes('全日制'));assert(!JSON.stringify(request).includes('示例研究大学'));
+const request=C.agentRequest(p,scan,plan,'fixture-user-model');assert(JSON.stringify(request).includes('全日制'));assert(request.fields.every(f=>f.factKeys.length<=40));assert(!JSON.stringify(request).includes('示例本科大学') || request.fields.some(f=>f.factKeys.includes('b.school')));
 let safe=C.safeAgentMappings(p,scan,{mode:'m.mode',school:'m.school'});assert.deepEqual(safe.accepted,{mode:'m.mode'});assert.deepEqual(safe.rejected,['school']);
 plan=C.plan(p,scan,safe.accepted);assert.equal(plan.rows[0].status,'ready');assert.equal(plan.rows[0].value,'全日制');
 safe=C.safeAgentMappings(p,scan,{mode:'b.mode'});assert.deepEqual(safe.accepted,{});
+scan.fields[0].label='学制';safe=C.safeAgentMappings(p,scan,{mode:'m.mode'});assert.deepEqual(safe.accepted,{},'Study duration cannot receive a full-time study mode');
 scan.fields[0].label='学校名称';safe=C.safeAgentMappings(p,scan,{mode:'m.mode'});assert.deepEqual(safe.accepted,{});
-console.log('PASS semantic aliases can map to existing facts; explicit meaning and record constraints remain enforced; personal values stay local');
+console.log('PASS semantic aliases can map to existing facts; explicit meaning and record constraints remain enforced; only related nonsensitive candidate facts reach matching');
 const boundaryProfile=C.profile(C.validatePack({schemaVersion:1,profiles:[{id:'general',label:'合成资料'}],rules:[],facts:[
  {key:'person.name',label:'姓名',module:'personal',value:'Fixture',aliases:['姓名']},
  {key:'person.home',label:'现居地',module:'personal',value:'Fixture City',aliases:['现居地']},
@@ -38,12 +39,12 @@ const boundaryFields=[
 ].map(f=>({...f,type:'text',value:''}));
 const boundaryScan={...scan,fields:boundaryFields};
 const boundaryPlan=C.plan(boundaryProfile,boundaryScan);
-assert.deepEqual(boundaryPlan.rows.map(r=>r.status),['manual','missing','missing','missing','missing','ready','ready','ready','ready']);
+assert.deepEqual(boundaryPlan.rows.map(r=>r.status),['missing','missing','missing','missing','missing','ready','ready','ready','ready']);
 const unsafe={family:'person.name',posts:'project.start',awards:'project.start',publications:'edu.end',unknown:'project.start'};
 assert.deepEqual(C.safeAgentMappings(boundaryProfile,boundaryScan,unsafe).accepted,{});
 assert.equal(C.plan(boundaryProfile,boundaryScan,unsafe).rows.filter(r=>r.status==='ready').length,4);
 assert(!C.agentRequest(boundaryProfile,boundaryScan,boundaryPlan).fields.some(f=>Object.hasOwn(unsafe,f.id)));
-console.log('PASS family and unsupported modules reject automatic/model mappings; old aliases retain shared synonyms');
+console.log('PASS family fields cannot use applicant facts or model mappings; unsupported modules stay isolated; old aliases retain shared synonyms');
 const extraPack={schemaVersion:1,profiles:[{id:'general',label:'合成资料'}],rules:[],facts:[
  {key:'highest',label:'最高学历',module:'personal',value:'硕士研究生'},
  {key:'master.level',label:'学历',module:'education',recordId:'master',value:'硕士'},

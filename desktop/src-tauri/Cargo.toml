@@ -1,6 +1,6 @@
 [package]
 name = "toudi"
-version = "0.5.4"
+version = "0.6.4"
 description = "TouDi personal application workbench"
 authors = ["TouDi contributors"]
 edition = "2021"
@@ -17,12 +17,16 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
+sha2 = "0.10"
+chrono = "0.4"
+chrono-tz = "0.10"
 getrandom = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["blocking"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString"] }
 
 [profile.release]
 strip = true

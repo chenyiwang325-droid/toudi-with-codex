@@ -10,9 +10,11 @@
       const value=style.getPropertyValue('--'+source).trim();if(value)root.style.setProperty('--'+child,value);
     }
     root.style.colorScheme=host.dataset.theme==='dark'?'dark':'light';
+    root.dataset.theme=host.dataset.theme;
+    root.dataset.motion=host.dataset.motion;
   }
   syncTheme();
-  const themeObserver=new MutationObserver(syncTheme);themeObserver.observe(parent.document.documentElement,{attributes:true,attributeFilter:['data-theme','data-palette']});
+  const themeObserver=new MutationObserver(syncTheme);themeObserver.observe(parent.document.documentElement,{attributes:true,attributeFilter:['data-theme','data-palette','data-motion']});
   window.addEventListener('pagehide',()=>themeObserver.disconnect());
   // srcdoc has no navigable URL. Tab selection stays inside this embedded form.
   const replaceState = history.replaceState.bind(history);
@@ -25,13 +27,16 @@
   async function request(method, body) {
     const response = await parent.fetch('/api/filling/profile', {method, headers:{'Content-Type':'application/json'}, ...(body ? {body:JSON.stringify(body)} : {})});
     const value = await response.json();
-    if (!response.ok) throw Error(response.status === 409 ? '资料已在另一处更新。当前编辑内容已保留。请先复制未保存内容，再重新打开核对最新资料；导出备份只包含已保存资料。' : (value.error || '工作区资料保存失败。'));
+    if (!response.ok) throw Error(response.status === 409 ? '资料已在另一处更新，当前编辑内容已保留。请复制需要保留的修改，取消编辑后会自动读取最新资料，再合并保存。' : (value.error || '工作区资料保存失败。'));
     return value;
   }
   async function dispatch(message) {
     switch (message.op) {
       case 'profile-read': {
-        state = await request('GET');
+        const incoming = await request('GET');
+        // A form may open while the request is in flight. Keep its original
+        // save base; do not silently rebase unsaved values onto newer facts.
+        if (!state || !hasDraft() || state.version === incoming.version) state=incoming;
         const valid = state.pack?.profiles?.some(p => p.id === preferences.profile);
         if (!valid && state.pack?.profiles?.length) preferences.profile = state.pack.profiles[0].id;
         return {pack:state.pack, preferences, sync:{status:'synced', enabled:true, workspaceKey:state.workspaceKey}};
@@ -55,9 +60,13 @@
     }
   }
   window.chrome = {runtime:{sendMessage:async message => {try {return {value:await dispatch(message)};} catch(error) {return {error:error.message};}}}};
-  window.toudiProfileEditor = {hasDraft:() => dirty || pending, isSaving:() => pending};
+  const hasDraft=()=>pending || (window.toudiProfileLibraryUI?.hasDraft() ?? dirty);
+  window.toudiProfileEditor = {
+    hasDraft, isSaving:() => pending,
+    refresh:async()=>{if(hasDraft() || !window.toudiProfileLibraryUI)return false;return window.toudiProfileLibraryUI.refresh();}
+  };
   document.addEventListener('input', event => {
-    if (event.target.closest('dialog') && !['search','profile'].includes(event.target.id)) dirty = true;
+    if (event.target.closest('.inline-editor,dialog') && !['search','profile'].includes(event.target.id)) dirty = true;
   });
   // Native export awaits the parent's save dialog; cancellation is not success.
   document.addEventListener('click', async event => {
@@ -67,7 +76,7 @@
     const notice=document.getElementById('notice');
     pending=true;
     try {
-      const value=await dispatch({op:'profile-read'});
+      const value=await request('GET');
       if (!value.pack) throw Error('没有可导出的资料。');
       const blob=new Blob([JSON.stringify(value.pack,null,2)],{type:'application/json'});
       const saved=await parent.toudiDesktop.saveBlob(blob,'TouDi-private-profile-'+new Date().toISOString().slice(0,10)+'.json');
@@ -75,7 +84,7 @@
     } catch(error) {notice.hidden=false;notice.textContent='备份未保存：'+error.message;notice.classList.add('error');}
     finally {pending=false;}
   },true);
-  window.addEventListener('beforeunload', event => {if(dirty || pending){event.preventDefault();event.returnValue='';}});
+  window.addEventListener('beforeunload', event => {if(hasDraft()){event.preventDefault();event.returnValue='';}});
   document.addEventListener('DOMContentLoaded', () => {
     const agent = document.getElementById('tab-agent'); agent.hidden=true; agent.removeAttribute('role'); agent.dataset.tab='profile';
     document.getElementById('workspaceSync')?.closest('.subsection')?.setAttribute('hidden','');

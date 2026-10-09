@@ -35,7 +35,7 @@ class FillingProfileTests(unittest.TestCase):
             self.assertTrue(all(not mapping_matches(profile,field,fact) for fact in profile['facts']))
         for label,module,key in [('开始时间','education','start'),('结束时间','education','end'),('单位名称','internship','unit'),('现居住地','personal','home')]:
             self.assertEqual([f['key'] for f in matching_facts(profile,self.field(label,module=module))],[key])
-        self.assertEqual(self.plan(self.field('姓名',module='personal',groupLabel='家庭成员'))['rows'][0]['status'],'manual')
+        self.assertEqual(self.plan(self.field('姓名',module='personal',groupLabel='家庭成员'))['rows'][0]['value'],'Never auto-fill family')
 
     def test_highest_graduation_and_numeric_equality(self):
         from filling_profile import matching_facts,mapping_matches,option_equivalent,numeric_equivalent
@@ -104,7 +104,8 @@ class FillingProfileTests(unittest.TestCase):
         state=load_profile(self.root,'state');ai=load_profile(self.root,'ai-product')
         self.assertNotIn('Internet Fixture',[f['value'] for f in state['facts']]);self.assertIn('Internet Fixture',[f['value'] for f in ai['facts']])
         self.assertEqual(self.plan(self.field('个人评价'),profile='ai-product')['rows'][0]['status'],'missing')
-        for label in ('父亲姓名','验证码','是否同意协议'):self.assertEqual(self.plan(self.field(label))['rows'][0]['status'],'manual')
+        self.assertEqual(self.plan(self.field('父亲姓名'))['rows'][0]['value'],'Never auto-fill family')
+        for label in ('验证码','是否同意协议'):self.assertEqual(self.plan(self.field(label))['rows'][0]['status'],'manual')
     def test_existing_values_preserved_and_sensitive_display_masked(self):
         same=self.plan(self.field('手机',value='12345678901'));self.assertEqual(same['rows'][0]['status'],'already');self.assertEqual(same['actions'],[])
         conflict=self.plan(self.field('手机',value='other'));self.assertEqual(conflict['rows'][0]['status'],'conflict');self.assertEqual(conflict['actions'],[]);self.assertNotEqual(conflict['rows'][0]['displayValue'],'12345678901')
@@ -113,7 +114,7 @@ class FillingProfileTests(unittest.TestCase):
         month=self.field('开始日期',module='education',groupLabel='本科',type='date');self.assertEqual(self.plan(month)['rows'][0]['status'],'manual')
         month['type']='month';self.assertEqual(self.plan(month)['actions'][0]['value'],'2020-09')
         date=self.field('开始日期',module='education',groupLabel='硕士',type='date');self.assertEqual(self.plan(date)['actions'][0]['value'],'2024-09-02')
-        long=self.plan(self.field('姓名',maxLength=3));self.assertEqual(long['rows'][0]['status'],'manual');self.assertEqual(long['rows'][0]['value'],'Fixture User')
+        long=self.plan(self.field('姓名',maxLength=3));self.assertEqual(long['rows'][0]['status'],'ready');self.assertEqual(long['rows'][0]['value'],'Fixture User')
         option=self.field('最高学历',type='select',options=[{'value':'m','text':'硕士研究生'}]);self.assertEqual(self.plan(option)['actions'][0]['optionValue'],'m')
         option['options']=[{'value':'b','text':'本科'}];self.assertEqual(self.plan(option)['rows'][0]['status'],'manual')
     def test_mapping_validates_keys_and_cannot_bypass_constraints(self):

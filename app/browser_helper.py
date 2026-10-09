@@ -14,7 +14,7 @@ HOST='com.toudi.filling.codex'
 EXTENSION_ID='edfgnahdkpobmkhckjhadadnlbhpbpmd'
 ORIGIN='chrome-extension://'+EXTENSION_ID+'/'
 MAX_MESSAGE=512*1024
-VERSION='0.5.4'
+VERSION='0.5.22'
 
 
 def validate_request(request):
@@ -59,7 +59,13 @@ def validate_request(request):
             if not isinstance(item,dict) or set(item)-allowed or not isinstance(item.get(key),str) or not item[key] or item[key] in seen:raise ValueError('核对请求包含无效或重复的字段。')
             seen.add(item[key])
             for name,value in item.items():
-                if name in {'options','aliases'}:continue
+                if name in {'options','aliases','factKeys'}:continue
+                if name in {'sensitive','manual'}:
+                    if not isinstance(value,bool):raise ValueError('资料标记无效。')
+                    continue
+                if name=='value':
+                    if not isinstance(value,(str,int,float)) or len(str(value))>24000:raise ValueError('资料值无效。')
+                    continue
                 if not isinstance(value,str) or len(value)>1000:raise ValueError('字段说明无效。')
             if key=='id':
                 if item.get('type') not in {'text','textarea','email','tel','date','month','number','select','radio','combobox'}:raise ValueError('此类字段不交给模型核对。')
@@ -69,8 +75,10 @@ def validate_request(request):
                 aliases=item.get('aliases',[])
                 if not isinstance(aliases,list) or len(aliases)>80 or any(not isinstance(a,str) or len(a)>1000 for a in aliases):raise ValueError('资料别名无效。')
                 if item.get('module') not in {'personal','education','internship','project','language','campus-role','awards','publications'}:raise ValueError('资料模块无效。')
-    checked(fields,'id',{'id','label','module','groupLabel','recordHint','type','options'})
-    checked(facts,'key',{'key','label','module','recordId','recordLabel','recordHint','aliases'})
+    checked(fields,'id',{'id','label','module','groupLabel','recordHint','type','options','factKeys'})
+    checked(facts,'key',{'key','label','module','recordId','recordLabel','recordHint','aliases','value','manual','sensitive'})
+    from codex_mapping import validate_model_context
+    validate_model_context(fields,facts)
     return request
 
 
@@ -102,7 +110,7 @@ def operation(request):
         hints, provider = adapt_with_codex(request['candidates'], model=request['model'])
         return {'hints': hints, 'provider': provider, 'helperVersion': VERSION}
     from codex_mapping import map_with_codex
-    profile={'facts':[dict(f,manual=False) for f in request['allowedFacts']]}
+    profile={'facts':request['allowedFacts']}
     scan={'fields':request['fields']}
     plan={'rows':[{'fieldId':f['id'],'status':'missing'} for f in request['fields']]}
     mappings,provider=map_with_codex(profile,scan,plan,model=request['model'])

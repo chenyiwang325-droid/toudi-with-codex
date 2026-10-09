@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TouDi 辅助填报",
-  "version": "0.5.4",
-  "description": "当前招聘网页的个人资料识别、核对与填写；可自行配置 Agent 协作。",
+  "version": "0.5.22",
+  "description": "当前招聘网页的资料识别、核对与填写；推荐通过 Codex 调用 Luna。",
   "permissions": [
     "activeTab",
     "scripting",
@@ -14,8 +14,7 @@
     "open_in_tab": true
   },
   "action": {
-    "default_title": "TouDi 辅助填报",
-    "default_popup": "popup.html"
+    "default_title": "TouDi 辅助填报"
   },
   "background": {
     "service_worker": "worker.js"
@@ -23,5 +22,24 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
   },
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArlAqrh5RRbE1qshGnt2ePvjq3U3xZxhYx7rtS+bDFWEm5lgdXFvVYkgedS/1ZzbAwEWwhHRwGlvYeEjiJPtd0eck9/HxjrmL/MKeXGJzdpkS1hXwz8UlvfGCV5dAupl8wgdKUGW/SZT8+0p4QsTO8t/rB62Kauhr0qu6z0yAWuu7Pfg6eVWovlZAshv3HGzF67s1HDOz4Y5PyK2mxyogl0eW1pyTYK+OJvejdvTEd1Hrin6w9yZttI93sDJv4BUbDWrJVxS4eGkXA3KytxvMXKusq7o0I2A4ZpG7ihdDxFA7Wh2W9CPbUEO/NDuLLqPU3IahJtg8sUY1t14keam4MwIDAQAB"
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArlAqrh5RRbE1qshGnt2ePvjq3U3xZxhYx7rtS+bDFWEm5lgdXFvVYkgedS/1ZzbAwEWwhHRwGlvYeEjiJPtd0eck9/HxjrmL/MKeXGJzdpkS1hXwz8UlvfGCV5dAupl8wgdKUGW/SZT8+0p4QsTO8t/rB62Kauhr0qu6z0yAWuu7Pfg6eVWovlZAshv3HGzF67s1HDOz4Y5PyK2mxyogl0eW1pyTYK+OJvejdvTEd1Hrin6w9yZttI93sDJv4BUbDWrJVxS4eGkXA3KytxvMXKusq7o0I2A4ZpG7ihdDxFA7Wh2W9CPbUEO/NDuLLqPU3IahJtg8sUY1t14keam4MwIDAQAB",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "popup.html",
+        "profile-view.js",
+        "popup.css",
+        "interface.css",
+        "interface-motion.js",
+        "popup.js",
+        "agent-config.js",
+        "logo.svg",
+        "filling-workflow.js"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ]
 }

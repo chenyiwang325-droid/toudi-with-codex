@@ -1,0 +1,28 @@
+'use strict';
+// Synthetic facts only. Exercise the real worker queue, module requests and storage.
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{webcrypto}=require('node:crypto');
+const root=path.join(__dirname,'../app/browser-extension'),local={},session={},waiting=[];let listener,removed,inspections=[],writes=0,values={};
+const store=data=>({async get(key){return {[key]:structuredClone(data[key])}},async set(v){Object.assign(data,structuredClone(v))},async remove(keys){for(const k of Array.isArray(keys)?keys:[keys])delete data[k]},async setAccessLevel(){}});
+const ctx={structuredClone,crypto:webcrypto,TextEncoder,URL,console,setTimeout,clearTimeout,chrome:{storage:{local:store(local),session:store(session)},runtime:{id:'fixture',getManifest:()=>({version:'fixture'}),getURL:p=>'chrome-extension://fixture/'+p,onMessage:{addListener(fn){listener=fn}}},tabs:{get:async()=>({id:1,url:'https://fixture.invalid/apply'}),query:async()=>[{id:1,url:'https://fixture.invalid/apply'}],onRemoved:{addListener(fn){removed=fn}}}}};vm.createContext(ctx);ctx.importScripts=(...names)=>names.forEach(n=>vm.runInContext(fs.readFileSync(path.join(root,n),'utf8'),ctx));vm.runInContext(fs.readFileSync(path.join(root,'worker.js'),'utf8'),ctx);
+const options=labels=>labels.map(text=>({value:text,text}));
+const scan=()=>({protocol:1,origin:'https://fixture.invalid',path:'/apply',fingerprint:'shape',fields:[
+ {id:'author',label:'作者',module:'publications',groupId:'paper',recordHint:'合成论文',groupLabel:'论文/专著',type:'combobox',adapter:'phoenix-select',options:[],value:values.author || ''},
+ {id:'role',label:'在校职务类别',module:'campus-role',groupId:'campus',recordHint:'学习部干事',groupLabel:'在校职务',type:'combobox',adapter:'phoenix-select',options:[],value:values.role || ''},
+ {id:'unknown',label:'无对应资料的自定义类型',module:'other',type:'combobox',adapter:'phoenix-select',options:[],value:''}
+]});
+ctx.fixtureEngine=async(tab,op,arg)=>{if(op==='inspect-options'){inspections.push(...arg.fieldIds);return {fingerprint:'shape',items:arg.fieldIds.map(fieldId=>({fieldId,options:fieldId==='author'?options(['第一作者','通讯作者','其他']):fieldId==='role'?options(['主席','部长','其他']):[]}))}}if(op==='apply'){writes++;for(const a of arg.actions)values[a.fieldId]=a.optionValue;return {summary:{verified:arg.actions.length},results:arg.actions.map(a=>({fieldId:a.fieldId,status:'verified'})),submitted:false}}return scan()};
+ctx.fixtureNative=request=>new Promise(resolve=>waiting.push({request,resolve}));vm.runInContext('engine=fixtureEngine;native=fixtureNative',ctx);
+const send=m=>new Promise((r,j)=>listener(m,{id:'fixture',url:'chrome-extension://fixture/popup.html'},result=>result.error?j(Error(result.error)):r(result.value)));
+async function next(){for(let i=0;i<100&&!waiting.length;i++)await new Promise(r=>setTimeout(r,5));assert(waiting.length);return waiting.shift()}
+function answer({request,resolve}){const author=request.fields[0].id==='author',id=author?'author':'role',factKey=author?'rank':'post';assert.equal(request.fields.length,1);assert.deepEqual(Array.from(request.allowedFacts,f=>f.key),[factKey]);assert(request.fields.every(f=>f.module===request.allowedFacts[0].module));resolve({mappings:{[id]:factKey},provider:{called:true,model:'fixture-model',optionDecisions:{[id]:{factKey,optionValue:'其他',sourceKeys:[factKey],reason:author?'第五作者对应其他作者。':'干事不属于主席或部长。'}}}})}
+(async()=>{
+ await send({op:'profile-save',base:null,pack:{schemaVersion:1,profiles:[{id:'general',label:'合成资料'}],rules:[],facts:[{key:'title',label:'论文名称',value:'合成论文',module:'publications',recordId:'p'},{key:'rank',label:'作者排序',value:'第五作者',module:'publications',recordId:'p'},{key:'post',label:'职务',value:'学习部干事',module:'campus-role',recordId:'c'}]}});await send({op:'preferences',preferences:{agentMode:'codex',agentModel:'fixture-model'}});await send({op:'scan'});
+ await send({op:'auto-fill'});assert.deepEqual(inspections,[],'Unmatched selectors are not opened during final filling');assert.equal(waiting.length,0,'Local fill never calls a model');
+ const run=send({op:'agent-review'}),one=await next();let progress=(await send({op:'state'})).state.agentReview;assert.equal(progress.moduleLabel,'论文发表');assert.equal(progress.completedModules,0);assert.equal(progress.totalModules,2);assert.match(progress.message,/正在核对论文发表（1\/2）/);answer(one);
+ const two=await next();progress=(await send({op:'state'})).state.agentReview;assert.equal(progress.moduleLabel,'在校经历');assert.equal(progress.completedModules,1);assert.match(progress.message,/正在核对在校经历（2\/2）/);answer(two);
+ const result=await run;assert.equal(result.agentReview.accepted,2);assert.deepEqual(Array.from(result.agentReview.items,i=>i.displayValue),['其他','其他']);assert(result.agentReview.items.every(i=>i.factLabel && i.selectedOption));
+ const checked=inspections.length;await send({op:'auto-fill'});assert.equal(inspections.length,checked,'Reviewed options and unavailable option inspection are not repeated');assert.deepEqual(values,{author:'其他',role:'其他'});assert.equal(waiting.length,0);
+ assert.equal(Object.keys(local).filter(k=>k.includes('Report')).length,1);assert(!JSON.stringify(local.toudiLastReport).includes('第五作者'),'Persistent report omits facts and model decisions');
+ await removed(1);assert.equal(session.toudiFillingSession,undefined,'Closing the source tab releases its temporary plan and model results');
+ console.log('PASS real worker: bounded per-module native calls, truthful progress, readable structured results, no unknown-selector traversal during filling, cached inspection, one value-free report, tab-close cleanup');
+})().catch(e=>{console.error(e);process.exitCode=1});

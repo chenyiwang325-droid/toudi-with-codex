@@ -149,7 +149,7 @@ def snapshot(path,allow_repair=False):
         if settings_changed:
             wb.validate('settings',settings); changes[MODULES['settings'][0]]=encoded(settings)
     for module,value in values.items():
-        key={'records':None,'qbank':'categories','preps':'preps','reviews':'sessions','prospects':'companies'}.get(module)
+        key={'records':None,'qbank':'categories','preps':'preps','reviews':'sessions','prospects':'companies','schedule':'events'}.get(module)
         if module=='records': counts[module]=len(value)
         elif key: counts[module]=len(value[key])
     counts['qbankItems']=sum(len(c['items']) for c in values['qbank']['categories'])

@@ -106,6 +106,27 @@ class Handler(SimpleHTTPRequestHandler):
             except (ValueError, OSError, KeyError) as exc:
                 return self._send_json({'error': str(exc)}, 400)
         if route == '/api/health': return self._send_json({'ok': True, 'mode': hosted.MODE, 'workspaceKey': WORKSPACE_KEY})
+        if route == '/api/schedule.ics':
+            try:
+                from schedule_store import export_ics
+                selected = parse_qs(urlsplit(self.path).query).get('id')
+                with data_lock(BASE_DIR, shared=True):
+                    body = export_ics(Workbench(WORKSPACE).read('schedule'), WORKSPACE_KEY, selected)
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/calendar; charset=utf-8')
+                self.send_header('Content-Disposition', 'attachment; filename="TouDi-schedule.ics"')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers(); self.wfile.write(body); return
+            except (ValueError, OSError, KeyError) as exc:
+                return self._send_json({'error': str(exc)}, 400)
+        if route == '/api/workspace-changes':
+            try:
+                with data_lock(BASE_DIR):
+                    revisions=Workbench(WORKSPACE).refresh_revisions()
+                if hosted.MODE=='hosted': revisions.pop('profile',None)
+                return self._send_json({'workspaceKey':WORKSPACE_KEY,'revisions':revisions})
+            except (ValueError,OSError,KeyError) as exc:
+                return self._send_json({'error':str(exc)},503)
         if route in ('/api/manage', '/api/backup'):
             try:
                 workbench = Workbench(WORKSPACE)
@@ -124,6 +145,15 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _serve_GET(self):
         route = urlsplit(self.path).path
+        calendar_prefix = '/assets/vendor/fullcalendar-7.1.1/'
+        if route.startswith(calendar_prefix):
+            name = route[len(calendar_prefix):]
+            if name not in ('fullcalendar.js', 'theme.js', 'zh-cn.js', 'skeleton.css', 'theme.css'):
+                return self._send_json({'error':'not_found'}, 404)
+            source = Path(CODE_DIR) / 'assets' / 'vendor' / 'fullcalendar-7.1.1' / name
+            body = source.read_bytes()
+            self.send_response(200); self.send_header('Content-Type', self.guess_type(str(source)))
+            self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
         if route.startswith('/browser-extension/'):
             from filling_tools import EXTENSION_FILES
             name = route.removeprefix('/browser-extension/')
@@ -162,7 +192,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers(); self.wfile.write(body); return
-        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js', '/assets/workspace-storage.js', '/assets/settings.css', '/assets/filling.js', '/assets/filling.css', '/assets/profile-workspace.js'):
+        if urlsplit(self.path).path in ('/assets/favicon.svg', '/assets/logo.svg', '/assets/logo-dark.svg', '/assets/workbench.js', '/assets/workspace-storage.js', '/assets/settings.css', '/assets/filling.js', '/assets/filling.css', '/assets/profile-workspace.js', '/assets/schedule.js', '/assets/schedule.css'):
             name = os.path.basename(urlsplit(self.path).path)
             body = open(os.path.join(CODE_DIR, 'assets', name), 'rb').read()
             self.send_response(200); self.send_header('Content-Type', 'text/javascript; charset=utf-8' if name.endswith('.js') else 'text/css; charset=utf-8' if name.endswith('.css') else 'image/svg+xml')

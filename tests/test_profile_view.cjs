@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),V=require('../app/browser-extension/profile-view.js');
+const record=(type,title='合成记录',label='获奖类型')=>({title,facts:type===null?[]:[{key:'type',label,value:type}]});
+for(const [type,id] of [['荣誉称号','honor'],['校级表彰','honor'],['奖学金','scholarship'],['Scholarship','scholarship'],['学科竞赛','competition'],['Competition','competition'],['自定义类型','other'],['竞赛与奖学金','other']])assert.equal(V.awardCategory(record(type)).id,id);
+assert.equal(V.awardCategory(record('自定义类型','示例奖学金')).id,'other','Do not override an explicit, unknown type with the title');
+assert.equal(V.awardCategory(record(null,'示例奖学金')).id,'scholarship');
+assert.equal(V.awardCategory(record(null,'示例案例竞赛')).id,'competition');
+assert.equal(V.awardCategory(record(null,'示例综合记录')).id,'other');
+const records=[record('竞赛','示例一'),record('荣誉称号','示例二'),record('奖学金','示例三'),record('荣誉称号','示例四'),record('其他类型','示例五')],before=structuredClone(records);
+const groups=V.awardGroups(records);assert.deepEqual(groups.map(g=>[g.id,g.records.length]),[['honor',2],['scholarship',1],['competition',1],['other',1]]);assert.deepEqual(groups[0].records.map(r=>r.title),['示例二','示例四']);assert.deepEqual(records,before,'Grouping cannot mutate or drop source facts');
+const name={key:'name',label:'奖项名称',value:'示例完整名称'},description={key:'description',label:'完整描述',value:'示例完整名称'};
+assert.equal(V.nameFact({title:'示例完整名称',facts:[description,name]}),name);assert.equal(V.nameFact({title:'组合 · 标题',facts:[name]}),undefined);
+assert(V.isReference({module:'personal',manual:true}));assert(!V.isReference({module:'personal',manual:false}));assert(!V.isReference({module:'publications',manual:true}));
+console.log('PASS profile view: explicit award types, conservative title fallback, unknown/mixed types retained, group order and original record order, immutable source, exact duplicate name remains copyable.');

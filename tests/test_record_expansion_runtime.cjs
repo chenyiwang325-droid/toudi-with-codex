@@ -1,0 +1,30 @@
+'use strict';
+// Actual MV3 worker + injected engine + popup UI, isolated from user Chrome.
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict'),F=require('./test_record_expansion.cjs');
+let pw;try{pw=require('playwright')}catch(_){pw=require(path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'))}
+const repo=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'toudi-expansion-runtime-')),extension=path.join(temp,'extension');
+fs.cpSync(path.join(repo,'app/browser-extension'),extension,{recursive:true});for(const [src,dst]of [['favicon.svg','logo.svg'],['form-engine.js','form-engine.js'],['form-adapters.js','form-adapters.js']])fs.copyFileSync(path.join(repo,'app/assets',src),path.join(extension,dst));
+const manifest=JSON.parse(fs.readFileSync(path.join(extension,'manifest.json')));manifest.host_permissions=['http://127.0.0.1/*'];fs.writeFileSync(path.join(extension,'manifest.json'),JSON.stringify(manifest));
+const worker=path.join(extension,'worker.js');fs.writeFileSync(worker,'const listener=chrome.action.onClicked.addListener.bind(chrome.action.onClicked);chrome.action.onClicked.addListener=fn=>{globalThis.fixtureAction=fn;listener(fn)};\n'+fs.readFileSync(worker,'utf8'));
+const definitions=F.definitions.filter(d=>['internship','project'].includes(d[0])),facts=F.facts.filter(f=>['internship','project'].includes(f.module));
+const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end(F.html+'<script>('+F.installFixture.toString()+')('+JSON.stringify({definitions,variant:'phoenix',zero:req.url==='/empty'})+')</script>')});let context;
+(async()=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));context=await pw.chromium.launchPersistentContext(path.join(temp,'profile'),{channel:'chromium',headless:true,args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`],viewport:{width:1360,height:900}});
+ const sw=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker'),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await sw.evaluate(async facts=>{await init;await chrome.storage.local.set({toudiPrivateProfile:Core.validatePack({schemaVersion:1,profiles:[{id:'general',label:'合成资料'}],facts,rules:[]}),toudiFillingPreferences:{profile:'general',agentMode:'external',autoAgent:false}})},facts);
+ const action=()=>sw.evaluate(async()=>{const [tab]=await chrome.tabs.query({active:true,currentWindow:true});await fixtureAction(tab)});
+ async function ui(){await page.waitForFunction(()=>document.querySelector('#toudi-floating-host'));for(let i=0;i<50;i++){const f=page.frames().find(f=>f.url().startsWith('chrome-extension:'));if(f){await f.locator('#runtimeVersion').filter({hasText:'扩展'}).waitFor();await f.locator('#scanSummary').filter({hasText:'识别到'}).waitFor();return f}await new Promise(r=>setTimeout(r,50))}throw Error('Extension did not load');}
+ for(const route of ['/apply','/empty']){
+  await page.goto('http://127.0.0.1:'+server.address().port+route);const initialRecords=await page.locator('.ux-standard-form').count();await page.bringToFront();await action();const panel=await ui();assert.equal(await panel.title(),'TouDi · 辅助填报');await panel.locator('#fill').waitFor();assert.equal(await page.locator('.ux-standard-form').count(),initialRecords,'Opening only scans; it never adds records');
+  assert.equal(await panel.locator('[data-record-group]:visible').count(),0);assert.equal(await panel.locator('#agentFeedback').count(),0);assert(await panel.locator('#fill').isEnabled());
+  await panel.locator('#fill').click();await panel.locator('#result .finish').waitFor();assert.match(await panel.locator('#result .finish').innerText(),/已填写 20 项/);assert.doesNotMatch(await panel.locator('#fillPane').innerText(),/新增|核对结果|匹配计划/);assert.equal(await panel.locator('#reviewAgent').innerText(),'Agent 核对');
+  assert.equal(await page.locator('.ux-standard-form').count(),5);assert.equal(await page.evaluate(()=>submissions),0);
+  const written=await page.locator('.ux-standard-form').evaluateAll(rows=>rows.map(row=>[...row.querySelectorAll('input,textarea')].map(n=>n.value)));
+  for(const record of written){assert.equal(record[1],'2025-05-01');assert.equal(record[2],'2025-08-30');assert.equal(record[3],F.full);}
+  const saved=await sw.evaluate(async()=>{const {toudiLastReport:r}=await chrome.storage.local.get('toudiLastReport');return r});assert.equal(saved.submitted,false);assert.equal(saved.summary.verified,20);assert(saved.results.every(r=>!('actualValue' in r)));
+  await panel.locator('#fill').click();await panel.locator('#result .finish').filter({hasText:'本次未新增填写'}).waitFor();assert.equal(await page.locator('.ux-standard-form').count(),5,'Repeated fill never adds duplicates');
+  await page.locator('textarea').first().fill('用户现有完整原文');await page.locator('textarea').last().fill('');await panel.locator('#fillMode').selectOption('empty');await panel.locator('#fill').click();await panel.locator('#result .finish').waitFor();assert.match(await panel.locator('#result .finish').innerText(),/已填写 1 项/);assert.equal(await page.locator('textarea').first().inputValue(),'用户现有完整原文');assert.equal(await page.locator('textarea').last().inputValue(),F.full);assert.equal(await page.locator('.ux-standard-form').count(),5);
+  if(process.env.TOUDI_EXPANSION_EVIDENCE)await page.screenshot({path:path.join(process.env.TOUDI_EXPANSION_EVIDENCE,'真实扩展_整段新增填写结果'+(route==='/empty'?'_全空':'')+'.png')});
+ }
+ assert.deepEqual(errors,[]);console.log('PASS actual extension: scan -> default add 3/5 complete records -> 20 original fields written/read back -> repeated scan adds zero -> only-empty writes 1 and preserves user text; no submission.');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{await context?.close();server.close();fs.rmSync(temp,{recursive:true,force:true})});

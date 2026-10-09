@@ -4,7 +4,8 @@ const managementLabels = {
   preps: '公司准备',
   prospects: '探查报告',
   reviews: '面试复盘',
-  qbank: '通用题库'
+  qbank: '通用题库',
+  schedule: '日程'
 };
 let management = null, managementPreviewGeneration = 0,
   managementDraftTimer = null,
@@ -831,33 +832,69 @@ copyAgentBootstrap = async function (module) {
 const workspaceRefreshSnapshots = new Map();
 const workspacePendingUpdates = new Set();
 let workspaceRefreshRunning = false;
+let workspaceRefreshTask = null;
+let workspaceRefreshManual = false;
+let workspaceRefreshManifestRead = false;
+let workspaceRefreshAgain = false;
+function setWorkspaceRefreshBusy(busy) {
+  const button = document.getElementById('workspaceRefreshButton');
+  if (!button) return;
+  button.disabled = busy;
+  button.setAttribute('aria-busy', String(busy));
+  button.textContent = busy ? '正在刷新…' : '刷新资料';
+}
 function workspaceDetailDraftExists() {
-  return [...detailInputMemory.entries()].some(([index, fields]) => {
+  const fieldsByRecord = new Map(detailInputMemory);
+  if(document.getElementById('detailModal')?.style.display==='flex' && detailIdx!==null) {
+    fieldsByRecord.set(detailIdx,[...document.querySelectorAll('#detailContent input,#detailContent textarea')].map(field=>({id:field.id,value:field.value})));
+  }
+  return [...fieldsByRecord.entries()].some(([index, fields]) => {
     const row = byId(index);
     return fields.some(field => {
       const expected = field.id === 'researchNote' ? row?._researchNote || '' : field.id.startsWith('fe_') ? row?.[field.id.slice(3)] || '' : field.value;
-      return field.value !== expected;
+      // Textareas normalize CRLF/CR to LF while parsing. Compare the same
+      // browser representation without rewriting the full source note.
+      const normalized = value => String(value ?? '').replace(/\r\n?/g, '\n');
+      return normalized(field.value) !== normalized(expected);
     });
   });
 }
 function workspaceHasDraft(module) {
+  if(module==='schedule' && window.toudiSchedule?.hasDraft())return true;
   const domain = module === 'records' ? 'edits' : module;
   let stored;
   try { stored = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}'); } catch (error) { return true; }
   const managerOpen = document.getElementById('managementOverlay')?.style.display === 'flex';
-  if (managerOpen || stored[module] || listUnsavedDrafts().some(item => item.domain === domain)) return true;
+  if ((managerOpen && management?.module === module) || stored[module] || listUnsavedDrafts().some(item => item.domain === domain)) return true;
+  if (module === 'profile') return document.querySelector('#fillingDialog iframe')?.contentWindow?.toudiProfileEditor?.hasDraft() || false;
   if (module === 'records' || module === 'edits') {
-    return workspaceDetailDraftExists() || editsDirty || editsConflict || editsSaveInFlight || document.getElementById('detailModal')?.style.display === 'flex' || document.getElementById('noteModal')?.style.display === 'flex';
+    return workspaceDetailDraftExists() || editsDirty || editsConflict || editsSaveInFlight || (fieldEditIdx!==null && document.getElementById('detailModal')?.style.display==='flex') || document.getElementById('noteModal')?.style.display === 'flex';
   }
-  if (module === 'qbank' || module === 'preps') return qbankDirty || qbankConflict || qbankSaveInFlight || qbankFormEditing() || qbFormDrafts.size > 0 || qbCategoryEditing.size > 0;
+  if (module === 'qbank') return qbankDirty || qbankConflict || qbankSaveInFlight || qbankFormEditing() || qbFormDrafts.size > 0 || qbCategoryEditing.size > 0;
   if (module === 'reviews') return reviewDirty || reviewConflict || reviewSaveInFlight || reviewFormEditing();
   return false;
 }
-function showWorkspaceRefreshNotice(message) {
+function showWorkspaceRefreshNotice(message, state = 'pending') {
   const notice = document.getElementById('workspaceRefreshNotice');
-  if (!notice) return;
-  notice.hidden = !message;
-  notice.querySelector('span').textContent = message;
+  const button = document.getElementById('workspaceUpdatesButton');
+  if (!notice || !button) return;
+  const text = message || '资料已是最新。后台会自动检查更新，你也可以主动刷新。';
+  if (notice.querySelector('span').textContent !== text) notice.querySelector('span').textContent = text;
+  button.dataset.state = message ? state : 'idle';
+  button.querySelector('.workspace-update-dot').hidden = !message;
+  button.title = message ? (state === 'error' ? '资料读取失败，点击查看' : '有资料更新待显示，点击查看') : '查看资料更新状态';
+  button.setAttribute('aria-label', button.title);
+}
+function toggleWorkspaceUpdates() {
+  const notice = document.getElementById('workspaceRefreshNotice');
+  const button = document.getElementById('workspaceUpdatesButton');
+  notice.hidden = !notice.hidden;
+  button.setAttribute('aria-expanded', String(!notice.hidden));
+}
+function closeWorkspaceUpdates() {
+  const notice = document.getElementById('workspaceRefreshNotice');
+  if (notice) notice.hidden = true;
+  document.getElementById('workspaceUpdatesButton')?.setAttribute('aria-expanded', 'false');
 }
 function repaintWorkspaceEmptySurfaces() {
   const activeModule = view === 'qbank' ? (qbMode === 'company' ? 'preps' : 'qbank') : view === 'review' ? 'reviews' : view === 'prospect' ? 'prospects' : 'records';
@@ -866,19 +903,60 @@ function repaintWorkspaceEmptySurfaces() {
   else if (view === 'qbank' && !qbankFormEditing()) renderQbank();
   else if (view === 'review' && !reviewFormEditing()) renderReview();
   else if (view === 'prospect') renderProspect();
+  else if (view === 'schedule') window.toudiSchedule?.update();
 }
 async function refreshWorkspaceData(manual = false) {
-  if (window.__SNAPSHOT__ || workspaceRefreshRunning) return;
-  if (manual && (!serverMode || apiBase === null)) await initServerStorage();
-  if (!serverMode || apiBase === null) {showWorkspaceRefreshNotice('工作区服务未连接，请检查后重新读取。');return;}
+  if (window.__SNAPSHOT__) return;
+  if (workspaceRefreshTask) {
+    if (manual) {
+      if (!workspaceRefreshManual) {workspaceRefreshManual = true;setWorkspaceRefreshBusy(true);}
+      // A manifest received before this click may miss files committed while
+      // its readers were running. Join the read, then check a fresh manifest.
+      // If the manifest is still in flight, its response covers this click.
+      if (workspaceRefreshManifestRead) workspaceRefreshAgain = true;
+    }
+    return workspaceRefreshTask;
+  }
   workspaceRefreshRunning = true;
+  workspaceRefreshManual = manual;
+  if (manual) setWorkspaceRefreshBusy(true);
+  workspaceRefreshTask = (async () => {
+    let changed = false;
+    do {
+      workspaceRefreshAgain = false;
+      workspaceRefreshManifestRead = false;
+      changed = !!await readWorkspaceUpdates() || changed;
+    } while (workspaceRefreshAgain);
+    if (workspaceRefreshManual && !workspacePendingUpdates.size && document.getElementById('workspaceUpdatesButton')?.dataset.state !== 'error') {
+      showToast(changed ? '已读取工作区最新资料' : '资料没有变化');
+    }
+  })().finally(() => {
+    workspaceRefreshRunning = false;
+    if (workspaceRefreshManual) setWorkspaceRefreshBusy(false);
+    workspaceRefreshManual = false;
+    workspaceRefreshTask = null;
+  });
+  return workspaceRefreshTask;
+}
+async function readWorkspaceUpdates() {
   const originalFocus = document.activeElement;
   const focusState = originalFocus?.id ? {id: originalFocus.id, start: originalFocus.selectionStart, end: originalFocus.selectionEnd} : null;
-  const button = document.getElementById('workspaceRefreshButton');
-  if (button) { button.disabled = true; button.textContent = '正在检查…'; }
-  const modules = ['settings', 'edits', 'records', 'qbank', 'preps', 'prospects', 'reviews'];
+  const allModules = ['settings', 'edits', 'records', 'qbank', 'preps', 'prospects', 'reviews', 'profile', 'schedule'];
   try {
-    const results = await Promise.allSettled(modules.map(module => managementRequest(module)));
+    if (!serverMode || apiBase === null) await initServerStorage();
+    if (!serverMode || apiBase === null) {showWorkspaceRefreshNotice('工作区服务未连接，请检查后重新读取。', 'error');return;}
+    const response = await fetch((apiBase || '') + '/api/workspace-changes', {cache:'no-store'});
+    if (!response.ok) throw Error('工作区更新状态暂时无法读取');
+    const snapshot = await response.json();
+    workspaceRefreshManifestRead = true;
+    if (snapshot.workspaceKey !== toudiWorkspaceStorage.id || !snapshot.revisions) throw Error('工作区连接已变化，请重新确认资料目录');
+    // A manual check also compares revisions. Re-reading unchanged modules
+    // rebuilds readers/forms for no benefit; failed reads still retry explicitly.
+    const modules = allModules.filter(module => snapshot.revisions[module] && (workspaceReadStates[module] === 'error' || workspacePendingUpdates.has(module) || workspaceRefreshSnapshots.get(module) !== snapshot.revisions[module]));
+    // Reader APIs already return current contents and their collection bases.
+    // Avoid downloading the same report twice or hashing every attachment just
+    // to detect changes; full business versions remain in the write contract.
+    const results = await Promise.allSettled(modules.map(module => ['settings','records'].includes(module) ? managementRequest(module) : Promise.resolve(null)));
     let changed = false;
     let emptyStateChanged = false;
     const updatedModules = new Set();
@@ -893,13 +971,13 @@ async function refreshWorkspaceData(manual = false) {
       }
       emptyStateChanged ||= workspaceReadStates[module] !== 'ready';
       workspaceReadStates[module] = 'ready';
-      const fingerprint = JSON.stringify(result.value.data);
-      if (workspaceRefreshSnapshots.get(module) === fingerprint) continue;
+      const fingerprint = snapshot.revisions[module];
       if ((module === 'settings' && (workspaceSettingsSaving || toudiWorkspaceStorage.getItem('toudiPendingSettings'))) || workspaceHasDraft(module) || (module === 'records' && workspaceHasDraft('edits'))) {
         workspacePendingUpdates.add(module);
         continue;
       }
       // Protect forms opened while the read was in flight. Never advance their save base.
+      let readComplete = true;
       if (module === 'settings') {
         settingsState = result.value;
         sourcePreferenceRules = settingsState.data.preferenceRules || null;
@@ -911,52 +989,66 @@ async function refreshWorkspaceData(manual = false) {
         renderQuickViews();
         if(view === 'settings') renderSettings();
         else if(['table','kanban','charts'].includes(view)) render();
-      } else if (module === 'edits') await initServerStorage();
+      } else if (module === 'profile') {
+        const editor = document.querySelector('#fillingDialog iframe')?.contentWindow?.toudiProfileEditor;
+        if (editor && !await editor.refresh()) {workspacePendingUpdates.add(module);continue;}
+      } else if (module === 'schedule') {if(window.toudiSchedule && !await window.toudiSchedule.refresh()) {workspacePendingUpdates.add(module);continue;}}
+      else if (module === 'edits') readComplete = await initServerStorage();
       else if (module === 'records') {
         const keys = new Set(data.filter(row => selected.has(row._idx)).map(row => row._key));
+        const detailKey=document.getElementById('detailModal')?.style.display==='flex'?byId(detailIdx)?._key:null;
         detailInputMemory.clear();
         initData(result.value.data);
         selected = new Set(data.filter(row => keys.has(row._key)).map(row => row._idx));
         render();
-      } else if (module === 'qbank') await initQbankStorage();
-      else if (module === 'preps') await initPrepsStorage();
-      else if (module === 'prospects') await initProspectsStorage();
-      else if (module === 'reviews') await initReviewsStorage();
-      const readFailed = SAVE_DOMAINS[module]?.readFailed || (module === 'preps' && workspaceReadStates.preps === 'error') || (module === 'prospects' && !!prospectLoadError);
+        refreshRecruitmentDetail(detailKey);
+      } else if (module === 'qbank') readComplete = await initQbankStorage();
+      else if (module === 'preps') readComplete = await initPrepsStorage();
+      else if (module === 'prospects') readComplete = await initProspectsStorage();
+      else if (module === 'reviews') readComplete = await initReviewsStorage();
+      if (workspaceHasDraft(module)) {workspacePendingUpdates.add(module);continue;}
+      const readFailed = readComplete === false || (module==='schedule' && window.toudiSchedule?.hasError()) || SAVE_DOMAINS[module]?.readFailed || (module === 'preps' && workspaceReadStates.preps === 'error') || (module === 'prospects' && !!prospectLoadError);
       if (readFailed) {workspaceReadStates[module]='error';failures.push(managementLabels[module]||(module==='settings'?'工作区设置':'个人标记'));emptyStateChanged=true;continue;}
       workspaceRefreshSnapshots.set(module, fingerprint);
       workspacePendingUpdates.delete(module);
       changed = true;
       updatedModules.add(module);
     }
-    if (failures.length) showWorkspaceRefreshNotice(failures.join('、') + '读取失败，当前内容保留。可检查连接后重新读取。');
-    else if (workspacePendingUpdates.size) showWorkspaceRefreshNotice('检测到新资料；当前编辑和草稿已保留。请先保存后刷新；如遇冲突，可先导出草稿进行对账。');
+    if (failures.length) showWorkspaceRefreshNotice(failures.join('、') + '读取失败，当前内容保留。可检查连接后重新读取。', 'error');
+    else if (workspacePendingUpdates.size) showWorkspaceRefreshNotice([...workspacePendingUpdates].map(module=>managementLabels[module] || (module==='profile'?'填报资料':module==='settings'?'设置':'个人标记')).join('、') + '有更新；当前编辑已保留，结束编辑后自动读取。版本冲突时先保留草稿核对。');
     else {
       showWorkspaceRefreshNotice('');
-      if (manual) showToast(changed ? '已读取工作区最新资料' : '资料没有变化');
     }
+    if(['records','edits'].some(module=>updatedModules.has(module)) && view==='schedule')window.toudiSchedule?.update();
     if(view==='settings'&&['settings','edits','records'].some(module=>updatedModules.has(module)))renderSettings();
     // Unchanged content never redraws, so focus, selection and reader scroll remain intact.
-    const visibleModules = view === 'qbank' ? ['qbank','preps'] : view === 'review' ? ['reviews'] : view === 'prospect' ? ['prospects'] : ['records','edits'];
+    const visibleModules = view === 'qbank' ? ['qbank','preps'] : view === 'review' ? ['reviews'] : view === 'prospect' ? ['prospects'] : view === 'schedule' ? ['schedule','records','edits'] : ['records','edits'];
     if (emptyStateChanged || visibleModules.some(module=>updatedModules.has(module))) repaintWorkspaceEmptySurfaces();
+    return changed;
+  } catch (error) {
+    showWorkspaceRefreshNotice(error.message + '，当前内容保留，连接恢复后自动重试。', 'error');
   } finally {
-    workspaceRefreshRunning = false;
     if (focusState && (document.activeElement === document.body || document.activeElement === originalFocus)) {
       const current = document.getElementById(focusState.id);
       if (current && current !== originalFocus) {current.focus({preventScroll:true});try {current.setSelectionRange(focusState.start,focusState.end);} catch(error) {}}
     }
-    if (button) { button.disabled = false; button.textContent = '刷新资料'; }
   }
 }
 function installWorkspaceRefresh() {
-  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<button id="workspaceRefreshButton" class="btn btn-sm" onclick="refreshWorkspaceData(true)">刷新资料</button>');
-  document.querySelector('.topbar').insertAdjacentHTML('afterend', '<div id="workspaceRefreshNotice" class="workspace-refresh-note" role="status" hidden><span></span></div>');
+  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<div id="workspaceRefreshControl" class="workspace-refresh-control"><button id="workspaceRefreshButton" class="btn btn-sm" onclick="refreshWorkspaceData(true)">刷新资料</button><button id="workspaceUpdatesButton" type="button" class="btn btn-sm workspace-update-button" data-state="idle" aria-label="查看资料更新状态" aria-controls="workspaceRefreshNotice" aria-expanded="false" onclick="toggleWorkspaceUpdates()" title="查看资料更新状态"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><i class="workspace-update-dot" hidden></i></button><div id="workspaceRefreshNotice" class="workspace-refresh-note" hidden><strong>资料更新</strong><span></span></div></div>');
+  showWorkspaceRefreshNotice('');
+  document.addEventListener('click', event => { if (!event.target.closest('#workspaceRefreshControl')) closeWorkspaceUpdates(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') { const open = !document.getElementById('workspaceRefreshNotice').hidden; closeWorkspaceUpdates(); if (open) document.getElementById('workspaceUpdatesButton').focus(); } });
   if (window.__SNAPSHOT__) {
     document.getElementById('workspaceRefreshButton').disabled = true;
     return;
   }
   window.addEventListener('focus', () => refreshWorkspaceData());
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshWorkspaceData(); });
+  // A focused App can stay open while the Agent publishes files. Poll only
+  // small revision signals; unchanged modules do not download or redraw.
+  const timer=setInterval(() => {if(document.visibilityState==='visible')refreshWorkspaceData();},4000);
+  window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
   // Initialization may restore drafts before the first remote read.
   const ready = setInterval(() => {
     if (!serverMode) return;
@@ -985,7 +1077,7 @@ render = function (...args) {
 installWorkspaceRefresh();
 
 async function selectDesktopWorkspace() {
-  if (['records','edits','qbank','preps','prospects','reviews'].some(workspaceHasDraft) || workspaceSettingsSaving || toudiWorkspaceStorage.getItem('toudiPendingSettings')) {
+  if (['records','edits','qbank','preps','prospects','reviews','profile'].some(workspaceHasDraft) || workspaceSettingsSaving || toudiWorkspaceStorage.getItem('toudiPendingSettings')) {
     showToast('请先保存或导出未提交草稿，再切换工作区');
     return;
   }
@@ -1011,7 +1103,7 @@ function trackWorkspaceReader(module, load, isEmpty, failed) {
     if (loadingEmpty) workspaceReadStates[module] = 'loading';
     try {
       const result = await load(...args);
-      workspaceReadStates[module] = failed() ? 'error' : 'ready';
+      workspaceReadStates[module] = result === false || failed() ? 'error' : 'ready';
       return result;
     } finally {
       const visibleLoading = document.querySelector('.workspace-empty[data-empty-module="' + module + '"][data-empty-state="loading"]');

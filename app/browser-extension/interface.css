@@ -1,0 +1,29 @@
+/* Shared geometry and motion for the workbench, profile editor and page panel. */
+:root {
+  --ui-radius-small: 6px;
+  --ui-radius-control: 8px;
+  --ui-radius-surface: 12px;
+  --ui-radius-dialog: 16px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-6: 24px;
+  --ui-motion-fast: 140ms;
+  --ui-motion-enter: 200ms;
+  --ui-ease: cubic-bezier(.22, 1, .36, 1);
+  --ui-shadow-color: 31, 48, 54;
+  --ui-shadow-surface: 0 1px 3px rgba(var(--ui-shadow-color), .025), 0 5px 18px rgba(var(--ui-shadow-color), .025);
+  --ui-shadow-menu: 0 3px 8px rgba(var(--ui-shadow-color), .04), 0 12px 32px rgba(var(--ui-shadow-color), .09);
+  --ui-shadow-dialog: 0 8px 24px rgba(var(--ui-shadow-color), .07), 0 24px 64px rgba(var(--ui-shadow-color), .13);
+}
+:root[data-theme="dark"] { --ui-shadow-color: 0, 0, 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ui-shadow-color: 0, 0, 0; } }
+@keyframes ui-content-enter { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes ui-panel-enter { from { opacity: .65; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
+  animation: none !important; transition: none !important; scroll-behavior: auto !important;
+}

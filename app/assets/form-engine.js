@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (adapterLibrary) {
   'use strict';
   let latest = null;
-  const ENGINE_VERSION = '0.5.4';
+  const ENGINE_VERSION = '0.5.19'+(adapterLibrary?.revision?'.'+adapterLibrary.revision:'');
   let structureHints={};
   const wait=(milliseconds=100)=>new Promise(resolve=>setTimeout(resolve,milliseconds));
   const adapters=adapterLibrary?.create({compact:v=>compact(v),visible,structuralPath,labelText,wait,setNative});
@@ -26,7 +26,7 @@
     return compact(copy.textContent);
   }
   function questionText(text) {
-    const value=compact(text);
+    const value=compact(text).replace(/^(?:请填写|请输入|请选择|请补充)\s*/, '');
     // A selected year/month/value is not a question, even if exposed as an ARIA name.
     return !value || /^\d+(?:[-/.年]\d+)*(?:月|日|年)?$/.test(value) || /^(请选择|请输入|必填项未填写)$/.test(value)?'':value;
   }
@@ -63,8 +63,8 @@
       if (title) { if (!group) { group = title; groupPath=structuralPath(p); } hint = compact(hint + ' ' + title); }
       if (p.tagName === 'FORM') break;
     }
-    const module = /在校职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部|campus-role|campus posts|school posts/i.test(hint) ? 'campus-role' : /获奖|荣誉|奖励|awards/i.test(hint) ? 'awards' : /论文|专著|发表|publications/i.test(hint) ? 'publications' : /教育|学历|学位|education/i.test(hint) ? 'education' : /实习|工作经历|任职|employment|work experience/i.test(hint) ? 'work' : /项目|project/i.test(hint) ? 'projects' : '';
-    const generic=/^(教育经历|教育背景|学历信息|工作经历|实习经历|项目经历|education|work experience|projects)$/i.test(group);
+    const module = /家庭成员|家庭情况|家庭信息|亲属|family|父亲|母亲/i.test(hint) ? 'family' : /紧急联系人|emergency contact/i.test(hint) ? 'personal' : /在校职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部|campus-role|campus posts|school posts/i.test(hint) ? 'campus-role' : /获奖|荣誉|奖励|awards/i.test(hint) ? 'awards' : /论文|专著|发表|publications/i.test(hint) ? 'publications' : /教育|学历|学位|education/i.test(hint) ? 'education' : /实习|工作经历|任职|employment|work experience/i.test(hint) ? 'work' : /项目|科研|实践|project/i.test(hint) ? 'projects' : /语言|外语|证书|language|certificate/i.test(hint)?'language':'';
+    const generic=/^(教育经历|教育背景|学历信息|工作经历|实习经历|项目经历|项目经验|在校职务|在校任职|在校经历|校园经历|学生工作|获奖情况|荣誉奖励|获奖经历|论文\/专著|论文发表|语言能力|外语能力|语言及证书|证书|education|work experience|projects|家庭成员|家庭情况|家庭信息|family)$/i.test(group);
     const recordHint = /本科|硕士|博士|大专|学士|master|bachelor|doctor/i.test(hint) ? hint : module && group && !generic ? group : '';
     return { groupLabel: group, recordHint, module, groupPath };
   }
@@ -118,11 +118,13 @@
   }
   function collect() {
     adapters?.reset();
-    const entries = [], warnings = [], counts = new Map();
+    const entries = [], warnings = [], counts = new Map(),scopeRoots=new Map();
     function walk(root, scope) {
+      scopeRoots.set(root,scope);
       const nodes = adapters?adapters.nodes(root):[...root.querySelectorAll('input,textarea,select,[role="combobox"]')];
       const radios = new Set();
       for (const node of nodes) {
+        if(node.closest?.("#toudi-floating-host,[data-toudi-panel]"))continue;
         if(adapters && !adapters.includes(node,root))continue;
         const rawType = (node.getAttribute('type') || '').toLowerCase();
         if (['hidden','password','submit','reset','button','image'].includes(rawType) || !visible(node)) continue;
@@ -137,7 +139,7 @@
         const type=adapted?.type || (rawType==='radio'?'radio':rawType==='checkbox'?'checkbox':rawType==='file'?'file':node.tagName==='SELECT'?'select':node.tagName==='TEXTAREA'?'textarea':node.getAttribute('role')==='combobox'?'combobox':rawType||'text');
         let ctx=context(node);
         let members = [node], options = [];
-        if (adapter==='phoenix-radio') {options=adapted.options;}
+        if (adapter==='phoenix-radio' || adapter==='ant-radio') {options=adapted.options;}
         else if (type === 'radio') {
           const local = radioContext(node,root), container=local.container;
           members = [...container.querySelectorAll('input[type="radio"]')].filter(x => x.name === node.name && visible(x) && radioContext(x,root).container===container);
@@ -146,34 +148,34 @@
           label = local.label;
           options = members.map(x => ({value:x.value,text:named(x) || (x.closest('label') ? labelText(x.closest('label')) : '')}));
         } else if (type === 'select') options = [...node.options].map(x => ({value:x.value,text:compact(x.textContent)}));
-        else if (type === 'combobox') {
+        else if (type === 'combobox' && !adapter.startsWith('ant-')) {
           const box = node.getRootNode().getElementById?.(node.getAttribute('aria-controls'));
           options = box ? [...box.querySelectorAll('[role="option"]')].filter(visible).map(x => ({value:x.getAttribute('data-value') || x.getAttribute('value') || '',text:compact(x.textContent)})) : [];
         }
-        const module = ctx.module || (/姓名|性别|出生|手机|电话|邮箱|证件|地址|name|email|phone/i.test(label) ? 'personal' : 'other');
+        const module = ctx.module || (/姓名|性别|出生|手机|电话|邮箱|证件|地址|最高学历|第一学历|国籍|民族|政治面貌|身高|体重|自我评价|个人评价|紧急联系|name|email|phone/i.test(label) ? 'personal' : 'other');
         let unsupported = '';
-        if (/家庭|亲属|family/i.test(ctx.groupLabel || ctx.module)) unsupported='family-member';
-        else if (type === 'file') unsupported = 'file-upload';
+        if (type === 'file') unsupported = 'file-upload';
         else if (/验证码|校验码|安全验证|captcha|verification code|one.time code/i.test(label)) unsupported = 'verification-code';
         else if (['checkbox','radio'].includes(type) && /同意|声明|隐私|条款|协议|我已阅读|本人确认|agree|consent|terms|declaration/i.test(label)) unsupported = 'consent';
         else if (type === 'combobox' && !adapter && (!options.length || options.some(x => !x.value))) unsupported = 'custom-selector';
         else if(adapted?.unsupported)unsupported=adapted.unsupported;
-        else if (members.some(n=>adapters?.disabled(n) || n.disabled || (n.readOnly && !adapted?.allowReadonly) || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) unsupported='disabled-or-readonly';
+        else if (!adapted?.presentChecked && members.some(n=>adapters?.disabled(n) || n.disabled || (n.readOnly && !adapted?.allowReadonly) || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) unsupported='disabled-or-readonly';
         else if (!label) unsupported = 'unlabeled';
         const constraints=Object.fromEntries(['min','max','step','pattern'].filter(k=>node.hasAttribute(k)).map(k=>[k,node.getAttribute(k)]));
         const placeholder=(node.getAttribute('placeholder') || '').trim().toUpperCase();
         const dateFormat=adapted?.dateFormat || (['YYYY-MM-DD','YYYY/MM/DD','YYYY.MM.DD','YYYY-MM','YYYY/MM','YYYY.MM'].includes(placeholder)?placeholder:undefined);
-        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,recordHint:ctx.recordHint,type,name:node.name || '',options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),...(adapted?.datePrecision?{datePrecision:adapted.datePrecision}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!adapted?.required,maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
+        const descriptor = {scope,label,module,groupLabel:ctx.groupLabel,groupPath:ctx.groupPath,type,name:node.name || '',options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),...(adapted?.datePrecision?{datePrecision:adapted.datePrecision}:{}),...(adapted?.regionDepth?{regionDepth:adapted.regionDepth}:{}),required:members.some(x=>x.required || x.getAttribute('aria-required')==='true') || !!adapted?.required,maxLength:node.maxLength >= 0 ? node.maxLength : null,unsupported};
         // Record values can constrain matching, but never rename/reidentify a field.
         const signature = JSON.stringify({scope,path:structuralPath(node),type,name:node.name || ''}), index = counts.get(signature) || 0;
         counts.set(signature,index+1);
         const id = 'field-' + hash(signature + ':' + index);
-        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported && unsupported!=='unlabeled' ? '' : read({node,nodes:members,type,field:{options,adapter}}),options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),...(adapted?.datePrecision?{datePrecision:adapted.datePrecision}:{})};
+        const field = {id,label,module,groupId:ctx.groupLabel ? 'group-'+hash(scope+ctx.groupPath+ctx.groupLabel) : '',groupLabel:ctx.groupLabel,recordHint:ctx.recordHint,type,required:descriptor.required,maxLength:descriptor.maxLength,value:unsupported && unsupported!=='unlabeled' ? '' : read({node,nodes:members,type,field:{options,adapter,label}}),options,constraints,...dateMeta,...(adapter?{adapter}:{}),...(dateFormat?{dateFormat}:{}),...(adapted?.datePrecision?{datePrecision:adapted.datePrecision}:{}),...(adapted?.regionDepth?{regionDepth:adapted.regionDepth}:{}),...(adapted?.presentAvailable?{presentAvailable:true}:{})};
         if (unsupported) field.unsupported = unsupported;
         entries.push({field,descriptor,node,nodes:members,type});
       }
       let shadowIndex = 0, frameIndex = 0;
       for (const el of root.querySelectorAll('*')) {
+        if(el.id==='toudi-floating-host' || el.hasAttribute('data-toudi-panel') || (el.tagName==='IFRAME' && /^(chrome|moz)-extension:/.test(el.getAttribute('src') || '')))continue;
         if (el.shadowRoot && visible(el)) walk(el.shadowRoot, scope+'/shadow:'+el.tagName.toLowerCase()+':'+shadowIndex++);
         if (el.tagName === 'IFRAME' && visible(el)) {
           const frameScope = scope+'/frame:'+frameIndex++;
@@ -205,9 +207,153 @@
       applied.push(id);
     }
     const fingerprint = hash(JSON.stringify({origin,path,structure:entries.map(x=>({id:x.field.id,...x.descriptor}))}));
-    return {entries,report:{protocol:1,engineVersion:ENGINE_VERSION,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),platforms:adapters?.platforms(document)||[{id:"generic",label:"通用表单",version:"1"}],structure:{fingerprint:structureFingerprint,candidates:publicCandidates,applied,rejected},warnings}};
+    const repeatables=repeatableCatalog(entries,scopeRoots);
+    return {entries,repeatables,report:{protocol:1,engineVersion:ENGINE_VERSION,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),repeatables:repeatables.map(({node,adds,records,...section})=>section),platforms:adapters?.platforms(document)||[{id:"generic",label:"通用表单",version:"1"}],structure:{fingerprint:structureFingerprint,candidates:publicCandidates,applied,rejected},warnings}};
+  }
+  const repeatableModules=new Set(['education','work','projects','campus-role','awards','publications','family','language']);
+  function recordNode(entry){for(let n=entry.node;n;n=n.parentElement)if(structuralPath(n)===entry.descriptor.groupPath)return n;return null;}
+  function sectionHeading(node){
+    const moka=node.querySelector(':scope > [class*="blockTitle-"] [class*="text-"]');
+    if(moka)return compact(moka.textContent);
+    const ant=node.querySelector(':scope > .tit-wrap p');if(ant)return compact(ant.textContent);
+    return [...node.children].filter(n=>!n.matches('input,textarea,select,button') && !n.querySelector('input,textarea,select,.form-item') && !/^(?:添加|新增|增加|add)/i.test(compact(n.textContent))).map(n=>compact(n.textContent)).find(t=>t.length<=40 && repeatableModules.has(adapters?.moduleOf(t))) || '';
+  }
+  function safeAddStatus(nodes){
+    if(nodes.length>1)return 'ambiguous';if(!nodes.length)return 'unsupported';
+    const n=nodes[0];
+    if(n.closest('a[href]') && !/^(?:#|javascript:void\(0\);?)$/.test(n.closest('a').getAttribute('href')))return 'unsupported';
+    if(n.closest('button')?.form && n.closest('button').type==='submit')return 'unsupported';
+    if(n.closest('[disabled],[aria-disabled="true"],[inert]') || /disabled/i.test(String(n.className)))return 'disabled';
+    return 'ready';
+  }
+  function repeatableCatalog(entries,roots){
+    const sections=new Map();
+    const install=(node,label,scope)=>{
+      const module=adapters?.moduleOf(label);if(!node || !repeatableModules.has(module))return null;
+      if(!sections.has(node))sections.set(node,{id:'section-'+hash(scope+structuralPath(node)+label),label,module,node,adds:[],records:[],groupIds:[]});
+      return sections.get(node);
+    };
+    for(const entry of entries){
+      if(!entry.field.groupId || !repeatableModules.has(entry.field.module))continue;
+      const record=recordNode(entry);if(!record)continue;
+      let section;
+      for(let p=record.parentElement,i=0;p&&i<9;p=p.parentElement,i++){const title=sectionHeading(p);if(adapters?.moduleOf(title)===entry.field.module){section=install(p,title,entry.descriptor.scope);break;}if(p.tagName==='FORM')break;}
+      if(!section)section=install(record,entry.field.groupLabel.replace(/\s*·\s*第\d+段$/,''),entry.descriptor.scope);
+      if(section && !section.groupIds.includes(entry.field.groupId)){section.groupIds.push(entry.field.groupId);section.records.push(record);}
+    }
+    // Semantic add controls are discovered locally, including custom Phoenix
+    // div+SVG controls. No CSS generated class names or site account values.
+    for(const [root,scope] of roots)for(const leaf of root.querySelectorAll('button,[role="button"],a,span,div')){
+      if(!visible(leaf) || leaf.closest('#toudi-floating-host,[data-toudi-panel]'))continue;
+      const text=compact(leaf.getAttribute('aria-label') || labelText(leaf));
+      if(!/^(?:添加|新增|增加|add)\s*(?:一段|一条|another\s*|new\s*)?.{0,35}$/i.test(text) && !/^(?:添加|新增|增加|\+|＋)$/.test(text))continue;
+      if(!/^(?:添加|新增|增加|\+|＋|add)$/i.test(text) && !repeatableModules.has(adapters?.moduleOf(text)))continue;
+      if(leaf.querySelector('input,textarea,select') || [...leaf.children].some(n=>compact(n.textContent)===text))continue;
+      let control=leaf.closest('button,[role="button"],a') || (leaf.tagName==='SPAN' && compact(leaf.parentElement.textContent)===text?leaf.parentElement:leaf);
+      let section;
+      for(let p=control.parentElement,i=0;p&&i<9;p=p.parentElement,i++){const title=sectionHeading(p);if(title){const mod=adapters?.moduleOf(text);if(mod!=='other' && mod!==adapters?.moduleOf(title))break;section=install(p,title,scope);break;}if(p.tagName==='FORM')break;}
+      if(section && !section.adds.includes(control))section.adds.push(control);
+    }
+    return [...sections.values()].map(s=>{
+      // Saved cards are not empty destinations. Without a verified readable
+      // identity, adding the same profile again would duplicate old records.
+      const editControls=[...s.node.querySelectorAll('button,[role="button"],a')].filter(n=>visible(n) && /^(编辑|修改|edit)$/i.test(compact(n.getAttribute('aria-label') || labelText(n))));
+      const closedCards=editControls.filter(n=>!s.records.some(record=>record.contains(n))).length;
+      const lockedRecords=s.records.filter(record=>{
+        const fields=entries.filter(e=>record.contains(e.node));
+        return fields.length && fields.every(e=>e.field.unsupported==='disabled-or-readonly');
+      }).length;
+      const blockedReason=closedCards || lockedRecords?'saved-records-closed':'';
+      return {...s,closedRecords:closedCards+lockedRecords,blockedReason,addStatus:blockedReason?'requires-edit':safeAddStatus(s.adds)};
+    });
+  }
+  function groupSnapshots(state){
+    const groups=new Map();
+    for(const e of state.entries){if(!e.field.groupId || !repeatableModules.has(e.field.module))continue;
+      if(!groups.has(e.field.groupId))groups.set(e.field.groupId,{id:e.field.groupId,module:e.field.module,node:recordNode(e),entries:[]});groups.get(e.field.groupId).entries.push(e);
+    }
+    const identities={education:/学校|院校|学历/,work:/公司|单位名称|实习单位|^单位$/,projects:/项目名称|实践名称|^名称$|在校科研及实践项目/,'campus-role':/职务|岗位|组织名称/,awards:/奖项|获奖名称/,publications:/名称|论文题目/,language:/证书名称|证书类型|语言.?证书名称/,family:/姓名|关系/};
+    return [...groups.values()].map(g=>({...g,empty:!g.entries.some(e=>e.field.value!==false && String(e.field.value ?? '').trim() && !/^(?:请选择.*|请输入.*)$/.test(String(e.field.value)) && (!['select','radio','combobox','checkbox'].includes(e.type) || identities[g.module]?.test(e.field.label))),signature:JSON.stringify(g.entries.map(e=>[e.field.label,e.type,e.field.value])),shape:JSON.stringify(g.entries.map(e=>[e.field.label,e.type]))}));
+  }
+  function relateGroups(before,after){
+    const mapped=new Map(),used=new Set();
+    for(const g of [...before].sort((a,b)=>Number(a.empty)-Number(b.empty))){
+      const eligible=after.filter(n=>n.module===g.module && n.signature===g.signature && !used.has(n.id));
+      let match=eligible.find(n=>n.node===g.node);
+      if(!match && eligible.length===1)match=eligible[0];
+      // Indistinguishable blank slots contain no experience identity. Their
+      // explicit placement can move to another equally empty destination.
+      if(!match && g.empty)match=eligible[0];
+      if(!match)throw Error('existing-record-changed');
+      mapped.set(g.id,match);used.add(match.id);
+    }
+    return mapped;
+  }
+  async function expandRecords(request){
+    let state=collect();
+    if(!request || request.fingerprint!==state.report.fingerprint || request.fingerprint!==latest?.report.fingerprint)throw Error('structure-changed');
+    if(!request.bindings || Array.isArray(request.bindings) || !Array.isArray(request.targets) || request.targets.length>16)throw Error('record-request-invalid');
+    const original=state,originalGroups=groupSnapshots(state);let bindings={...request.bindings},additions=[];
+    const allowedGroups=new Set(originalGroups.map(g=>g.id)),requested=new Set();
+    if(Object.entries(bindings).some(([id,rid])=>!allowedGroups.has(id) || typeof rid!=='string' || !rid || rid.length>240))throw Error('record-binding-invalid');
+    if(request.targets.reduce((n,t)=>n+(t.recordIds?.length || 0),0)>100)throw Error('record-limit-exceeded');
+    for(const t of request.targets){
+      const s=state.repeatables.find(s=>s.id===t.sectionId);
+      if(!s || !Array.isArray(t.recordIds) || t.recordIds.some(r=>typeof r!=='string' || !r || r.length>240 || requested.has(s.module+'|'+r)) || request.targets.filter(x=>x.sectionId===t.sectionId).length!==1)throw Error('record-target-invalid');
+      t.recordIds.forEach(r=>requested.add(s.module+'|'+r));
+    }
+    for(const target of request.targets){
+      const initialSection=state.repeatables.find(s=>s.id===target.sectionId),item={module:initialSection.module,label:initialSection.label,requested:target.recordIds.length,added:0,remaining:[],reason:''};additions.push(item);
+      for(const recordId of target.recordIds){
+        state=collect();const section=state.repeatables.find(s=>s.id===target.sectionId),before=groupSnapshots(state);
+        if(!section || section.addStatus!=='ready'){item.reason=section?.blockedReason || (section?.addStatus==='disabled'?'add-disabled':section?.addStatus==='ambiguous'?'add-ambiguous':'add-unavailable');break;}
+        const count=section.groupIds.length;
+        adapters.pointerClick(section.adds[0]);
+        let settled=false;
+        for(let attempt=0;attempt<36;attempt++){await wait(attempt?80:40);state=collect();const updated=state.repeatables.find(s=>s.id===target.sectionId);if(updated && updated.groupIds.length>count){await wait(100);state=collect();settled=true;break;}}
+        if(!settled){item.reason='add-no-new-record';break;}
+        try{
+          const after=groupSnapshots(state),map=relateGroups(before,after),currentSection=state.repeatables.find(s=>s.id===target.sectionId);
+          const used=new Set([...map.values()].map(g=>g.id)),created=after.filter(g=>currentSection?.groupIds.includes(g.id) && !used.has(g.id));
+          if(created.length!==1 || !created[0].empty || currentSection.groupIds.length!==count+1)throw Error('new-record-not-unique');
+          bindings=Object.fromEntries(Object.entries(bindings).map(([id,rid])=>[map.get(id)?.id,rid]).filter(([id])=>id));
+          bindings[created[0].id]=recordId;item.added++;
+        }catch(e){item.reason=e.message;break;}
+      }
+      item.remaining=target.recordIds.slice(item.added);
+      if(item.reason==='existing-record-changed' || item.reason==='new-record-not-unique')break;
+    }
+    state=collect();const finalGroups=groupSnapshots(state);let fieldMap={},validBindings={},safe=true;
+    try{
+      const map=relateGroups(originalGroups,finalGroups);
+      for(const [id,g] of map){const old=originalGroups.find(x=>x.id===id);old.entries.forEach((e,i)=>fieldMap[e.field.id]=g.entries[i].field.id);}
+      for(const [id,rid] of Object.entries(bindings))if(finalGroups.some(g=>g.id===id))validBindings[id]=rid;
+      for(const old of original.entries.filter(e=>!fieldMap[e.field.id])){
+        const matches=state.entries.filter(e=>!e.field.groupId || !repeatableModules.has(e.field.module)).filter(e=>e.node===old.node || e.field.label===old.field.label && e.field.module===old.field.module && e.type===old.type && e.field.value===old.field.value);
+        if(matches.length===1)fieldMap[old.field.id]=matches[0].field.id;
+      }
+    }catch(e){additions.push({label:'已有经历',module:'',requested:0,added:0,remaining:[],reason:e.message});validBindings={};safe=false;}
+    latest=state;
+    return {scan:state.report,bindings:validBindings,fieldMap,additions,safe,submitted:false};
   }
   async function scan(options={}) { structureHints=options?.structureHints && typeof options.structureHints==='object'&&!Array.isArray(options.structureHints)?options.structureHints:{}; const state = collect(); latest = state; return state.report; }
+  async function inspectOptions(request) {
+    if(!request || !Array.isArray(request.fieldIds) || request.fieldIds.length>40 || new Set(request.fieldIds).size!==request.fieldIds.length)throw Error('option-request-invalid');
+    const initial=collect(),items=[];
+    if(request.fingerprint!==initial.report.fingerprint)throw Error('page-changed');
+    for(const id of request.fieldIds) {
+      const entry=initial.entries.find(x=>x.field.id===id);
+      if(!entry || entry.field.unsupported || !['moka-select','phoenix-select','ant-select'].includes(entry.field.adapter)){items.push({fieldId:id,options:[],reason:'options-unavailable'});continue;}
+      const before=read(entry);let options=[],reason='';
+      try{options=(await adapters.inspectOptions(entry)).filter(o=>o.text && o.value);if(options.length>1000){options=[];reason='options-too-many';}}
+      catch(_){reason='options-unavailable';}
+      if(read(entry)!==before)throw Error('value-changed-during-inspection');
+      items.push({fieldId:id,options,reason:reason || (options.length?'':'options-unavailable')});
+    }
+    const final=collect();
+    if(final.report.fingerprint!==initial.report.fingerprint || initial.report.fields.some(f=>final.report.fields.find(v=>v.id===f.id)?.value!==f.value))throw Error('page-changed');
+    return {fingerprint:initial.report.fingerprint,items};
+  }
   function result(fieldId,status,reason,entry) {
     const out = {fieldId,status,reason};
     if (entry && !entry.field.unsupported) out.actualValue = read(entry);
@@ -228,9 +374,37 @@
     // Websites can render numeric results with trailing zeros. Never normalize identifiers.
     return /^(语言成绩|考试成绩|成绩（GPA）|GPA|平均绩点|身高|体重)$/.test(entry.field.label) && /^-?\d+(?:\.\d+)?$/.test(String(actual)) && /^-?\d+(?:\.\d+)?$/.test(String(expected)) && Number(actual)===Number(expected);
   }
+  const recordIdentityLabels={education:/^(学校名称|学校|院校|学历)$/,work:/^(公司名称|单位名称|实习单位|单位|公司)$/,projects:/^(项目名称|实践名称|名称|在校科研及实践项目)$/,'campus-role':/^(在校职务名称|职务|岗位|组织名称)$/,awards:/^(奖项|奖项名称|获奖名称)$/,publications:/^(名称|论文名称|论文题目)$/,language:/^(证书名称|语言.?证书名称)$/,family:/^(姓名|与本人关系|关系)$/};
+  function sameControl(a,b){
+    const strip=d=>Object.fromEntries(Object.entries(d).filter(([key])=>!['scope','groupPath','groupLabel'].includes(key)));
+    return JSON.stringify(strip(a.descriptor))===JSON.stringify(strip(b.descriptor));
+  }
+  function relocate(before,after,applied=new Map()){
+    const groupMap={},fieldMap={},usedGroups=new Set(),usedFields=new Set(),groups=groupSnapshots(after);
+    const normal=v=>String(v ?? '').normalize('NFKC').replace(/\s+/g,' ').trim();
+    const expected=e=>applied.has(e.field.id)?applied.get(e.field.id):e.field.value;
+    for(const old of groupSnapshots(before)){
+      const identity=old.entries.filter(e=>recordIdentityLabels[old.module]?.test(e.field.label) && normal(expected(e)) && !/^(请选择|请输入)/.test(normal(expected(e))));
+      const compatible=g=>g.module===old.module && !usedGroups.has(g.id) && identity.every(e=>g.entries.some(n=>n.field.label===e.field.label && normal(n.field.value)===normal(expected(e))));
+      const matches=groups.filter(compatible);
+      let match=identity.length && matches.length===1?matches[0]:null;
+      // Empty slots carry no identity. Preserve only the same live record node
+      // with the same sibling count; never infer a new blank slot by its index.
+      if(!match && !identity.length && groups.filter(g=>g.module===old.module).length===groupSnapshots(before).filter(g=>g.module===old.module).length)match=matches.find(g=>g.node===old.node && g.id===old.id);
+      if(match){groupMap[old.id]=match.id;usedGroups.add(match.id);}
+    }
+    for(const old of before.entries){
+      const repeated=repeatableModules.has(old.field.module) && old.field.groupId;
+      if(repeated && !groupMap[old.field.groupId])continue;
+      const matches=after.entries.filter(n=>!usedFields.has(n.field.id) && sameControl(old,n) && (!repeated || n.field.groupId===groupMap[old.field.groupId]));
+      const sameNode=matches.filter(n=>n.node===old.node),match=sameNode.length===1?sameNode[0]:matches.length===1?matches[0]:null;
+      if(match){fieldMap[old.field.id]=match.field.id;usedFields.add(match.field.id);}
+    }
+    return {groupMap,fieldMap};
+  }
   async function apply(plan) {
-    const actions = Array.isArray(plan?.actions) ? plan.actions : [];
-    const initial = collect(), output = [], applied = new Map();
+    const actions = Array.isArray(plan?.actions) ? [...plan.actions].sort((a,b)=>Number(/^(至今|present|ongoing|current)$/i.test(String(a.value)))-Number(/^(至今|present|ongoing|current)$/i.test(String(b.value)))) : [];
+    const initial = collect(), initialUrl=location.href, output = [], applied = new Map();
     let reject = '';
     if (!latest) reject='scan-required';
     else if (plan.origin !== initial.report.origin || plan.path !== initial.report.path) reject='page-changed';
@@ -239,19 +413,29 @@
     for (const action of actions) {
       if(repeated.has(action.fieldId)) {output.push(result(action.fieldId,'conflict','duplicate-action'));continue;}
       if (reject) { output.push(result(action.fieldId,'conflict',reject)); continue; }
-      const current=collect(), entry=current.entries.find(x=>x.field.id===action.fieldId), original=latest.entries.find(x=>x.field.id===action.fieldId);
-      if (current.report.origin!==plan.origin || current.report.path!==plan.path) {output.push(result(action.fieldId,'conflict','page-changed'));continue;}
-      if (!entry || !original || JSON.stringify(entry.descriptor)!==JSON.stringify(original.descriptor)) { output.push(result(action.fieldId,'conflict','field-changed'));continue; }
+      const current=collect(), original=initial.entries.find(x=>x.field.id===action.fieldId);
+      let entry=current.entries.find(x=>x.field.id===action.fieldId);
+      if (location.href!==initialUrl || current.report.origin!==plan.origin || current.report.path!==plan.path) {output.push(result(action.fieldId,'conflict','page-changed'));continue;}
+      if(!entry || !original || JSON.stringify(entry.descriptor)!==JSON.stringify(original.descriptor)){
+        const id=relocate(initial,current,applied).fieldMap[action.fieldId];
+        entry=id?current.entries.find(e=>e.field.id===id):null;
+      }
+      if (!entry || !original || !sameControl(original,entry)) { output.push(result(action.fieldId,'conflict','field-changed'));continue; }
       const value=read(entry), empty=value==='' || value===false;
       if (entry.field.unsupported) {output.push(result(action.fieldId,'manual',entry.field.unsupported));continue;}
       if (entry.nodes.some(n=>adapters?.disabled(n) || n.disabled || (n.readOnly && !adapters?.describe(n)?.allowReadonly) || n.closest('fieldset[disabled]') || n.getAttribute('aria-disabled')==='true')) {output.push(result(action.fieldId,'manual','disabled-or-readonly',entry));continue;}
-      if (!Object.hasOwn(action,'expectedValue') || value!==action.expectedValue || value!==original.field.value) {output.push(result(action.fieldId,'conflict','value-changed',entry));continue;}
-      if (!empty && !action.overwrite) {output.push(result(action.fieldId,'conflict','existing-value',entry));continue;}
       const target=action.optionValue ?? action.value;
       if (!['string','number','boolean'].includes(typeof target)) {output.push(result(action.fieldId,'failed','invalid-value',entry));continue;}
+      // Earlier writes can fill a linked field automatically. Accept it only
+      // when it already equals this confirmed target; conflicting values retain
+      // the same protection against overwriting user edits.
+      if(applied.size && Object.hasOwn(action,'expectedValue') && (value!==action.expectedValue || value!==original.field.value) && (value===target || adapters?.matchesValue(entry,String(target)))){
+        applied.set(action.fieldId,value);output.push(result(action.fieldId,'verified','pending-readback',entry));continue;
+      }
+      if (!Object.hasOwn(action,'expectedValue') || value!==action.expectedValue || value!==original.field.value) {output.push(result(action.fieldId,'conflict','value-changed',entry));continue;}
+      if (!empty && !action.overwrite) {output.push(result(action.fieldId,'conflict','existing-value',entry));continue;}
       if (entry.type==='checkbox' && typeof action.value!=='boolean') {output.push(result(action.fieldId,'failed','checkbox-requires-boolean',entry));continue;}
       if (entry.field.required && (target==='' || (entry.type==='checkbox' && target===false))) {output.push(result(action.fieldId,'failed','required-empty',entry));continue;}
-      if (entry.field.maxLength!==null && String(target).length>entry.field.maxLength) {output.push(result(action.fieldId,'failed','maxlength-exceeded',entry));continue;}
       // Native constraints can be checked on a detached clone before writing the live control.
       if (['text','textarea','email','tel','number','date','month'].includes(entry.type) && typeof entry.node.checkValidity==='function') {
         const probe=entry.node.cloneNode(false);probe.removeAttribute('id');probe.removeAttribute('name');probe.value=String(target);
@@ -284,10 +468,11 @@
     }
     await wait(500);
     const final=collect();
+    const continuation=relocate(initial,final,applied);
     for (let i=0;i<output.length;i++) {
       const item=output[i];if(!applied.has(item.fieldId))continue;
-      const entry=final.entries.find(x=>x.field.id===item.fieldId);
-      if(final.report.origin!==plan.origin || final.report.path!==plan.path) output[i]=result(item.fieldId,'failed','page-changed');
+      const entry=final.entries.find(x=>x.field.id===continuation.fieldMap[item.fieldId]);
+      if(location.href!==initialUrl || final.report.origin!==plan.origin || final.report.path!==plan.path) output[i]=result(item.fieldId,'failed','page-changed');
       else if(!entry) output[i]=result(item.fieldId,'failed','field-disappeared');
       else if(!retained(entry,applied.get(item.fieldId))) output[i]=result(item.fieldId,'failed','value-not-retained',entry);
       else if(adapters?.validationError(entry)) output[i]={...result(item.fieldId,'failed','validation-failed',entry),validationMessage:adapters.validationError(entry)};
@@ -299,7 +484,7 @@
       }
     }
     const summary={verified:0,failed:0,conflict:0,manual:0};output.forEach(x=>summary[x.status]++);
-    return {results:output,summary,submitted:false,saveState:'unconfirmed',warnings:final.report.fingerprint!==initial.report.fingerprint?[{code:'structure-changed',message:'页面字段结构发生变化，请重新扫描'}]:[]};
+    return {results:output,summary,scan:final.report,...continuation,submitted:false,saveState:'unconfirmed',warnings:final.report.fingerprint!==initial.report.fingerprint?[{code:'structure-changed',message:'页面字段结构发生变化，已重新识别'}]:[]};
   }
   function highlight(fieldId) {
     const entry=collect().entries.find(x=>x.field.id===fieldId);if(!entry)return false;
@@ -307,5 +492,5 @@
     const old=entry.node.style.outline;entry.node.style.outline='3px solid #416a70';
     setTimeout(()=>{entry.node.style.outline=old;},1600);return true;
   }
-  return {scan,apply,highlight};
+  return {scan,apply,highlight,inspectOptions,expandRecords};
 });

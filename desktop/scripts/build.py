@@ -3,6 +3,8 @@
 import argparse
 import ast
 import os
+import json
+import platform
 import shutil
 import subprocess
 import sys
@@ -24,6 +26,7 @@ def main():
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--skip-runtime', action='store_true', help='Reuse an already-built data component')
     parser.add_argument('--skip-install', action='store_true', help='Reuse local build dependencies')
+    parser.add_argument('--keep-bundle', action='store_true', help='Keep the unpacked macOS App for explicit native debugging')
     args = parser.parse_args()
     os.chdir(DESKTOP)
     venv = DESKTOP / '.venv'
@@ -40,7 +43,7 @@ def main():
     if not args.skip_install:
         if not python.exists():
             run([sys.executable, '-m', 'venv', venv])
-        run([python, '-m', 'pip', 'install', '--cache-dir', DESKTOP/'build/pip-cache', 'pyinstaller>=6.16,<7', 'cryptography>=42,<47', 'pypdf>=5,<7'])
+        run([python, '-m', 'pip', 'install', '--cache-dir', DESKTOP/'build/pip-cache', 'pyinstaller>=6.16,<7', 'cryptography>=42,<47', 'pypdf>=5,<7', 'tzdata>=2025.2'])
         npm = shutil.which('npm.cmd' if os.name == 'nt' else 'npm')
         if not npm:
             raise SystemExit('Source builds require Node.js/npm. Installed app users do not need them.')
@@ -91,7 +94,7 @@ def main():
                    '--onedir', '--distpath', runtime, '--workpath', DESKTOP/'build/pyinstaller',
                    '--specpath', DESKTOP/'build', '--paths', stage/'app', '--paths', stage/'app/脚本',
                    '--additional-hooks-dir', hooks,
-                   '--collect-all', 'cryptography']
+                   '--collect-all', 'cryptography', '--collect-all', 'tzdata']
         for path in sources:
             destination = path.name if path.is_dir() else '.'
             command += ['--add-data', str(path)+separator+destination]
@@ -107,6 +110,19 @@ def main():
     run(privacy_check+[DESKTOP/'src-tauri/runtime/toudi-runtime'], env=env)
     bundle = DESKTOP/'src-tauri/target'/('debug' if args.debug else 'release')/'bundle'
     run(privacy_check+[bundle], env=env)
+    if sys.platform=='darwin' and not args.keep_bundle:
+        app=bundle/'macos/TouDi.app'
+        if app.is_dir():
+            version=json.loads((DESKTOP/'src-tauri/tauri.conf.json').read_text())['version']
+            architecture='arm64' if platform.machine()=='arm64' else 'x64'
+            package=app.parent/f'TouDi_{version}_macos_{architecture}.zip'
+            temporary=package.with_suffix('.pending.zip');temporary.unlink(missing_ok=True)
+            run(['ditto','-c','-k','--sequesterRsrc','--keepParent',app,temporary])
+            temporary.replace(package)
+            register=Path('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister')
+            if register.exists(): subprocess.run([str(register),'-u',str(app)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+            shutil.rmtree(app)
+            print('macOS App archived (no duplicate application entry): '+str(package))
     print('Built TouDi: '+str(DESKTOP/'src-tauri/target'/('debug' if args.debug else 'release')/'bundle'))
 
 

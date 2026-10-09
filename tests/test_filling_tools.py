@@ -120,7 +120,16 @@ class FillingToolsTests(unittest.TestCase):
     def test_extension_bundle_contains_only_code_and_shared_engine(self):
         with zipfile.ZipFile(io.BytesIO(extension_bundle())) as bundle:
             names=bundle.namelist()
-            self.assertEqual(len(names),16)
+            expected = {
+                'agent-config.js', 'filling-aliases.js', 'filling-core.js',
+                'filling-workflow.js', 'manifest.json', 'interface.css',
+                'interface-motion.js', 'options.css', 'options.html', 'options.js',
+                'profile-library.js', 'profile-view.js', 'sync-core.js', 'popup.css',
+                'popup.html', 'popup.js', 'panel-host.js', 'panel-worker.js',
+                'worker.js', 'form-adapters.js', 'form-engine.js', 'logo.svg',
+            }
+            self.assertEqual(set(names), {'TouDi-filling/' + name for name in expected})
+            self.assertEqual(len(names),len(expected))
             self.assertIn('TouDi-filling/form-adapters.js',names)
             self.assertIn('TouDi-filling/sync-core.js',names)
             self.assertIn('TouDi-filling/profile-library.js',names)

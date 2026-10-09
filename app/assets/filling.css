@@ -1,5 +1,5 @@
-.filling-dialog{margin:auto;position:fixed;inset:0;overflow:hidden;width:min(920px,calc(100vw - 48px));max-height:calc(100dvh - 64px);padding:0;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);box-shadow:0 20px 70px #152d3426;font:inherit}
-.filling-dialog::backdrop{background:#172d3659;backdrop-filter:blur(3px)}
+.filling-dialog{margin:auto;position:fixed;inset:0;overflow:hidden;width:min(920px,calc(100vw - 48px));max-height:calc(100dvh - 64px);padding:0;border:1px solid var(--border);border-radius:var(--ui-radius-dialog);background:var(--card);color:var(--text);box-shadow:var(--ui-shadow-dialog);font:inherit}
+.filling-dialog::backdrop{background:#172d363d;backdrop-filter:blur(2px)}
 .filling-head{flex:0 0 auto;padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
 .filling-head h2{font-size:20px;margin:0 0 5px}
 .filling-head p{margin:0;color:var(--text3);font-size:12px}
@@ -35,7 +35,7 @@
 .filling-head h2{font-size:18px}
 }
 
-.filling-dialog[open]{display:flex;flex-direction:column}
+.filling-dialog[open]{display:flex;flex-direction:column;animation:ui-panel-enter var(--ui-motion-enter) var(--ui-ease)}
 
 @media(max-width:760px){.topbar:has(#fillingEntry){flex-wrap:wrap}.topbar-actions:has(#fillingEntry){width:100%;min-width:0;flex:1 1 100%;justify-content:flex-start;flex-wrap:wrap}}
 
@@ -56,6 +56,7 @@
 
 .filling-footer{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:12px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)}
 .filling-footer a{color:var(--primary);text-decoration:underline;text-underline-offset:3px}
+.filling-footer .action-link{text-decoration:none}
 html[data-profile-workspace] #panel-agent{display:none!important}
 html[data-profile-workspace] main{max-width:1100px}
 @media(max-width:480px){html[data-profile-workspace] .section-title{flex-wrap:wrap;align-items:flex-start}html[data-profile-workspace] .section-title>button{white-space:nowrap}.filling-footer{padding:10px 18px;gap:8px 14px}}

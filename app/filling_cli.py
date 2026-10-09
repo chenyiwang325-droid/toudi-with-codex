@@ -22,6 +22,7 @@ def main(argv=None):
     preview.add_argument('--profile', default=None, help='资料版本 ID；默认使用资料包中的首个版本')
     preview.add_argument('--scan', required=True)
     preview.add_argument('--mappings', help='已核对的 fieldId 到 factKey JSON 文件')
+    preview.add_argument('--record-bindings', help='已核对的 groupId 到 recordId JSON 文件；一次绑定整段经历')
     preview.add_argument('--output', required=True)
     args = parser.parse_args(argv)
     if args.command == 'export':
@@ -43,7 +44,8 @@ def main(argv=None):
         else:
             scan = _validate_scan(json.loads(Path(args.scan).read_text(encoding='utf-8')))
             mappings = json.loads(Path(args.mappings).read_text(encoding='utf-8')) if args.mappings else None
-            plan = plan_fields(profile, scan, mappings)
+            bindings = json.loads(Path(args.record_bindings).read_text(encoding='utf-8')) if args.record_bindings else None
+            plan = plan_fields(profile, scan, mappings, record_bindings=bindings)
             plan.pop('actions', None)
             for row in plan['rows']:
                 row.pop('value', None); row.pop('expectedValue', None)

@@ -13,6 +13,7 @@ use std::{
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
+mod calendar;
 
 struct Runtime {
     child: Option<Child>,
@@ -23,6 +24,22 @@ struct Runtime {
     error: Option<String>,
 }
 struct AppState(Mutex<Runtime>);
+
+#[tauri::command]
+async fn calendar_action(action: String, request: Option<serde_json::Value>, state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    if action == "sync" {
+        use sha2::{Digest, Sha256};
+        let expected = {
+            let runtime = state.0.lock().map_err(|e| e.to_string())?;
+            let root = runtime.workspace.canonicalize().map_err(|_| "当前工作区不可用")?;
+            format!("{:x}", Sha256::digest(root.to_string_lossy().as_bytes()))
+        };
+        if request.as_ref().and_then(|r| r.get("workspaceKey")).and_then(|v| v.as_str()) != Some(expected.as_str()) {
+            return Err("日历请求不属于当前工作区，请重新读取日程。".into());
+        }
+    }
+    calendar::calendar_action(action, request).await
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,7 +62,7 @@ struct BackendResponse {
 // Opt-in local development diagnostics; never enabled by a normal app launch.
 // It records only structure/layout and snapshots this app's own WebView.
 #[tauri::command]
-fn native_render_report(
+async fn native_render_report(
     window: tauri::WebviewWindow,
     mut report: serde_json::Value,
 ) -> Result<(), String> {
@@ -55,9 +72,15 @@ fn native_render_report(
     if text.len() > 65536 {
         return Err("诊断超出范围".into());
     }
-    std::fs::write(path, text).map_err(|e| e.to_string())?;
+    let path = PathBuf::from(path);
+    let pending = path.with_extension("pending.json");
+    std::fs::write(&pending, text).map_err(|e| e.to_string())?;
+    std::fs::rename(pending, path).map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     if let Some(path) = std::env::var_os("TOUDI_RENDER_SNAPSHOT") {
+        let snapshot_phase = if std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("workspace-live-update") {
+            report["phase"].as_str().filter(|phase| matches!(*phase, "initial" | "automatic" | "manual" | "failed")).map(str::to_owned)
+        } else { None };
         window.with_webview(move |raw| unsafe {
             use objc2::{class, msg_send, runtime::AnyObject};
             let path = PathBuf::from(path);
@@ -71,14 +94,32 @@ fn native_render_report(
                 if png.is_null() { return; }
                 let bytes: *const u8 = msg_send![png, bytes];
                 let length: usize = msg_send![png, length];
-                let _ = std::fs::write(&path, std::slice::from_raw_parts(bytes, length));
+                let pixels = std::slice::from_raw_parts(bytes, length);
+                let _ = std::fs::write(&path, pixels);
+                if let Some(phase) = &snapshot_phase {
+                    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+                    let phased_path = path.with_file_name(format!("{stem}_{phase}.png"));
+                    let _ = std::fs::write(phased_path, pixels);
+                }
             });
             let view: &AnyObject = &*raw.inner().cast();
             let _: () = msg_send![view, takeSnapshotWithConfiguration: std::ptr::null::<AnyObject>(), completionHandler: &*completion];
         }).map_err(|e| e.to_string())?;
     }
     #[cfg(not(target_os = "macos"))]
-    let _ = window;
+    let _ = &window;
+    // A diagnostic run must leave by the normal exit path, otherwise macOS
+    // offers to restore the interrupted test window on the user's next launch.
+    if std::env::var("TOUDI_RENDER_AUTO_EXIT").as_deref() == Ok("1")
+        && std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("workspace-live-update")
+        && matches!(report["phase"].as_str(), Some("manual" | "failed"))
+    {
+        let app = window.app_handle().clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(750));
+            app.exit(0);
+        });
+    }
     Ok(())
 }
 
@@ -473,11 +514,20 @@ fn main() {
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_secs(2));
                     if let Ok(view) = std::env::var("TOUDI_RENDER_VIEW") {
-                        if ["table","kanban","charts","qbank","company","prospect","review","settings","agent-settings","data-settings","preference-settings","education-preferences","industry-preferences","filling"].contains(&view.as_str()) {
+                        if ["table","kanban","charts","qbank","company","prospect","review","settings","agent-settings","data-settings","preference-settings","education-preferences","industry-preferences","filling","schedule","schedule-month","recruitment-detail","recruitment-followup","recruitment-materials","refresh-stability","workspace-live-update"].contains(&view.as_str()) {
                             let _ = webview.eval(format!("window.__TOUDI_DIAG_VIEW__ = '{view}';"));
                         }
                     }
-                    let _ = webview.eval(include_str!("render_check.js"));
+                    if std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("workspace-live-update") {
+                        // This flow verifies an open, visible reader. A GUI
+                        // process started by the test runner is not activated
+                        // by LaunchServices and WKWebView may suspend timers.
+                        let _ = webview.window().show();
+                        let _ = webview.window().set_focus();
+                        let _ = webview.eval(include_str!("workspace_refresh_check.js"));
+                    } else {
+                        let _ = webview.eval(include_str!("render_check.js"));
+                    }
                 });
             }
         })
@@ -518,6 +568,7 @@ fn main() {
             select_workspace,
             save_file,
             export_reading,
+            calendar_action,
             native_render_report
         ])
         .build(context)

@@ -14,9 +14,9 @@ from urllib.parse import urlsplit
 import filling_profile
 
 EXTENSION_FILES = (
-    'agent-config.js', 'filling-aliases.js', 'filling-core.js', 'manifest.json',
-    'options.css', 'options.html', 'options.js', 'profile-library.js', 'sync-core.js', 'popup.css', 'popup.html',
-    'popup.js', 'worker.js',
+    'agent-config.js', 'filling-aliases.js', 'filling-core.js', 'filling-workflow.js', 'manifest.json', 'interface.css', 'interface-motion.js',
+    'options.css', 'options.html', 'options.js', 'profile-library.js', 'profile-view.js', 'sync-core.js', 'popup.css', 'popup.html',
+    'popup.js', 'panel-host.js', 'panel-worker.js', 'worker.js',
 )
 
 

@@ -1,0 +1,2 @@
+# Preserve bundled dependencies exactly as distributed upstream.
+app/assets/vendor/** -whitespace

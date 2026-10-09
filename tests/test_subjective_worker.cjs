@@ -10,7 +10,8 @@ vm.createContext(c);vm.runInContext(src.slice(src.indexOf('// Subjective answers
  for(const label of ['家庭描述','验证码','同意协议','身份证优势','邮箱'])assert.equal(c.subjectiveField({label,type:'textarea'}),false);
  assert.equal(c.subjectiveField({label:'个人评价',type:'select'}),false);
  for(const label of ['兴趣爱好','专业技能','优劣势'])assert.equal(c.subjectiveField({label,type:'textarea'}),true);
- const request=await c.answerRequest(state,'q');assert.deepEqual(Array.from(request.sources,s=>s.key),['project.description']);
+ facts.push({key:'award.long',label:'竞赛分工',module:'awards',recordLabel:'合成竞赛',value:'完整核对后的分工长稿',manual:true,answerSource:true},{key:'award.conflict',label:'竞赛分工',module:'awards',value:'冲突版本',manual:true},{key:'project.secret',label:'项目电话',module:'project',value:'13900000000',manual:true,answerSource:true},{key:'project.hidden',label:'项目职责',module:'project',value:'隐藏材料',manual:true,answerSource:true,sensitive:true});
+ const request=await c.answerRequest(state,'q');assert.deepEqual(Array.from(request.sources,s=>s.key),['project.description','award.long']);
  await assert.rejects(()=>c.answerRequest(state,'unknown'));
  const generated=await c.answerOperation({fieldId:'q'});assert.equal(generated.answerDraft.approved,false);assert.equal(generated.answerDraft.sourceLabels[0],'合成项目 · 项目职责');assert(!generated.plan.rows);
  assert.throws(()=>c.validateAnswer(request,{answer:'x'.repeat(16),sourceKeys:['project.description'],uncertainties:[]}));

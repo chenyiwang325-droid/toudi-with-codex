@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSCalendarsUsageDescription</key><string>TouDi 在您主动连接日历后，将您的求职日程同步到所选日历，并读取已绑定日程以避免覆盖外部修改。</string>
+<key>NSCalendarsFullAccessUsageDescription</key><string>TouDi 需要读取并更新您主动同步的日程，以识别外部修改。仅处理您所选日历内由 TouDi 创建并绑定的事件。</string>
+</dict></plist>

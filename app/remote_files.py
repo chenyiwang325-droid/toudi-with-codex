@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit, unquote
 DATA_FILES = {
     '投递记录.json': None, '用户编辑数据.json': 'edits', '逐字稿数据.json': 'categories',
     '面试准备数据.json': 'preps', '面试复盘数据.json': 'sessions', '工作区配置.json': 'schemaVersion',
+    '日程数据.json': 'events',
 }
 MATERIAL_DIRS = {'面试准备', '岗位探查', '复盘'}
 EXTENSIONS = {'.md', '.txt', '.pdf', '.docx', '.png', '.jpg', '.jpeg', '.webp', '.json', '.xlsx'}
@@ -121,6 +122,9 @@ def check_content(relative, content, validate_records):
         key = DATA_FILES.get(Path(relative).name, 'companies')
         if Path(relative).name == '投递记录.json':
             validate_records(d)
+        elif Path(relative).name == '日程数据.json':
+            from schedule_store import validate
+            validate(d)
         elif not isinstance(d, dict):
             raise ValueError('JSON material root must be an object')
         elif key == 'edits':

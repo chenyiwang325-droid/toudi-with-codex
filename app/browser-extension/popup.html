@@ -1,15 +1,26 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TouDi · 辅助填报</title><link rel="stylesheet" href="popup.css"></head>
-<body><header><img src="logo.svg" width="26" height="26" alt=""><div><strong>TouDi · 辅助填报</strong><small id="runtimeVersion">本地资料 · 当前网页</small></div><button id="settings" class="quiet">资料与设置</button></header>
-<main><p id="workspaceSync" class="caption" role="status" hidden></p>
-  <section id="empty"><h1>先填写自己的资料</h1><p>保存一次个人、教育和经历资料，以后在网申页面直接识别与填写。</p><button id="importStart" class="primary">打开资料库</button><p class="caption">基本填写可独立使用。Agent 协作可在设置中自行选择。</p></section>
-  <section id="controls" hidden><div class="profile"><label for="profile">本次资料版本</label><select id="profile"><option value="general">默认资料</option></select></div><p id="sourceStatus" class="caption"></p><button id="scan" class="primary">识别当前页面</button><button id="openCopyLibrary">查看资料与手动复制</button><p class="caption">默认保留已有内容；填写后逐项读回核验。</p><label id="autoAgentRow" class="check"><input id="autoAgent" type="checkbox">识别后自动用所选模型核对歧义</label></section>
-  <section id="copyLibrary" hidden><h2>我的资料 · 手动复制</h2><p class="caption">无需识别网页。按本次资料版本查看，点击复制后可自行粘贴到不支持的控件。</p><label for="copyModule">资料分类</label><select id="copyModule"></select><div id="copyRecords"></div></section>
-  <p id="notice" role="status" hidden></p>
-  <section id="structureFeedback" aria-live="polite" hidden></section>
-  <section id="agentFeedback" aria-live="polite" hidden></section>
-  <section id="review" hidden></section>
-  <section id="agent" hidden><h2>核对歧义字段</h2><p>不确定的字段由你选择的 Agent 匹配到已有资料；具体填写值留在本地。</p><div class="buttons"><button id="structureCli">补充页面结构</button><button id="agentCli">配置 Agent 协作</button><button id="agentSettings" class="quiet">协作设置</button></div><p id="agentConnectionStatus" class="caption"></p><details id="agentTransfer"><summary>复制任务与导入结果</summary><p>把字段结构交给自己正在使用的 Agent，再导入返回的匹配。</p><button id="structureCopy">复制结构适配任务</button><button id="agentCopy">复制匹配任务</button><label for="agentResult">Agent 返回的 JSON 匹配</label><textarea id="agentResult" rows="3" placeholder='{"字段id":"资料键"}' spellcheck="false"></textarea><label class="check"><input id="remember" type="checkbox">记住本页匹配（页面结构变化后失效）</label><button id="structureImport">导入结构适配 JSON</button><button id="agentImport">导入并重新核对</button></details><button id="agentCheck" class="quiet">检查 Codex 连接</button></section>
-  <section id="answerBox" hidden><h2>主观题问答草稿</h2><p id="answerQuestion"></p><p class="caption">仅把当前版本的教育、经历、技能和评价资料交给你选择的 Agent。生成内容为草稿，预览采纳后才可选择填入。</p><div class="buttons"><button id="answerGenerate">用所选模型生成</button><button id="answerCopy">复制单题任务</button></div><label for="answerImportText">外部 Agent 返回 JSON</label><textarea id="answerImportText" rows="3" spellcheck="false" placeholder='{"answer":"回答","sourceKeys":["资料键"],"uncertainties":[]}'></textarea><button id="answerImport">导入草稿</button><label for="answerText">可编辑的回答草稿</label><textarea id="answerText" rows="6"></textarea><p id="answerEvidence" class="caption"></p><button id="answerApprove" class="primary">采纳草稿，加入待选填写</button></section>
-  <section id="result" hidden></section>
-<nav class="extension-links" aria-label="关联工作台"><button id="openWorkbench" class="quiet">打开投递中控台</button><a href="https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/辅助填报.md" target="_blank" rel="noreferrer">安装与使用</a></nav></main><footer id="actions" hidden><span id="selectionCount"></span><button id="fill" class="primary">填写所选字段</button></footer><script src="agent-config.js"></script><script src="popup.js"></script></body></html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TouDi · 辅助填报</title><link rel="stylesheet" href="interface.css"><link rel="stylesheet" href="popup.css"><script src="interface-motion.js" defer></script></head>
+<body>
+<header><img src="logo.svg" width="25" height="25" alt=""><strong>TouDi · 辅助填报</strong><small id="runtimeVersion" class="sr-only"></small><button id="settings" class="quiet">资料与设置</button></header>
+<nav class="panel-tabs" role="tablist" aria-label="填报工具"><button id="tabFill" role="tab" aria-selected="true" aria-controls="fillPane">自动填写</button><button id="tabLibrary" role="tab" aria-selected="false" aria-controls="copyLibrary" tabindex="-1">我的资料</button></nav>
+<main>
+<p id="workspaceSync" class="caption" role="status" hidden></p>
+<section id="empty"><h1>先添加自己的资料</h1><p>保存个人信息和经历，再回到招聘网页填写。</p><button id="importStart" class="primary">打开资料库</button></section>
+<section id="controls" hidden><div class="profile"><label for="profile">资料版本</label><select id="profile"><option value="general">默认资料</option></select></div></section>
+<p id="notice" role="status" hidden></p>
+<section id="fillPane" role="tabpanel" aria-labelledby="tabFill">
+  <div class="fill-intro"><h1>填写当前网页</h1><button id="scan" class="quiet">重新识别</button></div>
+  <section id="scanSummary" aria-live="polite"><p>正在识别网页中的填写内容…</p></section>
+  <div class="fill-actions"><label class="sr-only" for="fillMode">填写范围</label><select id="fillMode"><option value="all">填写全部内容</option><option value="empty">仅填空白</option></select><button id="reviewAgent" disabled>Agent 核对</button><button id="fill" class="primary" disabled>自动填写</button></div>
+  <p id="progress" role="status" hidden></p>
+  <p id="reviewResult" class="caption" role="status" hidden></p>
+  <details id="reviewDetails" class="review-details" hidden><summary id="reviewDetailsSummary">查看核对结果</summary><div id="reviewItems"></div></details>
+  <section id="result" aria-live="polite" hidden></section>
+  <section id="scanGroups" aria-label="已识别的填写内容"></section>
+  <button id="browseFallback" class="text-button">查找资料并复制填写</button>
+</section>
+<section id="copyLibrary" role="tabpanel" aria-labelledby="tabLibrary" hidden><div class="library-search"><label class="sr-only" for="copySearch">搜索资料</label><input id="copySearch" type="search" placeholder="搜索字段、经历或内容"><span id="copyCount" class="caption" role="status"></span></div><div class="library-layout"><nav id="copyDirectory" aria-label="资料分类目录"></nav><div class="library-content"><div id="copyRecords" tabindex="0" aria-label="资料内容"></div></div></div></section>
+</main>
+<footer><button id="openWorkbench" class="text-button">打开投递中控台</button></footer>
+<script src="profile-view.js"></script><script src="agent-config.js"></script><script src="filling-workflow.js"></script><script src="popup.js"></script>
+</body></html>

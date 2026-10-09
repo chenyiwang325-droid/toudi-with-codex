@@ -56,6 +56,7 @@
       return path;
     },
     exportReading: () => invoke('export_reading'),
+    calendar: (action, request = null) => invoke('calendar_action', {action, request}),
     saveBlob: async (blob, name) => {
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const chunks = [];

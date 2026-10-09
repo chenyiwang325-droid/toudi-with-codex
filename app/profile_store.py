@@ -60,7 +60,7 @@ def validate_pack(value):
         if (isinstance(content, bool) or not isinstance(content, (str, int, float))
                 or isinstance(content, float) and not math.isfinite(content) or len(str(content)) > 24000):
             raise ValueError('填报字段内容无效。')
-        if fact.get('module') not in {'personal', 'education', 'internship', 'project', 'language', 'campus-role', 'awards', 'publications'}:
+        if fact.get('module') not in {'personal', 'education', 'internship', 'project', 'language', 'campus-role', 'awards', 'publications', 'family'}:
             raise ValueError('填报资料模块无效。')
         members = fact.get('profiles')
         if not isinstance(members, list) or not members or any(not isinstance(p, str) or p not in ids for p in members):
@@ -71,6 +71,7 @@ def validate_pack(value):
         aliases = fact.get('aliases', [])
         if not isinstance(aliases, list) or len(aliases) > 80 or any(not isinstance(a, str) or not a.strip() or len(a) > 1000 for a in aliases):
             raise ValueError('字段别名无效。')
+        if 'answerSource' in fact and not isinstance(fact['answerSource'],bool):raise ValueError('问答资料许可需要为布尔值。')
         validate_date_policy(fact)
     rules = value.get('rules', [])
     if not isinstance(rules, list) or any(not isinstance(r, str) or len(r) > 12000 for r in rules):

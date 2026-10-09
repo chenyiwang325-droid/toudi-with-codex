@@ -1,0 +1,26 @@
+'use strict';
+const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const extension='chrome-extension://fixture/',store={},calls=[];let action,activeTab=7;
+const tabRecords={7:{id:7,windowId:3,url:'https://careers.invalid/form'},11:{id:11,windowId:5,url:'about:blank'}};
+const chrome={runtime:{id:'fixture',getURL:p=>extension+p},storage:{session:{get:async key=>({[key]:store[key]}),set:async value=>Object.assign(store,value),remove:async key=>delete store[key]}},tabs:{get:async id=>tabRecords[id],query:async q=>q.windowId===5?[tabRecords[11]]:[{...tabRecords[7],id:activeTab}],update:async(id,props)=>Object.assign(tabRecords[id],props),onRemoved:{addListener(){}}},scripting:{executeScript:async args=>calls.push(args)},windows:{create:async args=>{calls.push({window:args});return {id:5};},update:async(id,props)=>calls.push({updatedWindow:id,...props}),remove:async id=>calls.push({removedWindow:id})},action:{onClicked:{addListener:fn=>action=fn},setBadgeText:async()=>{},setTitle:async()=>{}}};
+const context=vm.createContext({chrome,crypto:require('node:crypto').webcrypto,URL,Set,Number});vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../app/browser-extension/panel-worker.js'),'utf8'),context);
+(async()=>{
+ await action(tabRecords[7]);const session=store['toudiPanel:7'];assert(session);assert.equal(calls.length,2);
+ const message={op:'copy-library',panelTabId:7,panelToken:session.token},sender={id:'fixture',url:session.url,tab:{id:7},frameId:2};
+ assert.equal(await context.trustedPanelSender(message,sender),true);
+ assert.equal(await context.trustedPanelSender(message,{...sender,tab:{id:9}}),false);
+ assert.equal(await context.trustedPanelSender({...message,panelToken:'wrong'},sender),false);
+ assert.equal(await context.trustedPanelSender({...message,op:'profile-delete'},sender),false);
+ assert.equal(await context.trustedPanelSender(message,{...sender,url:'https://careers.invalid/form'}),false);
+ assert.equal(await context.trustedPanelSender({op:'state'},{id:'fixture',url:extension+'popup.html',tab:{id:7},frameId:2}),false);
+ assert.equal(await context.trustedPanelSender({op:'state'},{id:'fixture',url:extension+'popup.html',tab:{id:9},frameId:0}),true);
+ assert.equal(await context.trustedPanelSender({...message,op:'panel-ready'},sender),true);
+ assert.equal(await context.trustedPanelSender({...message,op:'agent-review'},sender),true);
+ assert.equal(await context.trustedPanelSender({...message,op:'panel-fallback'},sender),false,'Separate-window recovery is removed');
+ assert.equal(await context.trustedPanelSender(message,{...sender,url:session.url+'&window=1',tab:{id:11,windowId:5},frameId:0}),false);
+ tabRecords[7].url='https://careers.invalid/other';await assert.rejects(context.trustedPanelSender(message,sender),/对应的招聘页面/);await action(tabRecords[7]);assert.notEqual(store['toudiPanel:7'].token,session.token);assert.equal(await context.trustedPanelSender(message,sender),false);
+ const fresh=store['toudiPanel:7'];activeTab=8;await assert.rejects(context.trustedPanelSender({...message,panelToken:fresh.token},{...sender,url:fresh.url}),/对应的招聘页面/);activeTab=7;
+ await action({id:9,url:'chrome://newtab'});assert.equal(calls.filter(c=>c.window).length,0,'All toolbar paths stay page-bound; no new browser window');
+ const manifest=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../app/browser-extension/manifest.json')));assert(!manifest.action.default_popup);assert(!manifest.host_permissions);assert.deepEqual(manifest.permissions,['activeTab','scripting','storage','nativeMessaging']);
+ console.log('PASS per-page panel authorization: action token/tab/URL, trusted ready acknowledgement, optional review, reject forged/cross-tab/standalone/fallback/unsupported operations, restricted page does not open a window, no added permissions');
+})().catch(e=>{console.error(e);process.exitCode=1});

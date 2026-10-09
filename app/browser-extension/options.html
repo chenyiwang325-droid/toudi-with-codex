@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>TouDi · 填报资料与设置</title>
+  <link rel="stylesheet" href="interface.css">
   <link rel="stylesheet" href="options.css">
+  <script src="interface-motion.js" defer></script>
 </head>
 <body>
 <header class="page-header">
@@ -26,28 +28,32 @@
       <div class="profile-control"><label id="profileLabel" for="profile">资料版本</label><select id="profile" aria-labelledby="profileLabel"><option value="general">默认资料</option></select><button id="manageVersions">管理版本</button></div>
       <div class="search-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="搜索资料" aria-label="搜索资料"></div>
     </div>
-    <p id="factCount" class="result-count"></p>
-    <div id="facts" aria-live="polite"></div>
+    <div class="profile-browser"><nav id="profileDirectory" aria-label="资料模块目录"><p id="factCount" class="result-count"></p><div id="profileDirectoryItems"></div></nav><div id="facts" aria-live="polite"></div></div>
   </section>
   <section id="panel-rules" class="settings-panel" role="tabpanel" aria-labelledby="tab-rules" hidden>
     <div class="section-title"><h2>填写要求</h2><button id="editRules" disabled>编辑填写规则</button></div>
     <p class="section-intro">保留每次填报需要遵循的资料口径和个人要求。</p>
     <div id="rules"><p>尚未保存额外填写要求。</p></div>
-    <p class="hint section-note">日期精度、经历归属、选项和长度由表单引擎检查；新增的自然语言规则需要在填写计划中人工核对。</p>
+    <p class="hint section-note">填写使用已确认的完整资料。补充规则供自己的 Agent 参考。</p>
   </section>
   <section id="panel-agent" class="settings-panel" role="tabpanel" aria-labelledby="tab-agent" hidden>
-    <h2>Agent 协作</h2><p class="section-intro">首次选择自己的协作方式与模型，之后在这里调整。明确字段始终先用本地规则匹配。</p>
-    <div class="setting-row"><div><strong>协作方式</strong><p>Codex 可直接核对；其他 Agent 使用复制任务、导入结果。</p></div><select id="agentMode" aria-label="协作方式"><option value="">暂不接入 Agent</option><option value="codex">本机 Codex · 现有额度</option><option value="external">使用自己的 Agent</option></select></div>
+    <h2>Agent 协作</h2><p class="section-intro">选择自己的协作方式与模型。网页先自动识别；需要时点击“Agent 核对”，查看结果后再点击“自动填写”。</p>
+    <div class="setting-row"><div><strong>协作方式</strong><p>推荐本机 Codex 与 Luna；核对使用 ChatGPT 登录的现有额度。</p></div><select id="agentMode" aria-label="协作方式"><option value="">暂不接入 Agent</option><option value="codex">本机 Codex（推荐）</option><option value="external">其他 Agent · 兼容接入</option></select></div>
     <div id="codexSettings" hidden>
       <div class="setting-row"><div><strong>本机 Codex 连接</strong><p id="codexStatus">检查连接后，从当前客户端的模型目录选择。</p></div><button id="checkCodex">检查连接与模型</button></div>
-      <div class="setting-row"><div><strong>核对模型</strong><p>由你指定；不可用时保留原计划，不替换模型。</p></div><select id="agentModel" aria-label="核对模型"><option value="">先检查连接，再选择模型</option></select></div>
-      <div class="setting-row"><div><strong>识别后自动核对</strong><p>开启后仅对歧义字段调用所选模型，消耗现有 Codex 额度。</p></div><label class="switch"><input id="autoAgent" type="checkbox" role="switch" aria-label="识别后自动核对歧义"><span aria-hidden="true"></span></label></div>
+      <div class="setting-row"><div><strong>核对模型</strong><p>推荐 gpt-6-luna。只从实际目录选择；不可用时保留计划，不更换模型。</p></div><select id="agentModel" aria-label="核对模型"><option value="">先检查连接，再选择模型</option></select></div>
     </div>
-    <div id="externalSettings" class="agent-instructions" hidden><ol><li>在招聘网页点击插件，先识别并查看填写计划。</li><li>点击「复制匹配任务」，交给自己正在使用的 Agent。</li><li>将返回的 JSON 粘贴到插件，点击「导入并重新核对」。</li></ol><p>无需本机连接工具。使用哪个 Agent、模型与账号由你决定；费用按你已有工具的使用方式确定。</p></div>
+    <div id="externalSettings" class="agent-instructions" hidden><ol><li>在招聘网页点击「自动填写」，建立当前网页的对应资料。</li><li>在下方「补充任务」复制匹配任务，交给自己的 Agent。</li><li>将返回的 JSON 粘贴到下方，导入后应用到当前网页。</li></ol><p>无需本机连接工具。使用哪个 Agent、模型与账号由你决定；费用按你已有工具的使用方式确定。</p></div>
     <div class="agent-save"><button id="saveAgent" class="primary">保存协作设置</button><span id="agentSummary" class="hint">尚未配置 Agent；本地识别与填写可用。</span></div>
-    <p class="hint section-note">字段核对只发送字段说明与候选资料键。主动生成主观题草稿时，会把所选资料版本的相关经历内容交给你指定的 Agent，并排除身份、联系方式、家庭信息及标为敏感的字段；草稿经你采纳后才进入填写计划。连接检查不发起生成。</p>
+    <p class="hint section-note">核对只使用当前字段、网页实际选项及对应的非敏感资料。固定内容按完整原文填写；主观回答可在下方补充任务中生成并编辑。</p>
+    <details class="disclosure" id="agentTools"><summary><span>补充任务</span><span class="disclosure-action">展开</span></summary><div class="disclosure-body">
+      <p>为最近处理的招聘网页补充匹配或主观回答。外部 Agent 返回已有资料键与网页选项，不修改资料原文。</p>
+      <button id="loadAgentTarget">读取当前网页任务</button><p id="agentTargetStatus" class="hint"></p>
+      <div id="agentTaskTools" hidden><div class="buttons"><button id="copyMappingTask">复制匹配任务</button><button id="copyStructureTask">复制结构任务</button></div><label for="mappingResult">Agent 返回的 JSON</label><textarea id="mappingResult" rows="4"></textarea><div class="buttons"><button id="importMappingTask">导入匹配</button><button id="importStructureTask">导入结构</button><button id="applyAgentPlan">应用到当前网页</button></div>
+      <h3>主观回答</h3><label for="questionField">网页问题</label><select id="questionField"></select><div class="buttons"><button id="generateQuestion">生成回答</button><button id="copyQuestionTask">复制问答任务</button></div><label for="questionResult">外部 Agent 返回的回答 JSON</label><textarea id="questionResult" rows="3"></textarea><button id="importQuestion">导入回答</button><label for="questionDraft">回答草稿</label><textarea id="questionDraft" rows="6"></textarea><button id="approveQuestion">采纳并填入当前网页</button></div>
+    </div></details>
     <details class="disclosure"><summary><span>首次连接 Codex</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><ol><li>运行浏览器工具包中的「TouDi 浏览器连接」安装程序一次。</li><li>安装官方 Codex 客户端，并使用自己的 ChatGPT 账号登录。</li><li>选择「本机 Codex」，检查连接，选择模型并保存协作设置。</li></ol><p>Chrome 按需启动连接工具，日常无需打开中控台或终端。不需要 API Key 或新增模型服务；模型核对使用现有 Codex 额度。</p></div></details>
-    <p class="section-note"><a href="https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/辅助填报.md" target="_blank" rel="noreferrer">辅助填报安装与使用</a> · <a href="https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/开始与初始化.md" target="_blank" rel="noreferrer">中控台开始指南</a></p>
+    <p class="section-note"><a href="https://github.com/chenyiwang325-droid/toudi-with-codex/blob/main/docs/辅助填报.md" target="_blank" rel="noreferrer">辅助填报安装与使用</a> · <a href="https://github.com/chenyiwang325-droid/toudi-with-codex/blob/main/docs/开始与初始化.md" target="_blank" rel="noreferrer">中控台开始指南</a></p>
   </section>
   <section id="panel-data" class="settings-panel" role="tabpanel" aria-labelledby="tab-data" hidden>
     <h2>资料管理</h2><p class="section-intro">资料保存在当前 Chrome 的扩展本地存储中。</p>
@@ -57,18 +63,19 @@
     <details class="disclosure"><summary><span>清除本地资料</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><p>先导出备份。清除只影响这个浏览器中的插件副本。</p><button id="deleteProfile" class="danger" disabled>清除资料、匹配和核验记录</button></div></details>
   </section>
 </main>
-<dialog id="editor" aria-labelledby="editorTitle">
+<div id="inlineEditorHome" hidden></div>
+<section id="editor" class="inline-editor field-editor" aria-labelledby="editorTitle" hidden>
   <form id="editForm">
     <div class="dialog-head"><div class="section-title"><h2 id="editorTitle">编辑资料</h2><button type="button" id="closeEditor" aria-label="关闭资料编辑">关闭</button></div><p id="editorError" role="alert" hidden></p></div>
     <div class="dialog-body">
       <input id="factKey" type="hidden">
-      <div class="form-section"><h3>字段内容</h3><div class="pair"><div><label for="factModule">所属模块</label><select id="factModule"><option value="personal">个人信息</option><option value="education">教育经历</option><option value="internship">工作与实习</option><option value="project">项目经历</option><option value="language">语言能力</option><option value="campus-role">在校经历</option><option value="awards">荣誉获奖</option><option value="publications">论文发表</option></select></div><div><label for="factRecord">所属资料／经历</label><select id="factRecord"></select></div></div><p id="factContext" class="hint"></p><label for="factLabel">字段名称</label><input id="factLabel" required maxlength="200"><label for="factValue">已确认内容</label><textarea id="factValue" rows="4" required maxlength="24000"></textarea></div>
-      <details id="matchingOptions" class="disclosure"><summary><span>匹配与填写约束</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><label for="factAliases">字段别名（每行一个）</label><textarea id="factAliases" rows="3"></textarea><fieldset id="factVersionSection"><legend>适用资料版本</legend><div id="factProfiles" class="profile-checks"></div></fieldset><div class="pair"><div><label for="factPrecision">日期精度</label><select id="factPrecision"><option value="">非日期／按内容识别</option><option value="month">精确到月</option><option value="day">精确到日</option></select></div><div><label for="gpaScale">GPA 满分（如适用）</label><select id="gpaScale"><option value="">未知／不适用</option><option value="4.0">4.0</option><option value="5.0">5.0</option></select></div></div><div id="ongoingPolicy" hidden><label for="dateFallback">网站必须填写具体结束日期时</label><select id="dateFallback"><option value="">保留人工确认</option><option value="today">使用填写当天作为占位日期</option></select><p class="hint">资料仍保存「至今」。仅在明确的日期控件中使用当天日期，计划会注明此日期不是实际结束日。</p></div><div class="constraint-checks"><input id="factSensitive" type="checkbox" hidden><label class="check"><input id="factManual" type="checkbox">仅供人工确认</label></div></div></details>
+      <div class="form-section"><h3>字段内容</h3><div class="pair"><div><label for="factModule">所属模块</label><select id="factModule"><option value="personal">个人信息</option><option value="education">教育经历</option><option value="internship">工作与实习</option><option value="project">项目经历</option><option value="language">语言能力</option><option value="campus-role">在校经历</option><option value="awards">荣誉获奖</option><option value="publications">论文发表</option><option value="family">家庭成员</option></select></div><div><label for="factRecord">所属资料／经历</label><select id="factRecord"></select></div></div><p id="factContext" class="hint"></p><label for="factLabel">字段名称</label><input id="factLabel" required maxlength="200"><label for="factValue">已确认内容</label><textarea id="factValue" rows="7" required></textarea></div>
+      <details id="matchingOptions" class="disclosure"><summary><span>匹配与填写约束</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div class="disclosure-body"><label for="factAliases">字段别名（每行一个）</label><textarea id="factAliases" rows="3"></textarea><fieldset id="factVersionSection"><legend>适用资料版本</legend><div id="factProfiles" class="profile-checks"></div></fieldset><div class="pair"><div><label for="factPrecision">日期精度</label><select id="factPrecision"><option value="">非日期／按内容识别</option><option value="month">精确到月</option><option value="day">精确到日</option></select></div><div><label for="gpaScale">GPA 满分（如适用）</label><select id="gpaScale"><option value="">未知／不适用</option><option value="4.0">4.0</option><option value="5.0">5.0</option></select></div></div><div id="ongoingPolicy" hidden><label for="dateFallback">网站必须填写具体结束日期时</label><select id="dateFallback"><option value="">保留人工确认</option><option value="today">使用填写当天作为占位日期</option></select><p class="hint">资料仍保存「至今」。仅在明确的日期控件中使用当天日期，计划会注明此日期不是实际结束日。</p></div><div class="constraint-checks"><input id="factSensitive" type="checkbox" hidden><label class="check"><input id="factManual" type="checkbox">仅作参考，不参与自动填写</label></div></div></details>
     </div>
     <div class="dialog-actions"><button type="button" id="removeFact" class="danger">删除此字段</button><button type="submit" class="primary">保存资料</button></div>
   </form>
-</dialog>
-<dialog id="recordEditor" aria-labelledby="recordTitle"><form id="recordForm">
+</section>
+<section id="recordEditor" class="inline-editor" aria-labelledby="recordTitle" hidden><form id="recordForm">
   <div class="dialog-head"><div class="section-title"><h2 id="recordTitle">填写资料</h2><button type="button" id="closeRecord">取消</button></div><p class="hint dialog-intro">只填写已经确认的信息，未填写的字段不会用于自动填报。</p><p id="recordError" role="alert" hidden></p></div>
   <div class="dialog-body"><div id="recordFields" class="field-grid"></div>
     <details id="optionalFields" class="disclosure"><summary><span>补充信息（选填）</span><span class="disclosure-action" aria-hidden="true"><span class="when-closed">展开</span><span class="when-open">收起</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7"/></svg></span></summary><div id="recordOptionalFields" class="disclosure-body field-grid"></div></details>
@@ -76,9 +83,10 @@
     <fieldset id="recordVersionSection"><legend>适用资料版本</legend><div id="recordProfiles" class="profile-checks"></div><p id="recordSharing" class="hint"></p></fieldset>
     <div id="recordExtras" class="hint section-note" hidden></div>
   </div><div class="dialog-actions"><button type="button" id="removeRecord" class="danger">删除这段资料</button><button type="submit" class="primary">保存资料</button></div>
-</form></dialog>
+</form></section>
 <dialog id="versionsEditor" aria-labelledby="versionsTitle"><div class="dialog-head"><div class="section-title"><h2 id="versionsTitle">资料版本</h2><button id="closeVersions">关闭</button></div></div><div class="dialog-body"><p>一套资料即可使用。需要不同简历内容时，再复制一个独立版本。</p><div id="versionList"></div><form id="newVersionForm" class="form-section"><label for="versionName">新版本名称</label><div class="inline-input"><input id="versionName" required maxlength="20" placeholder="由自己命名"><button class="primary" type="submit">复制当前版本</button></div></form><p id="versionError" role="alert" hidden></p></div></dialog>
 <dialog id="rulesEditor" aria-labelledby="rulesTitle"><form id="rulesForm"><div class="dialog-head"><div class="section-title"><h2 id="rulesTitle">编辑填写规则</h2><button type="button" id="closeRules">取消</button></div></div><div class="dialog-body"><p>一行一条。程序检查之外的要求，需要在填写计划中人工核对。</p><label for="rulesText">填写规则</label><textarea id="rulesText" rows="12"></textarea></div><div class="dialog-actions"><button type="submit" class="primary">保存规则</button></div></form></dialog>
+<script src="profile-view.js"></script>
 <script src="agent-config.js"></script>
 <script src="filling-aliases.js"></script>
 <script src="filling-core.js"></script>

@@ -11,7 +11,7 @@
 <script>
 (function(){try{const w=JSON.parse(localStorage.getItem('toudiPublicWorkspace_v1')||'{}'),t=w.theme||'system';document.documentElement.dataset.theme=t==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;document.documentElement.dataset.motion=w.motion==='off'?'off':'on';document.documentElement.dataset.palette=['teal','ink','forest','clay','graphite'].includes(w.colorPalette)?w.colorPalette:'teal';}catch(e){document.documentElement.dataset.theme='light';document.documentElement.dataset.palette='teal';}})();
 </script>
-<style>:root { --primary: #386a70; --primary-hover: #2d565b; --primary-light: #e1eeec; --primary-faint: #f0f6f5; --success: #477a62; --success-light: #edf4ef; --danger: #a45750; --danger-light: #fbefed; --warning: #9a743d; --warning-light: #faf5e9; --info: #557a8d; --info-light: #edf3f6; --purple: #6b7586; --purple-light: #f0f2f6; --bg: #f4f6f7; --card: #ffffff; --border: #d5dfe2; --border-light: #eaf0f2; --text: #243338; --text2: #4a5c62; --text3: #62767c; --muted: var(--text3); --text-secondary: var(--text2); --sb-bg: var(--card); --sb-bg2: var(--bg); --sb-border: var(--border); --sb-text: var(--text2); --sb-text-hover: var(--text); --sb-active: var(--primary-faint); --sb-active-text: var(--primary); --st-0: var(--text2); --st-bg-0: var(--bg); --st-1: var(--text2); --st-bg-1: var(--bg); --st-2: var(--text2); --st-bg-2: var(--bg); --st-3: var(--text2); --st-bg-3: var(--bg); --st-4: var(--text2); --st-bg-4: var(--bg); --st-5: var(--text2); --st-bg-5: var(--bg); --st-6: var(--text2); --st-bg-6: var(--bg); --radius: 8px; --radius-sm: 5px; --shadow: none; --shadow-md: 0 3px 12px rgba(36,51,56,.07); --shadow-lg: 0 12px 32px rgba(36,51,56,.14); --sidebar-width: 236px; --row-alt: #f8fafb; --row-hover: #edf1f2; --row-star: #faf9f3; --on-primary: #ffffff; }
+<style>:root { --primary: #386a70; --primary-hover: #2d565b; --primary-light: #e1eeec; --primary-faint: #f0f6f5; --success: #477a62; --success-light: #edf4ef; --danger: #a45750; --danger-light: #fbefed; --warning: #9a743d; --warning-light: #faf5e9; --info: #557a8d; --info-light: #edf3f6; --purple: #6b7586; --purple-light: #f0f2f6; --bg: #f4f6f7; --card: #ffffff; --border: #e0e6e8; --border-light: #edf1f2; --text: #243338; --text2: #4a5c62; --text3: #62767c; --muted: var(--text3); --text-secondary: var(--text2); --sb-bg: var(--card); --sb-bg2: var(--bg); --sb-border: var(--border); --sb-text: var(--text2); --sb-text-hover: var(--text); --sb-active: var(--primary-faint); --sb-active-text: var(--primary); --st-0: var(--text2); --st-bg-0: var(--bg); --st-1: var(--text2); --st-bg-1: var(--bg); --st-2: var(--text2); --st-bg-2: var(--bg); --st-3: var(--text2); --st-bg-3: var(--bg); --st-4: var(--text2); --st-bg-4: var(--bg); --st-5: var(--text2); --st-bg-5: var(--bg); --st-6: var(--text2); --st-bg-6: var(--bg); --radius: var(--ui-radius-surface,12px); --radius-sm: var(--ui-radius-control,8px); --shadow: var(--ui-shadow-surface); --shadow-md: var(--ui-shadow-menu); --shadow-lg: var(--ui-shadow-dialog); --sidebar-width: 236px; --row-alt: #f8fafb; --row-hover: #edf1f2; --row-star: #faf9f3; --on-primary: #ffffff; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 a { color: var(--primary); text-decoration: none; }
@@ -25,7 +25,7 @@ a:hover { text-decoration: underline; }
 .main { transition: none; flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; min-width: 0; max-width: calc(100vw - var(--sidebar-width)); }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: #bccbd0; border-radius: 2px; }
-.sb-fold { position: absolute; top: 16px; right: 12px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--sb-border); border-radius: 6px; color: var(--text2); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; border-color: var(--border); }
+.sb-fold { position: absolute; top: 16px; right: 12px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--sb-border); border-radius: var(--radius-sm); color: var(--text2); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; border-color: var(--border); }
 .sb-fold:hover { color: var(--primary); border-color: var(--primary); }
 .sb-edge { position: fixed; left: 0; top: 96px; z-index: 190; width: 20px; height: 72px; display: none; align-items: center; justify-content: center; background: var(--card); color: var(--primary); border: 1px solid var(--border); border-radius: 0 8px 8px 0; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; box-shadow: none; }
 .sb-edge:hover { color: var(--primary-hover); }
@@ -39,15 +39,15 @@ a:hover { text-decoration: underline; }
 .sb-search input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(56,106,112,.15); }
 .sb-section { padding: 10px 10px; }
 .sb-section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; padding: 17px 14px 8px; }
-.sb-item { display: grid; align-items: center; gap: 8px; padding: 9px 8px; border-radius: var(--radius-sm); color: var(--text2); font-size: 13px; cursor: pointer; transition: all .15s; margin-bottom: 1px; border: 0; background: none; width: 100%; text-align: left; font: inherit; min-height: 40px; grid-template-columns: 18px minmax(0,1fr) auto; white-space: nowrap; height: 40px; line-height: 20px;  }
+.sb-item { display: grid; align-items: center; gap: 8px; padding: 9px 8px; border-radius: var(--radius-sm); color: var(--text2); font-size: 13px; cursor: pointer; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); margin-bottom: 1px; border: 0; background: none; width: 100%; text-align: left; font: inherit; min-height: 40px; grid-template-columns: 18px minmax(0,1fr) auto; white-space: nowrap; height: 40px; line-height: 20px;  }
 .sb-item:hover { background: var(--bg); color: var(--sb-text-hover); }
-.sb-item.active { background: var(--primary-light); color: var(--text); font-weight: 600; }
+.sb-item.active { background: var(--primary-faint); color: var(--text); font-weight: 600; }
 .sb-item .icon { width: 20px; }
 .sb-item .icon svg { width: 15px; height: 15px; }
 .sb-item .count { margin-left: auto; font-size: 11px; color: var(--text3); background: var(--bg); padding: 1px 5px; border-radius: 8px; min-width: 32px; font-variant-numeric: tabular-nums; text-align: right; }
 .sb-item.active .count { background: var(--primary-light); color: var(--primary); }
 .sb-filters { flex: 1; padding: 0 !important; }
-.filter-group { margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 12px; min-width: 0; margin: 0; }
+.filter-group { margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; min-width: 0; margin: 0; }
 .filter-group h3 { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0; padding: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
 .filter-group h3 .toggle { font-size: 12px; transition: transform .2s; }
 .filter-group.collapsed h3 .toggle { transform: rotate(-90deg); }
@@ -70,13 +70,13 @@ a:hover { text-decoration: underline; }
 .storage-badge.error { color: var(--danger); background: var(--danger-light); }
 .storage-badge.error .dot { background: var(--danger); }
 .sb-footer .btn-group { display: flex; flex-direction: column; gap: 6px; }
-.sb-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: none; background: transparent; color: var(--text3); font-size: 12px; cursor: pointer; border-radius: var(--radius-sm); transition: all .15s; text-align: left; border-color: var(--border); }
+.sb-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: none; background: transparent; color: var(--text3); font-size: 12px; cursor: pointer; border-radius: var(--radius-sm); transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); text-align: left; border-color: var(--border); }
 .sb-btn:hover { background: var(--sb-bg2); color: var(--sb-text-hover); }
 .topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px; position: sticky; top: 0; z-index: 100; box-shadow: none; min-height: 68px; }
 .topbar-title { font-size: 18px; font-weight: 600; color: var(--text2); display: block; min-width: 0; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-title .icon { vertical-align: -3px; margin-right: 6px; }
 .topbar-actions { display: flex; gap: 14px; flex-wrap: nowrap; flex-shrink: 0; align-items: center; }
-.btn { padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text2); transition: background .12s ease,border-color .12s ease; display: inline-flex; align-items: center; gap: 5px; box-shadow: none; border-color: var(--border); min-height: 34px; }
+.btn { padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text2); transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease), box-shadow var(--ui-motion-fast) var(--ui-ease); display: inline-flex; align-items: center; gap: 5px; box-shadow: none; border-color: var(--border); min-height: 34px; }
 .btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-faint); }
 .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
 .btn-primary:hover { background: var(--primary-hover); color: var(--on-primary); }
@@ -93,18 +93,30 @@ a:hover { text-decoration: underline; }
 .topbar-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .topbar-tools .btn { padding: 6px 10px; }
 .nav-text { margin-left: 4px; }
-.stats-bar { display: flex; gap: 6px; padding: 12px 24px; flex-wrap: wrap; background: var(--card); border-bottom: 1px solid var(--border); margin: 0; }
+.records-overview { display:flex; align-items:center; flex-wrap:wrap; gap:12px 20px; padding:12px 24px; background:var(--card); border-bottom:1px solid var(--border); }
+.stats-bar { display:flex; align-items:center; gap:6px; flex:0 1 auto; flex-wrap:wrap; min-width:0; margin:0; }
+.record-query { display:flex; align-items:center; flex:1 1 250px; min-width:220px; max-width:440px; height:38px; margin-left:auto; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg); transition:border-color var(--ui-motion-fast) var(--ui-ease),box-shadow var(--ui-motion-fast) var(--ui-ease); }
+.record-query:focus-within { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-faint); }
+.record-query>.query-icon { width:16px; height:16px; margin-left:12px; flex:none; color:var(--text3); }
+.record-query input { flex:1; min-width:0; width:100%; height:100%; padding:0 9px; border:0; outline:0; border-radius:inherit; background:transparent; color:var(--text); font:inherit; font-size:13px; }
+.record-query input::placeholder { color:var(--text3); }
+.record-query input:focus-visible { outline:none; }
+.record-query .query-filter { display:inline-flex; align-items:center; justify-content:center; gap:6px; flex:none; align-self:stretch; padding:0 11px; border:0; border-left:1px solid var(--border); border-radius:0 var(--radius-sm) var(--radius-sm) 0; background:transparent; color:var(--text2); font:inherit; font-size:13px; cursor:pointer; transition:background-color var(--ui-motion-fast) var(--ui-ease),color var(--ui-motion-fast) var(--ui-ease); }
+.record-query .query-filter:hover,.record-query .query-filter[aria-expanded="true"] { background:var(--primary-faint); color:var(--primary); }
+.query-filter svg { width:15px; height:15px; flex:none; }
+.query-filter .query-filter-count { min-width:16px; height:18px; padding:0 4px; display:grid; place-items:center; border-radius:5px; color:var(--primary); background:var(--primary-light); font-size:11px; font-variant-numeric:tabular-nums; }
+@media (max-width:1180px) { .record-query { max-width:none; } }
 .stats-explainer { flex: 2 1 280px; min-width: 250px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 10px 14px; }
 .stats-explainer strong { font-size: 13px; }
 .stats-explainer span { font-size: 20px; font-weight: 800; }
 .stats-explainer small { color: var(--text3); line-height: 1.4; }
-.stat-card { flex-shrink: 0; display: inline-flex; flex-direction: row; align-items: center; padding: 8px 10px; background: transparent; color: var(--text2); font: inherit; border-radius: 0; border: 0; cursor: pointer; transition: all .2s; min-width: 0; flex: 0 0 auto; min-height: 36px; box-shadow: none; gap: 7px; border-bottom: 2px solid transparent; white-space: nowrap; }
-.stat-card:hover { border-color: var(--border); background: var(--primary-faint); transform: none; box-shadow: none; }
+.stat-card { flex-shrink: 0; display: inline-flex; flex-direction: row; align-items: center; padding: 8px 10px; background: transparent; color: var(--text2); font: inherit; border-radius: var(--radius-sm); border: 0; cursor: pointer; transition: background-color var(--ui-motion-fast) var(--ui-ease), box-shadow var(--ui-motion-enter) var(--ui-ease), transform var(--ui-motion-enter) var(--ui-ease); min-width: 0; flex: 0 0 auto; min-height: 36px; box-shadow: none; gap: 7px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.stat-card:hover { border-color: transparent; background: var(--primary-faint); transform: none; box-shadow: none; }
 .stat-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .kanban-filter:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .bar-action:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .stat-card:disabled { cursor: default; opacity: .55; transform: none; box-shadow: none; }
-.stat-card.active { border-color: var(--primary); background: transparent; box-shadow: none; color: var(--primary); }
+.stat-card.active { border-color: transparent; background: var(--primary-faint); box-shadow: none; color: var(--primary); }
 .stat-card .num { font-size: 13px; font-weight: 600; line-height: 1; letter-spacing: -0.5px; order: 2; color: inherit; }
 .stat-card .label { font-size: 13px; color: inherit; margin-top: 0; font-weight: 400; order: 1; }
 .stat-card .dot { width: 5px; height: 5px; border-radius: 50%; margin-bottom: 0; position: static; }
@@ -123,13 +135,13 @@ a:hover { text-decoration: underline; }
 .batch-bar.show { display: flex; }
 .batch-bar .selected-count { font-weight: 700; color: var(--primary); font-size: 16px; }
 .batch-bar select { padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
-.table-wrap { background: var(--card); border-radius: 7px; border: 1px solid var(--border); overflow: auto; box-shadow: none; }
+.table-wrap { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); overflow: auto; box-shadow: var(--shadow); }
 #tableView table { width: 100%; border-collapse: collapse; min-width: 0; table-layout: auto; }
 .table-wrap > table { table-layout: fixed; }
 .table-wrap > table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .table-wrap > table td:nth-child(-n/**/+3) { text-overflow: clip; padding-left: 7px; padding-right: 7px; }
 #tableView thead { position: sticky; top: 0; z-index: 10; }
-#tableView th { background: var(--bg); padding: 10px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text3); border-bottom: 2px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; text-transform: uppercase; letter-spacing: .3px; }
+#tableView th { background: var(--bg); padding: 10px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text3); border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; text-transform: uppercase; letter-spacing: .3px; }
 #tableView th:hover { background: var(--border-light); color: var(--text2); }
 #tableView th .sort-arrow { font-size: 9px; margin-left: 4px; }
 #tableView td { padding: 10px; border-bottom: 1px solid var(--border-light); font-size: 13px; vertical-align: top; }
@@ -142,20 +154,20 @@ a:hover { text-decoration: underline; }
 .deadline-expired { background: var(--bg); color: var(--text2); text-decoration: none; border: 1px solid var(--border); border-color: var(--border); }
 .deadline-none { background: var(--bg); color: var(--text3); border: 1px solid var(--border); border-color: var(--border); }
 .deadline-days { font-size: 10px; opacity: .75; }
-.status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; }
+.status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); }
 .status-badge:hover { transform: none; box-shadow: none; outline: 1px solid var(--border); }
 .status-dropdown { position: fixed; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 300; padding: 4px; min-width: 130px; }
 .status-option { padding: 8px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: var(--radius-sm); transition: background .1s; }
 .status-option:hover { background: var(--bg); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-.star { cursor: pointer; transition: all .15s; color: var(--border); }
+.star { cursor: pointer; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); color: var(--border); }
 .star:hover { color: var(--warning); transform: scale(1.2); }
 .star.active { color: var(--warning); }
 .star svg { width: 16px; height: 16px; fill: currentColor; stroke: currentColor; }
-.ban-btn { cursor: pointer; color: var(--border); display: inline-flex; transition: all .15s; }
+.ban-btn { cursor: pointer; color: var(--border); display: inline-flex; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); }
 .ban-btn:hover { color: var(--danger); transform: scale(1.15); }
 .ban-btn.active { color: var(--danger); }
-.research-toggle { cursor: pointer; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-secondary); width: 26px; height: 26px; font-weight: 700; }
+.research-toggle { cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); width: 26px; height: 26px; font-weight: 700; }
 .research-toggle.active { background: var(--warning-light); border-color: var(--warning); color: #92400e; }
 .research-record { width: 100%; min-height: 90px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font: inherit; background: var(--bg); color: var(--text); }
 .ban-btn svg { width: 15px; height: 15px; }
@@ -164,7 +176,7 @@ a:hover { text-decoration: underline; }
 .note-text:hover { color: var(--primary); }
 .note-text.has-note { color: var(--text2); }
 .pagination { display: flex; justify-content: center; align-items: center; gap: 5px; padding: 18px; }
-.page-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card); cursor: pointer; font-size: 13px; color: var(--text2); font-weight: 500; transition: all .15s; }
+.page-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card); cursor: pointer; font-size: 13px; color: var(--text2); font-weight: 500; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); }
 .page-btn:hover:not(:disabled) { background: var(--primary-faint); color: var(--primary); border-color: var(--primary); }
 .page-btn.active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 .page-btn:disabled { opacity: .35; cursor: default; }
@@ -177,7 +189,7 @@ a:hover { text-decoration: underline; }
 .kanban-filter:hover { background: var(--primary-faint); }
 .kanban-col-header .count { background: var(--card); padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
 .kanban-col-body { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 300px); }
-.kanban-card { background: var(--card); border-radius: var(--radius-sm); padding: 12px; box-shadow: var(--shadow); cursor: pointer; transition: all .2s; border-left: 3px solid var(--text3); }
+.kanban-card { background: var(--card); border-radius: var(--radius-sm); padding: 12px; box-shadow: var(--shadow); cursor: pointer; transition: background-color var(--ui-motion-fast) var(--ui-ease), box-shadow var(--ui-motion-enter) var(--ui-ease), transform var(--ui-motion-enter) var(--ui-ease); border-left: 3px solid var(--text3); }
 .kanban-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
 .kanban-card .card-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
 .kanban-card .card-info { font-size: 11px; color: var(--text2); display: flex; flex-wrap: wrap; gap: 4px; }
@@ -217,13 +229,13 @@ a:hover { text-decoration: underline; }
 .rv-collapse-btn svg { width: 15px; height: 15px; }
 .rv-rail-count { font-size: 10px; color: var(--text3); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .rv-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.rv-tab { flex: 1; padding: 10px 6px; border: none; background: none; font-size: 13px; font-weight: 500; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; }
+.rv-tab { flex: 1; padding: 10px 6px; border: none; background: none; font-size: 13px; font-weight: 500; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); }
 .rv-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
 .rv-search { padding: 10px 12px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
 .rv-search input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; outline: none; background: var(--bg); }
 .rv-search input:focus { border-color: var(--primary); background: var(--card); }
 .rv-list { overflow-y: auto; padding: 8px; flex: 1; min-height: 0; }
-.rv-card { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); margin-bottom: 8px; cursor: pointer; transition: all .15s; }
+.rv-card { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); margin-bottom: 8px; cursor: pointer; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); }
 .rv-card:hover { border-color: var(--primary); box-shadow: var(--shadow); }
 .rv-card.active { border-color: var(--primary); background: var(--primary-faint); }
 .rv-card .rv-co { font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
@@ -260,7 +272,7 @@ a:hover { text-decoration: underline; }
 .prep-content-col .pp-md p,.prep-content-col .pp-md ul,.prep-content-col .pp-md ol { max-width:48em; }
 ::highlight(search-match) { background: var(--warning-light); color: #92400e; }
 mark.search-match { background: var(--warning-light); color: #92400e; border-radius: 2px; padding: 0 1px; }
-.rv-panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: none; padding: 16px; margin-bottom: 16px; }
+.rv-panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: none; padding: 16px; margin-bottom: 16px; }
 .rv-panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-light); background: var(--card); }
 .rv-panel-head h3 { font-size: 14px; font-weight: 700; color: var(--text); }
 .rv-meta-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; font-size: 12px; }
@@ -396,7 +408,7 @@ details.qb-co-fold .qb-co-body .qb-group-fold:first-of-type { margin-top: 10px; 
 .pp-note { margin-top: 10px; background: var(--bg); border: 1px solid var(--border-light); border-radius: 8px; padding: 4px 12px; }
 .pp-note .md-quote { border: none; background: transparent; padding: 0; margin: 6px 0; border-radius: 0; }
 .pp-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.pp-chip { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--text2); cursor: pointer; white-space: nowrap; transition: all .15s; }
+.pp-chip { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--text2); cursor: pointer; white-space: nowrap; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); }
 .pp-chip:hover { border-color: var(--primary); color: var(--primary); }
 .pp-sec { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
 .pp-sec>summary { cursor: pointer; list-style: none; padding: 12px 16px; font-weight: 600; font-size: 15px; color: var(--text); user-select: none; display: flex; align-items: center; gap: 8px; }
@@ -634,7 +646,9 @@ body.reader-module { overflow: hidden; }
 .sidebar.open { display: flex; box-shadow: var(--shadow-lg); }
 body.sb-off .sidebar.open { visibility:visible; transform:none; }
 .main { margin-left: 0; max-width: 100vw; transition: none; }
-.stats-bar { flex-wrap: wrap; padding: 10px 15px; gap: 8px; }
+.records-overview { padding:10px 15px; gap:10px; }
+.stats-bar { gap:8px; }
+.record-query { flex-basis:100%; min-width:0; }
 .menu-btn { display: inline-flex; align-items: center; }
 .menu-btn svg { width: 16px; height: 16px; }
 .sb-scrim.show { display: block; position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 190; }
@@ -728,7 +742,7 @@ textarea { font-size: 16px; }
 .settings-section { padding: 18px 0; }
 }
 
-:root[data-theme="dark"] { color-scheme: dark; --bg:#172025; --card:#202b31; --text:#e4eaed; --text2:#b3c1c7; --text3:#91a5ad; --border:#405057; --border-light:#324147; --primary:#8ebfc0; --primary-hover:#aed0d0; --primary-light:#304e53; --primary-faint:#293b41; --on-primary:#172025; --row-alt:#243037; --row-hover:#304149; --row-star:#30342e; --success:#a0b9a6; --success-light:#2c3931; --danger:#e0aba4; --danger-light:#443332; --warning:#d4bb88; --warning-light:#3c382e; --info:#abc1ca; --info-light:#2f3d43; --purple:#b4bdc8; --purple-light:#303a46; }
+:root[data-theme="dark"] { color-scheme: dark; --bg:#172025; --card:#202b31; --text:#e4eaed; --text2:#b3c1c7; --text3:#91a5ad; --border:#37474e; --border-light:#2c3b42; --primary:#8ebfc0; --primary-hover:#aed0d0; --primary-light:#304e53; --primary-faint:#293b41; --on-primary:#172025; --row-alt:#243037; --row-hover:#304149; --row-star:#30342e; --success:#a0b9a6; --success-light:#2c3931; --danger:#e0aba4; --danger-light:#443332; --warning:#d4bb88; --warning-light:#3c382e; --info:#abc1ca; --info-light:#2f3d43; --purple:#b4bdc8; --purple-light:#303a46; }
 .overview-caption { font-size:11px; color:var(--text3); align-self:center; padding-right:8px; white-space:nowrap; }
 .rv-side.rv-collapsed > :not(.rv-rail) { display:none !important; }
 .rv-side.rv-collapsed .rv-rail > :not(:first-child) { display:none; }
@@ -760,8 +774,8 @@ textarea { font-size: 16px; }
 .industry-group .pref-options { padding:8px 0 14px; }
 .industry-group-actions { display:flex; gap:8px; margin-bottom:8px; }
 .theme-button:focus-visible, summary:focus-visible, .rv-collapse-btn:focus-visible, .rv-rail-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
-@media (prefers-reduced-motion: no-preference) { html[data-motion="on"] .btn, html[data-motion="on"] .sb-item, html[data-motion="on"] .stat-card { transition:background-color 180ms ease,color 120ms ease,border-color 120ms ease; } html[data-motion="on"] .modal-overlay { animation:panel-reveal 180ms ease-out; } }
-@keyframes panel-reveal { from { opacity:.6; } to { opacity:1; } }
+@media (prefers-reduced-motion: no-preference) { html[data-motion="on"] .btn, html[data-motion="on"] .sb-item, html[data-motion="on"] .stat-card { transition:background-color var(--ui-motion-fast) var(--ui-ease),color var(--ui-motion-fast) var(--ui-ease),border-color var(--ui-motion-fast) var(--ui-ease); } html[data-motion="on"] .modal-overlay { animation:panel-reveal var(--ui-motion-enter) var(--ui-ease); } }
+@keyframes panel-reveal { from { opacity:0; } to { opacity:1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
 html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after { animation:none !important; transition:none !important; }
 
@@ -785,31 +799,35 @@ html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="
 .setting-control { display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap; }
 .setting-control select { width:190px; padding:8px 10px; border:1px solid var(--border); border-radius:5px; background:var(--card); color:var(--text); font:inherit; }
 #settingsView .topbar-tools { display:flex; gap:6px; }
-.pp-md a,.qb-md a,.rv-answer a,.detail-value a,.detail-links a,.detail-materials a,#tableBody a { text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
-@keyframes module-reveal { from { opacity:.3; } to { opacity:1; } }
-html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
+.pp-md a,.qb-md a,.rv-answer a,.detail-value a { text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
+html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motion-enter) var(--ui-ease); }
 @media(max-width:900px) { .setting-row { grid-template-columns:minmax(0,1fr) 140px; gap:14px; padding:14px 0; } .setting-control { justify-content:flex-end; } .setting-control select { width:100%; } }
 @media(max-width:389px) { .setting-row { grid-template-columns:minmax(0,1fr); gap:10px; } .setting-control { justify-content:flex-start; } }
 #settingsShortcut[hidden] { display:none!important; }
 
 /* Detail reading surface and preference taxonomy */
 .detail-modal .modal { width:min(820px,100%); max-width:820px; height:100dvh; max-height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding:0; }
-.detail-modal .detail-sticky { position:static; flex-shrink:0; padding:16px 24px 14px; }
-.detail-sticky h2 { font-size:20px; line-height:1.4; margin:12px 0 6px; overflow-wrap:anywhere; }
-.detail-shortcuts { display:flex; gap:20px; margin-top:12px; }
-.detail-shortcuts button { padding:0; border:0; background:none; color:var(--primary); font:inherit; font-size:12px; cursor:pointer; text-decoration:underline; text-underline-offset:4px; }
-.detail-context { font-size:12px; color:var(--text2); }
-#detailContent { overflow:auto; min-height:0; padding:0 24px 28px; overscroll-behavior:contain; }
-.detail-section { padding:22px 0; border-bottom:1px solid var(--border-light); }
-.detail-section:last-child { border:0; padding-bottom:0; }
-.detail-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
-.detail-section-heading h3 { font-size:15px; margin:0; }
-.detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px 24px; }
+.detail-modal .detail-sticky { position:static; flex-shrink:0; padding:18px 24px 0; }
+.detail-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.detail-heading>div:first-child { min-width:0; }
+.detail-heading .detail-nav { flex-wrap:nowrap; flex-shrink:0; }
+.detail-sticky h2 { font-size:20px; line-height:1.4; margin:0; overflow-wrap:anywhere; }
+.detail-shortcuts { display:flex; gap:24px; margin-top:14px; }
+.detail-shortcuts button { padding:10px 0 11px; border:0; border-bottom:2px solid transparent; background:none; color:var(--text2); font:inherit; font-size:13px; cursor:pointer; text-decoration:none; }
+.detail-shortcuts button[aria-selected="true"] { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
+.detail-context { font-size:12px; line-height:1.6; color:var(--text3); margin:6px 0 0; }
+.detail-entry-actions { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-top:14px; }
+.detail-entry-actions .detail-links { gap:8px; }
+#detailContent { flex:1; overflow:auto; min-height:0; padding:0 24px 24px; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.detail-section { padding:18px 0 0; border:0; }
+.detail-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.detail-section-heading h3,.detail-material-group h3 { font-size:14px; line-height:22px; margin:0; font-weight:600; }
+.detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; margin:0; }
 .detail-fact { min-width:0; }
 .detail-fact dt,.detail-subtitle { color:var(--text3); font-size:12px; font-weight:500; margin-bottom:4px; }
-.detail-fact dd { margin:0; font-size:14px; line-height:1.7; overflow-wrap:anywhere; white-space:pre-wrap; }
+.detail-fact dd { margin:0; font-size:13px; line-height:1.65; overflow-wrap:anywhere; white-space:pre-wrap; }
 .detail-fact.wide { grid-column:1/-1; }
-.detail-prose { font-size:14px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; }
+.detail-prose { font-size:13px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
 .detail-edited { font-size:11px; color:var(--text3); margin-left:6px; white-space:nowrap; }
 .detail-actions,.detail-materials { display:flex; gap:8px; flex-wrap:wrap; }
 .detail-stages { margin-bottom:16px; }
@@ -820,13 +838,38 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
 .detail-source h4 { font-size:14px; margin-bottom:10px; }
 .detail-source .detail-facts { margin:12px 0; gap:10px 20px; }
 .detail-source .detail-fact dd { font-size:13px; }
+.detail-source-info { margin-top:18px; padding-top:14px; border-top:1px solid var(--border-light); font-size:12px; color:var(--text2); }
+.detail-source-info>summary { cursor:pointer; line-height:24px; }
+.detail-source-info>.detail-facts { margin-top:14px; }
+.detail-related-schedule { margin-top:20px; border-top:1px solid var(--border-light); padding-top:16px; }
+.detail-schedule-row { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; padding:10px 0; text-align:left; border:0; border-bottom:1px solid var(--border-light); color:var(--text2); background:transparent; font:inherit; cursor:pointer; }
+.detail-schedule-row strong { display:block; font-size:13px; line-height:20px; font-weight:500; }
+.detail-schedule-row small { display:block; margin-top:3px; font-size:11px; color:var(--text3); }
+.detail-schedule-row:hover strong { color:var(--primary); text-decoration:underline; text-underline-offset:3px; }
+.detail-note-block { margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light); }
+.detail-note-block .detail-prose { margin:0; }
+.detail-material-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
 .merged-sources > summary { cursor:pointer; color:var(--primary); padding:12px 0 0; font-size:13px; }
-.detail-material-group + .detail-material-group { margin-top:18px; }
+.detail-material-group + .detail-material-group { margin-top:0; }
 .detail-material-group .detail-materials { margin-top:8px; }
 .detail-linked { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-top:10px; }
-.detail-linked button { text-align:left; color:var(--primary); text-decoration:underline; text-underline-offset:3px; border:0; background:none; font:inherit; font-size:13px; cursor:pointer; }
+.detail-linked .action-link { text-align:left; justify-content:space-between; max-width:100%; }
+.action-link { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:34px; padding:7px 11px; color:var(--primary); background:var(--card); border:1px solid var(--border); border-radius:var(--ui-radius-control,var(--radius-sm)); font:inherit; font-size:13px; font-weight:500; line-height:18px; text-decoration:none; cursor:pointer; transition:background 140ms ease,border-color 140ms ease,box-shadow 140ms ease; }
+.action-link:hover { color:var(--primary); background:var(--primary-faint); border-color:var(--primary); box-shadow:0 2px 6px rgba(0,0,0,.04); }
+.action-link:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+.action-link svg { width:14px; height:14px; flex-shrink:0; }
+.action-link>span { min-width:0; overflow-wrap:anywhere; }
+.resource-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+#tableBody .table-entry-link { min-height:26px; padding:3px 7px; font-size:12px; text-decoration:none; }
+.detail-linked .action-link { width:100%; }
 #detailContent .research-record { height:104px; min-height:80px; margin:6px 0 8px; }
-.detail-editor { padding-top:18px; }
+.detail-editor { padding-top:0; }
+.detail-field-editor { border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; }
+.detail-field-row { display:grid; grid-template-columns:76px minmax(0,1fr) auto; gap:10px; align-items:start; margin:10px 0; }
+.detail-field-row>span { padding-top:8px; font-size:12px; color:var(--text3); }
+.detail-field-row input,.detail-field-row textarea { min-width:0; width:100%; margin:0; padding:8px 10px; font:inherit; font-size:13px; line-height:20px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); }
+.detail-field-row textarea { resize:vertical; min-height:80px; }
+@media(max-width:600px) { .detail-heading { flex-wrap:wrap; gap:10px; } .detail-heading .detail-nav { width:100%; } .detail-heading .detail-nav button:last-child { margin-left:auto; } .detail-entry-actions { align-items:flex-start; } .detail-material-columns { grid-template-columns:1fr; gap:24px; } }
 .pref-dialog.modal { width:min(760px,100%); max-width:760px; }
 .pref-tabs { display:flex; gap:20px; padding:0 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
 .pref-tabs button { border:0; border-bottom:2px solid transparent; background:none; padding:13px 0 11px; font:inherit; color:var(--text2); cursor:pointer; }
@@ -867,9 +910,16 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
 .rv-list>.rv-empty { padding:24px 12px; font-size:12px; }
 .rv-tab,.qb-side-title { white-space:nowrap; }
 .rv-tabs .rv-collapse-btn { flex-shrink:0; }
-.workspace-refresh-note { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:12px; padding:9px 20px; border-bottom:1px solid var(--border); color:var(--text2); background:var(--primary-faint); }
+.workspace-refresh-control { position:relative; display:flex; align-items:center; gap:6px; flex:none; }
+.workspace-update-button { position:relative; justify-content:center; width:34px; height:34px; padding:0; flex:none; }
+.workspace-update-button svg { width:16px; height:16px; }
+.workspace-update-button[data-state="pending"] { color:var(--primary); }
+.workspace-update-button[data-state="error"] { color:var(--warning); }
+.workspace-update-dot { position:absolute; top:5px; right:5px; width:6px; height:6px; border-radius:50%; background:currentColor; box-shadow:0 0 0 2px var(--card); }
+.workspace-refresh-note { position:absolute; top:calc(100% + 9px); right:0; z-index:120; width:min(340px,calc(100vw - 32px)); padding:15px 16px; border:1px solid var(--border); border-radius:var(--radius); color:var(--text2); background:var(--card); box-shadow:var(--shadow-lg); font-size:13px; line-height:1.65; }
+.workspace-refresh-note strong { display:block; margin-bottom:5px; color:var(--text); font-size:13px; font-weight:600; }
 .workspace-refresh-note[hidden] { display:none; }
-#workspaceRefreshButton { white-space:nowrap; }
+#workspaceRefreshButton { white-space:nowrap; min-width:88px; justify-content:center; }
 .desktop-workspace-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; }
 .desktop-workspace-row .connection-path { flex:1 1 260px; min-width:0; overflow-wrap:anywhere; margin:0; }
 #kanbanView>.workspace-empty,#chartsView>.workspace-empty { min-height:140px; margin-bottom:16px; padding:20px; }
@@ -899,8 +949,16 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
  .reader-module .rv-tabs { flex-wrap:wrap; }
  .reader-module .rv-tabs .rv-tab { flex:1 0 70px; }
 }
+
+/* Local feedback preserves frozen-column geometry and reading density. */
+#tableView td { transition:background-color var(--ui-motion-fast) var(--ui-ease); }
+.btn:active:not(:disabled) { box-shadow:inset 0 1px 2px rgba(31,48,54,.06); }
+input:not([type="checkbox"]),textarea,select { transition:background-color var(--ui-motion-fast) var(--ui-ease),border-color var(--ui-motion-fast) var(--ui-ease),box-shadow var(--ui-motion-fast) var(--ui-ease); }
 </style>
 <link rel="stylesheet" href="/assets/settings.css">
+<link rel="stylesheet" href="/assets/schedule.css">
+<link rel="stylesheet" href="/browser-extension/interface.css">
+<script src="/browser-extension/interface-motion.js" defer></script>
 </head>
 <body>
 
@@ -910,9 +968,6 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
       <h1><img class="brand-symbol" width="24" height="24" alt="TouDi" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgNjQgNjQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSI+PHRpdGxlIGlkPSJ0aXRsZSI+VG91RGkg5oqV6YCSPC90aXRsZT48cmVjdCB4PSI0IiB5PSI0IiB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHJ4PSIxNCIgZmlsbD0iIzMxNWY2NSIvPjxwYXRoIGQ9Ik0xNiAyMy41IDQ4IDE1IDM2LjUgNDggMjkgMzRaIiBmaWxsPSIjZjRmOGY2IiBzdHJva2U9IiNmNGY4ZjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yOSAzNCA0NyAxNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzE1ZjY1IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo="> 投递中控台</h1>
       <div class="sub" id="dataDate">个人工作台</div>
       <button class="sb-fold" onclick="toggleSbCollapse()" title="收起侧栏">‹</button>
-    </div>
-    <div class="sb-search">
-      <input type="text" placeholder="搜索公司/岗位/性质..." id="searchInput" oninput="onSearch()">
     </div>
     <div class="sb-section" id="quickViews"></div>
     <div class="sb-filters" id="filterPanel"></div>
@@ -965,7 +1020,14 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
       </div>
     </div>
 
-    <div class="stats-bar" id="statsBar"></div>
+    <div class="records-overview" id="recordsOverview">
+      <div class="stats-bar" id="statsBar"></div>
+      <div class="record-query" role="search" aria-label="检索投递记录">
+        <svg class="query-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+        <input type="search" id="searchInput" placeholder="搜索公司、岗位…" aria-label="搜索投递记录" autocomplete="off" oninput="if(!event.isComposing)onSearch()" oncompositionend="onSearch()">
+        <button type="button" class="query-filter" id="recordFilterButton" onclick="openFilters()" aria-haspopup="dialog" aria-controls="filterModal" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--bg)"/><circle cx="15" cy="12" r="2" fill="var(--bg)"/><circle cx="9" cy="18" r="2" fill="var(--bg)"/></svg><span>筛选</span><span id="recordFilterCount" class="query-filter-count" hidden></span></button>
+      </div>
+    </div>
 
     <div class="content">
       <div class="toolbar" id="dashboardToolbar">
@@ -1088,7 +1150,7 @@ html[data-motion="on"] .module-enter { animation:module-reveal 180ms ease-out; }
 
 <div id="detailModal" class="modal-overlay detail-modal" style="display:none" onclick="if(event.target===this)closeDetailModal()">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
-    <div class="detail-sticky"><div class="detail-nav"><button class="btn btn-sm" onclick="stepDetail(-1)">上一条</button><button class="btn btn-sm" onclick="stepDetail(1)">下一条</button><button class="btn btn-sm" style="margin-left:auto" onclick="closeDetailModal()">关闭</button></div><h2 id="detailTitle"></h2><div id="detailLead"></div></div>
+    <div class="detail-sticky"><div class="detail-heading"><div><h2 id="detailTitle"></h2><p id="detailMeta" class="detail-context"></p></div><div class="detail-nav"><button class="btn btn-sm" onclick="stepDetail(-1)">上一条</button><button class="btn btn-sm" onclick="stepDetail(1)">下一条</button><button class="btn btn-sm" onclick="closeDetailModal()">关闭</button></div></div><div id="detailLead"></div></div>
     <div id="detailContent"></div>
 
   </div>
@@ -1199,13 +1261,14 @@ let apiBase = null;
 const SAVE_DOMAINS={
   edits:{label:'个人数据',state:'idle',message:''},
   reviews:{label:'复盘',state:'idle',message:''},
-  qbank:{label:'问答库',state:'idle',message:''}
+  qbank:{label:'问答库',state:'idle',message:''},
+  schedule:{label:'日程',state:'idle',message:''}
 };
-let editsSaveGeneration=0, editsSaveInFlight=false, editsDirty=false, editsConflict=false;
+let editsSaveGeneration=0, editsSaveInFlight=false, editsSavePromise=null, editsDirty=false, editsConflict=false;
 function isPlainObject(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
 function setSaveState(domain,state,message=''){const d=SAVE_DOMAINS[domain];if(!d)return;d.state=state;d.message=message;d.readFailed=false;updateStorageBadge();}
 function setReadError(domain,message){const d=SAVE_DOMAINS[domain];if(!d)return;d.state='error';d.message=message;d.readFailed=true;updateStorageBadge();}
-const DRAFT_PREFIX={edits:'jobEditsDraft:',reviews:'jobReviewsDraft:',qbank:'jobQbankDraft:'};
+const DRAFT_PREFIX={edits:'jobEditsDraft:',reviews:'jobReviewsDraft:',qbank:'jobQbankDraft:',schedule:'toudiScheduleDraft:'};
 const LEGACY_DRAFT_KEY={edits:'jobEditsDraft',reviews:'jobReviewsDraft',qbank:'jobQbankDraft'};
 let draftSessionId='';
 try{draftSessionId=sessionStorage.getItem('toudiDraftSession_27')||'';if(!draftSessionId){draftSessionId=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));sessionStorage.setItem('toudiDraftSession_27',draftSessionId);}}catch(e){draftSessionId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);}
@@ -1253,18 +1316,26 @@ function savePersonalDraft(){
 let storageInitPromise=null;
 function initServerStorage(){if(storageInitPromise)return storageInitPromise;storageInitPromise=readServerStorage().finally(()=>{storageInitPromise=null;});return storageInitPromise;}
 async function readServerStorage() {
+  const startedGeneration=editsSaveGeneration;
+  const wasReady=personalReady;
+  const previousSaveState={...SAVE_DOMAINS.edits};
+  let loaded=false;
   personalReady=false;setSaveState('edits','saving','正在读取个人数据…');
   try {
-    apiBase = await detectApiBase();
+    if(apiBase===null)apiBase = await detectApiBase();
     if (apiBase === null) throw new Error('no server');
-    const res = await fetch(apiBase + '/api/edits');
+    const res = await fetch(apiBase + '/api/edits',{cache:'no-store'});
     if (!res.ok) throw new Error('bad status');
     const payload = await res.json();
     if(!payload||!isPlainObject(payload.edits)||!isPlainObject(payload.pref)||typeof payload.version!=='string')throw new Error('invalid payload');
+    if(!/^[a-f0-9]{64}$/.test(payload.workspaceKey||'')||(toudiWorkspaceStorage.id&&payload.workspaceKey!==toudiWorkspaceStorage.id))throw Error('workspace mismatch');
+    if(editsSaveGeneration!==startedGeneration){personalReady=wasReady;return false;}
+    if(wasReady && typeof workspaceHasDraft==='function' && workspaceHasDraft('edits')){Object.assign(SAVE_DOMAINS.edits,previousSaveState);personalReady=wasReady;updateStorageBadge();return false;}
+    const detailKey=document.getElementById('detailModal')?.style.display==='flex'?byId(detailIdx)?._key:null;
+    if(wasReady)detailInputMemory.clear();
     const diskEdits = payload.edits;
     editsVersion = payload.version;
     serverMode = true;
-    if(!/^[a-f0-9]{64}$/.test(payload.workspaceKey||'')||(toudiWorkspaceStorage.id&&payload.workspaceKey!==toudiWorkspaceStorage.id))throw Error('workspace mismatch');
     window.__TOUDI_WORKSPACE_KEY__=payload.workspaceKey;
     discardConfirmedDrafts('edits',{edits:payload.edits,pref:payload.pref});
     const draft=readOwnDraft('edits');
@@ -1272,20 +1343,26 @@ async function readServerStorage() {
       userEdits=draft.data.edits;preferences={...DEFAULT_PREF,...draft.data.pref};editsDraftBase=String(draft.base);editsDirty=true;editsConflict=editsDraftBase!==String(payload.version);
       setSaveState('edits',editsConflict?'conflict':'error',editsConflict?'个人草稿基于旧版本，请先导出':'发现可重试的个人数据草稿');
     }else{
-      userEdits = diskEdits;preferences = {...DEFAULT_PREF, ...payload.pref};editsDraftBase=null;
+      userEdits = diskEdits;preferences = {...DEFAULT_PREF, ...payload.pref};editsDraftBase=null;editsDirty=false;editsConflict=false;
 
 
       setSaveState('edits','idle','');
     }
     reapplyEdits();
-    personalReady=true;buildFilterPanel(); render();
-  } catch(e) { serverMode = false; apiBase = null; setReadError('edits','工作区数据读取失败'); }
+    personalReady=true;loaded=true;buildFilterPanel(); render();
+    if(typeof refreshRecruitmentDetail==='function')refreshRecruitmentDetail(detailKey);
+  } catch(e) {
+    // A failed module read is not a lost workspace connection. Keep the
+    // confirmed transport so other modules still read and this one can retry.
+    setReadError('edits','工作区个人数据读取失败');
+  }
   updateStorageBadge();
+  return loaded;
 }
 async function detectApiBase() {
   if(window.__SNAPSHOT__||window.__WORKSPACE_DISCONNECTED__||(!window.__TOUDI_SERVICE__&&!['127.0.0.1','localhost','[::1]'].includes(location.hostname)))return null;
-  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),1500);
-  try{const r=await fetch('/api/edits',{signal:ctrl.signal});return r.ok?'':null;}catch(e){return null;}finally{clearTimeout(timer);}
+  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),8000);
+  try{const r=await fetch('/api/health',{signal:ctrl.signal,cache:'no-store'});if(!r.ok)return null;const status=await r.json();return status.ok===true&&/^[a-f0-9]{64}$/.test(status.workspaceKey||'')?'':null;}catch(e){return null;}finally{clearTimeout(timer);}
 }
 
 function reapplyEdits() {
@@ -1310,10 +1387,22 @@ function persistToServer() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(flushEdits,400);
 }
-async function flushEdits(){
+function flushEdits(){
   clearTimeout(saveTimer);saveTimer=null;
-  if(editsSaveInFlight||!editsDirty||editsConflict||apiBase===null)return;
+  if(editsSaveInFlight)return editsSavePromise;
+  if(!editsDirty||editsConflict||apiBase===null)return Promise.resolve();
   editsSaveInFlight=true;
+  editsSavePromise=flushEditsRequest();return editsSavePromise;
+}
+async function settlePersonalEdits(){
+  // The public management base spans related workspace files. Finish this
+  // page's already-requested mark save before reading a new schedule base.
+  for(let i=0;i<4&&(editsDirty||editsSaveInFlight);i++){
+    await flushEdits();if(editsConflict||SAVE_DOMAINS.edits.state==='error')return false;
+  }
+  return !editsDirty&&!editsSaveInFlight&&!editsConflict;
+}
+async function flushEditsRequest(){
   const sentGeneration=editsSaveGeneration;
   const sentDraft=readOwnDraft('edits');
   if(!sentDraft){editsSaveInFlight=false;setSaveState('edits','error','个人草稿缺失，未发送');return;}
@@ -1631,7 +1720,7 @@ function render() {
       <td>${dlBadge}</td>
       <td><span class="status-badge ${STATUSES.includes(item._status)?'s-'+item._status:'s-unknown'}" onclick="showStatusDropdown(event,${item._idx})" title="${STATUSES.includes(item._status)?'进度':'原标记：'+esc(item._status)}">${STATUSES.includes(item._status)?item._status:UNKNOWN_STATUS}</span></td>
       <td class="note-cell"><span class="${noteCls}" onclick="openNoteModal(${item._idx})" title="${esc(item._note)}">${esc(notePrev)}</span></td>
-      <td style="white-space:nowrap;font-size:12px">${item['公告链接']?`<a href="${esc(item['公告链接'])}" target="_blank">公告</a>`:''} ${item['网申链接/邮箱']?`<a href="${esc(item['网申链接/邮箱'])}" target="_blank">网申</a>`:''}</td>
+      <td style="white-space:nowrap;font-size:12px">${item['公告链接']?`<a class="action-link table-entry-link" href="${esc(item['公告链接'])}" target="_blank" rel="noopener noreferrer">公告</a>`:''} ${item['网申链接/邮箱']?`<a class="action-link table-entry-link" href="${esc(item['网申链接/邮箱'])}" target="_blank" rel="noopener noreferrer">网申</a>`:''}</td>
     </tr>`;
   }).join('');
 
@@ -1702,6 +1791,7 @@ function renderActiveFilters() {
     });
   }
   el.innerHTML = html;const clear=document.getElementById('clearConditions');if(clear)clear.hidden=!searchQuery&&!Object.values(filters).some(v=>v.length);
+  const count=Object.values(filters).reduce((total,values)=>total+values.length,0),badge=document.getElementById('recordFilterCount');if(badge){badge.hidden=!count;badge.textContent=String(count);}
 }
 
 function removeFilter(key, value) {
@@ -1814,10 +1904,12 @@ function closeNoteModal(){document.getElementById('noteModal').style.display='no
 function saveNote(){if(!personalMutationAllowed())return;if(currentNoteIdx<0)return;const it=byId(currentNoteIdx);if(!it)return;const text=document.getElementById('noteText').value.trim();const e=editForItem(it);e.note=text;it._note=text;saveEdits();closeNoteModal();render();showToast('备注已修改，正在保存…');}
 
 // ============== DETAIL ==============
-let detailIdx=null,detailReturnFocus=null;const detailInputMemory=new Map();
+let detailIdx=null,detailReturnFocus=null,detailTab='detailRecruitment',detailLoadId=0;const detailInputMemory=new Map(),detailScrollMemory=new Map();
 function rememberDetailInputs(){
-  if(detailIdx===null)return;
-  detailInputMemory.set(detailIdx,[...document.querySelectorAll('#detailContent input,#detailContent textarea')].map(e=>({id:e.id,value:e.value})));
+  // A closed dialog retains old DOM. After records are reordered/replaced,
+  // caching that DOM again can create a phantom draft under its old index.
+  if(detailIdx===null||document.getElementById('detailModal').style.display!=='flex'||!byId(detailIdx))return;
+  detailInputMemory.set(detailIdx,[...document.querySelectorAll('#detailContent input,#detailContent textarea,#detailContent details[id]')].map(e=>({id:e.id,value:e.value,open:e.open})));
 }
 function stepDetail(delta){const rows=getFiltered();const n=rows.findIndex(r=>r._idx===detailIdx);const next=rows[n+delta];if(next)showDetail(next._idx);}
 function openApplicationMaterial(idx,kind){
@@ -1838,34 +1930,63 @@ function detailFact(item,key,label=key,wide=false){
 function detailEntryLink(value,label){
   const v=String(value||'').trim();if(!v)return '';
   const href=/^https?:\/\//i.test(v)?v:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)?'mailto:'+v:'';
-  return href?`<a class="btn btn-sm" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`:`<span class="detail-prose">${esc(label)}：${esc(v)}</span>`;
+  return href?`<a class="action-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer"><span>${esc(label)}</span>${navigationIcon()}</a>`:`<span class="detail-prose">${esc(label)}：${esc(v)}</span>`;
 }
+function navigationIcon(internal=false){return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${internal?'<path d="M4 10h12m-5-5 5 5-5 5"/>':'<path d="M5 15 15 5M6 5h9v9"/>'}</svg>`;}
+function resourceLink(url,label){return `<a class="action-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer"><span>${esc(label)}</span>${navigationIcon()}</a>`;}
 function mergedSourceHtml(src){
   const e=src['编辑键']?(userEdits[src['编辑键']]||{}):{};
   const marks=[e.excluded?'不适合':'',e.status||'',e.starred?'已收藏':'',e.research?'待探查':''].filter(Boolean);
   return `<article class="detail-source"><h4>${esc(src['名称']||'招聘记录')}</h4>${marks.length?`<p class="detail-context">${esc(marks.join(' · '))}</p>`:''}<p class="detail-prose">${esc(src['岗位']||'岗位未注明')}</p><dl class="detail-facts">${['地点','应届生','学历要求','截止时间','录入时间'].filter(k=>src[k]).map(k=>detailFact(src,k)).join('')}</dl><div class="detail-links">${detailEntryLink(src['公告链接'],'招聘公告')}${detailEntryLink(src['网申链接/邮箱'],'投递入口')}</div>${e.note?`<p class="detail-prose">${esc(e.note)}</p>`:''}</article>`;
 }
-function showDetail(idx){
+function detailMaterialsHtml(idx){
+  const item=byId(idx);if(!item)return '';
+  const ppLinked=prepData.preps.filter(p=>p.companyKey===item._key),rvLinked=reviewData.sessions.filter(s=>s.companyKey===item._key);
+  return `<div class="detail-material-columns"><div class="detail-material-group"><h3>面试准备</h3><div class="detail-materials"><button class="btn btn-sm" onclick="openApplicationMaterial(${idx},'prep')">公司准备${ppLinked.length?'（'+ppLinked.length+'）':''}</button><button class="btn btn-sm" onclick="openGeneralPreparation()">通用准备</button></div><div class="detail-linked">${ppLinked.map(p=>`<button class="action-link" onclick="closeDetailModal();openPrep('${esc(p.id)}')">${esc(p.position||'准备文档')}${p.cohort?' · '+esc(p.cohort):''}</button>`).join('')}</div></div><div class="detail-material-group"><h3>面试复盘</h3><div class="detail-materials"><button class="btn btn-sm" onclick="openApplicationMaterial(${idx},'review')">公司复盘${rvLinked.length?'（'+rvLinked.length+'）':''}</button><button class="btn btn-sm" onclick="closeDetailModal();switchView('review');switchReviewTab('weakness')">弱项追踪</button></div><div class="detail-linked">${rvLinked.map(r=>`<button class="action-link" onclick="closeDetailModal();openReviewSession('${esc(r.id)}')">${esc(r.date||'')} ${esc(r.round||'面试复盘')}</button>`).join('')}</div></div></div>`;
+}
+async function loadDetailRelations(idx,request){
+  const item=byId(idx);if(!item)return;
+  const current=()=>request===detailLoadId&&detailIdx===idx&&document.getElementById('detailModal').style.display==='flex';
+  const results=await Promise.allSettled([window.toudiSchedule.refresh({preserveInspector:true}),ensureViewData('qbank'),ensureViewData('review')]);
+  if(!current())return;
+  const target=document.getElementById('detailSchedule');
+  if(results[0].status==='rejected'||window.toudiSchedule.hasError())target.innerHTML='<p class="detail-context">日程暂时无法读取，可在日程页重新读取。</p>';
+  else {const events=window.toudiSchedule.linked(item._key),format=event=>!event.start?'待安排':event.allDay?event.start:new Intl.DateTimeFormat('zh-CN',{timeZone:event.timeZone||'Asia/Shanghai',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(event.start));target.innerHTML=events.length?events.slice().sort((a,b)=>(a.start||'9999').localeCompare(b.start||'9999')).map(event=>`<button class="detail-schedule-row" data-detail-event="${esc(event.id)}"><span><strong>${esc(event.title)}</strong><small>${esc(format(event))} · ${event.status==='completed'?'已完成':'待完成'}</small></span><span aria-hidden="true">›</span></button>`).join(''):'<p class="detail-context">尚未安排日程</p>';}
+  document.getElementById('detailMaterials').innerHTML=detailMaterialsHtml(idx);
+}
+function showDetail(idx,options={}){
   const opening=document.getElementById('detailModal').style.display!=='flex';if(opening)detailReturnFocus=document.activeElement;
   const previous=detailIdx,scroll=document.getElementById('detailContent').scrollTop;
-  rememberDetailInputs();detailIdx=idx;
+  if(options.fresh)detailInputMemory.delete(idx);else rememberDetailInputs();detailIdx=idx;if(opening||previous!==idx){detailTab='detailRecruitment';detailScrollMemory.clear();}
   const item=byId(idx);if(!item)return;
-  const rvLinked=reviewData.sessions.filter(s=>s.companyKey===item._key),ppLinked=prepData.preps.filter(p=>p.companyKey===item._key);
   const sources=Array.isArray(item['归并来源'])?item['归并来源']:[];
-  let html=`<section class="detail-section" id="detailRecruitment"><div class="detail-section-heading"><h3>招聘信息</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div><dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}${detailFact(item,'截止时间')}${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl><div class="detail-links" style="margin-top:16px">${detailEntryLink(item['公告链接'],'查看招聘公告')}${detailEntryLink(item['网申链接/邮箱'],'打开投递入口')}</div>${sources.length?`<details class="merged-sources"><summary>招聘来源与分计划（${sources.length} 条）</summary>${sources.map(mergedSourceHtml).join('')}</details>`:''}${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:''}</section>`;
-  html+=`<section class="detail-section" id="detailFollowup"><div class="detail-section-heading"><h3>跟进记录</h3><button class="btn btn-sm" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button></div><p class="detail-subtitle">投递进度</p><div class="detail-stages">${STATUSES.map(st=>`<button aria-pressed="${item._status===st}" class="${item._status===st?'active':''}" onclick="setStatus(${idx},'${st}');showDetail(${idx})">${st}</button>`).join('')}</div><div class="detail-section-heading"><h4 class="detail-subtitle">个人备注</h4><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p><div class="detail-followup"><button class="btn btn-sm" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><span>${item._research?'待探查：核实后再决定是否投递':''}</span></div><label class="detail-subtitle" for="researchNote">待核实事项与探查记录</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存探查记录</button><button class="btn btn-sm" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button></div></section>`;
-  html+=`<section class="detail-section" id="detailMaterials"><div class="detail-section-heading"><h3>准备与复盘</h3></div><div class="detail-material-group"><p class="detail-subtitle">面试准备</p><div class="detail-materials"><button class="btn btn-sm" onclick="openApplicationMaterial(${idx},'prep')">公司准备${ppLinked.length?'（'+ppLinked.length+'）':''}</button><button class="btn btn-sm" onclick="openGeneralPreparation()">通用准备</button></div><div class="detail-linked">${ppLinked.map(p=>`<button onclick="closeDetailModal();openPrep('${esc(p.id)}')">${esc(p.position||'准备文档')}${p.cohort?' · '+esc(p.cohort):''}</button>`).join('')}</div></div><div class="detail-material-group"><p class="detail-subtitle">面试复盘</p><div class="detail-materials"><button class="btn btn-sm" onclick="openApplicationMaterial(${idx},'review')">公司复盘${rvLinked.length?'（'+rvLinked.length+'）':''}</button><button class="btn btn-sm" onclick="closeDetailModal();switchView('review');switchReviewTab('weakness')">弱项追踪</button></div><div class="detail-linked">${rvLinked.map(r=>`<button onclick="closeDetailModal();openReviewSession('${esc(r.id)}')">${esc(r.date||'')} ${esc(r.round||'面试复盘')}</button>`).join('')}</div></div></section>`;
+  const panel=(id,body)=>`<section class="detail-section" id="${id}" role="tabpanel" aria-labelledby="tab-${id}" ${detailTab===id?'':'hidden'}>${body}</section>`;
+  let html=panel('detailRecruitment',`<div class="detail-section-heading"><h3>岗位与要求</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div>${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:`<dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'截止时间','招聘截止')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}</dl>`}<details id="detailSourceInfo" class="detail-source-info"><summary>企业信息与招聘来源${sources.length?' · '+sources.length+' 条':''}</summary><dl class="detail-facts">${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl>${sources.length?sources.map(mergedSourceHtml).join(''):''}</details><div class="detail-related-schedule"><div class="detail-section-heading"><h3>日程安排</h3><button class="schedule-link" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加事项</button></div><div id="detailSchedule"><p class="detail-context">正在读取日程…</p></div></div>`);
+  html+=panel('detailFollowup',`<div class="detail-section-heading"><h3>投递进度</h3><button class="btn btn-sm" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button></div><div class="detail-stages">${STATUSES.map(st=>`<button aria-pressed="${item._status===st}" class="${item._status===st?'active':''}" onclick="setStatus(${idx},'${st}');showDetail(${idx})">${st}</button>`).join('')}</div><div class="detail-followup"><button class="btn btn-sm" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><button class="btn btn-sm" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button><span>${item._research?'待探查：核实后再决定是否投递':''}</span></div><div class="detail-note-block"><div class="detail-section-heading"><h3>个人备注</h3><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p></div><div class="detail-note-block"><label class="detail-subtitle" for="researchNote">待核实事项与探查记录</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存探查记录</button></div></div>`);
+  html+=panel('detailMaterials',detailMaterialsHtml(idx));
   document.getElementById('detailTitle').textContent=item['名称'];
-  document.getElementById('detailLead').innerHTML=`<p class="detail-context">${esc(item['校招类型']||'招聘记录')} · ${esc(item._status)}${item._starred?' · 已收藏':''}</p><nav class="detail-shortcuts" aria-label="详情章节"><button onclick="jumpDetailSection('detailRecruitment')">招聘信息</button><button onclick="jumpDetailSection('detailFollowup')">跟进记录</button><button onclick="jumpDetailSection('detailMaterials')">准备与复盘</button></nav>`;
+  document.getElementById('detailMeta').textContent=[item['校招类型']||'招聘记录',item._status,item._starred?'已收藏':''].filter(Boolean).join(' · ');
+  document.getElementById('detailLead').innerHTML=`<div class="detail-entry-actions"><div class="detail-links">${detailEntryLink(item['公告链接'],'招聘公告')}${detailEntryLink(item['网申链接/邮箱'],'投递入口')}</div><button class="btn btn-sm btn-primary" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加到日历</button></div><nav class="detail-shortcuts" role="tablist" aria-label="招聘详情">${[['detailRecruitment','招聘信息'],['detailFollowup','跟进记录'],['detailMaterials','准备与复盘']].map(([id,title])=>`<button id="tab-${id}" role="tab" aria-controls="${id}" aria-selected="${detailTab===id}" tabindex="${detailTab===id?0:-1}" onclick="jumpDetailSection('${id}')">${title}</button>`).join('')}</nav>`;
   document.getElementById('detailContent').innerHTML=html;
-  (detailInputMemory.get(idx)||[]).forEach(x=>{const e=document.getElementById(x.id);if(e)e.value=x.value;});
+  (detailInputMemory.get(idx)||[]).forEach(x=>{const e=document.getElementById(x.id);if(e){if(e.tagName==='DETAILS')e.open=x.open;else e.value=x.value;}});
   document.getElementById('detailModal').style.display='flex';
   document.getElementById('detailContent').scrollTop=!opening&&previous===idx?scroll:0;
   const rows=getFiltered(),position=rows.findIndex(r=>r._idx===idx),nav=document.querySelectorAll('.detail-nav button');nav[0].disabled=position<=0;nav[1].disabled=position<0||position>=rows.length-1;if(opening)nav[2].focus({preventScroll:true});
+  loadDetailRelations(idx,++detailLoadId);
 }
 
-function jumpDetailSection(id){const el=document.getElementById(id);if(el)el.scrollIntoView({block:'start',behavior:workspace.motion==='off'||matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}
+function jumpDetailSection(id){if(!['detailRecruitment','detailFollowup','detailMaterials'].includes(id))return;const content=document.getElementById('detailContent');detailScrollMemory.set(detailTab,content.scrollTop);detailTab=id;document.querySelectorAll('#detailContent>[role="tabpanel"]').forEach(el=>{el.hidden=el.id!==id;});document.querySelectorAll('.detail-shortcuts [role="tab"]').forEach(el=>{const active=el.getAttribute('aria-controls')===id;el.setAttribute('aria-selected',active);el.tabIndex=active?0:-1;});content.scrollTop=detailScrollMemory.get(id)||0;}
+document.querySelector('.detail-sticky').addEventListener('keydown',event=>{const tab=event.target.closest('[role="tab"]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const tabs=[...document.querySelectorAll('.detail-shortcuts [role="tab"]')],i=tabs.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(i+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;jumpDetailSection(tabs[next].getAttribute('aria-controls'));tabs[next].focus();});
+document.getElementById('detailContent').addEventListener('click',event=>{const button=event.target.closest('[data-detail-event]');if(button)window.toudiSchedule.openLinked(button.dataset.detailEvent);});
 function closeDetailModal(){rememberDetailInputs();document.getElementById('detailModal').style.display='none';if(detailReturnFocus?.isConnected)detailReturnFocus.focus({preventScroll:true});}
+function refreshRecruitmentDetail(key){
+  if(!key || document.getElementById('detailModal').style.display!=='flex')return;
+  const item=data.find(row=>row._key===key);
+  if(!item){closeDetailModal();detailIdx=null;detailInputMemory.clear();return;}
+  const tab=detailTab,scroll=document.getElementById('detailContent').scrollTop;
+  detailIdx=item._idx;showDetail(item._idx,{fresh:true});jumpDetailSection(tab);
+  document.getElementById('detailContent').scrollTop=scroll;
+}
 document.addEventListener('keydown',event=>{const modal=document.getElementById('detailModal');if(modal.style.display!=='flex')return;if(event.key==='Escape'){event.preventDefault();closeDetailModal();return;}if(event.key==='Tab'){const nodes=[...modal.querySelectorAll('button,input,a,summary,textarea,[tabindex]')].filter(e=>!e.disabled&&e.getClientRects().length),first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
 
 // ============== FIELD OVERRIDES ==============
@@ -1878,13 +1999,13 @@ function fieldEditForm(item){
     const cur=item[k]||'';
     const ovr=item._rawF&&item._rawF[k]!==undefined;
     const resetBtn=ovr?`<button class="btn btn-sm" style="margin-left:6px" title="恢复为抓取的原始值：${esc(String(item._rawF[k]||'—'))}" onclick="resetField(${item._idx},'${k}')">恢复</button>`:'';
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <span style="flex:0 0 70px;color:var(--muted);font-size:13px">${k}</span>
-      <input id="fe_${k}" type="text" value="${esc(cur)}" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="留空则不生效">
+    return `<div class="detail-field-row">
+      <span>${k}</span>
+      ${k==='岗位'||/[\r\n]/.test(cur)?`<textarea id="fe_${k}" rows="3" placeholder="留空则不生效">${esc(cur)}</textarea>`:`<input id="fe_${k}" type="text" value="${esc(cur)}" placeholder="留空则不生效">`}
       ${resetBtn}
     </div>`;
   }).join('');
-  return `<div style="margin-top:10px;padding:12px;border:1px dashed var(--border);border-radius:8px;background:var(--bg-soft,#f8fafc)">
+  return `<div class="detail-field-editor">
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px">修改只覆盖显示，不改动抓取的原始数据；与抓取值一致或留空的字段不会被记录。</div>
     ${rows}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
@@ -2031,15 +2152,16 @@ async function flushReviews(){
   finally{reviewSaveInFlight=false;if(reviewDirty&&reviewSaveGeneration>sentGeneration&&!reviewConflict)setTimeout(flushReviews,0);}
 }
 async function initReviewsStorage(){
-  if(reviewDirty||reviewConflict||reviewFormEditing())return;
+  if(reviewDirty||reviewConflict||reviewFormEditing())return false;
   let draft=readOwnDraft('reviews');
-  if(apiBase===null){if(draft&&Array.isArray(draft.data.sessions)){reviewData={sessions:draft.data.sessions};reviewDraftBase=String(draft.base);reviewDirty=true;setSaveState('reviews','error','发现未提交的复盘草稿');if(view==='review')renderReview();}else loadReviewsCache();return;}
+  if(apiBase===null){if(draft&&Array.isArray(draft.data.sessions)){reviewData={sessions:draft.data.sessions};reviewDraftBase=String(draft.base);reviewDirty=true;setSaveState('reviews','error','发现未提交的复盘草稿');if(view==='review')renderReview();}else loadReviewsCache();return false;}
   const startedGeneration=reviewSaveGeneration;
+  let loaded=false;
   try{
     const res=await fetch(apiBase+'/api/reviews');
     if(!res.ok)throw new Error('bad status');
     const payload=(await res.json())||{};
-    if(reviewDirty||reviewConflict||reviewFormEditing()||reviewSaveGeneration!==startedGeneration)return;
+    if(reviewDirty||reviewConflict||reviewFormEditing()||reviewSaveGeneration!==startedGeneration)return false;
     if(!Array.isArray(payload.sessions)||typeof payload.version!=='string')throw new Error('invalid payload');
     if(payload.workspaceKey!==toudiWorkspaceStorage.id)throw Error('workspace mismatch');
     discardConfirmedDrafts('reviews',{sessions:payload.sessions});draft=readOwnDraft('reviews');
@@ -2050,8 +2172,10 @@ async function initReviewsStorage(){
     }else{
       reviewDraftBase=null;reviewData.sessions=payload.sessions;setSaveState('reviews','idle','');
     }
+    loaded=true;
   }catch(e){setReadError('reviews','复盘数据读取失败');}
   if(view==='review')renderReview();
+  return loaded;
 }
 function sessionById(id){return reviewData.sessions.find(s=>s.id===id);}
 function rowByCompanyKey(key){return key?(data.find(d=>d._key===key)||null):null;}
@@ -2275,16 +2399,19 @@ let prepData={preps:[]};
 function loadPrepsCache(){const d=cachedData("toudiPreps");if(d&&Array.isArray(d.preps))prepData=d;}
 async function initPrepsStorage(){
   loadPrepsCache();
-  if(apiBase===null)return;
+  if(apiBase===null)return false;
+  let loaded=false;
   try{
-    const res=await fetch(apiBase+'/api/preps');
+    const res=await fetch(apiBase+'/api/preps',{cache:'no-store'});
     if(!res.ok)throw new Error('bad status');
     const disk=((await res.json())||{}).preps;
     if(!Array.isArray(disk))throw new Error('invalid preps');
     workspaceReadStates.preps='ready';
     prepData.preps=disk;
+    loaded=true;
   }catch(e){workspaceReadStates.preps='error';showToast('公司准备读取失败，请检查本地数据文件');}
   if(view==='qbank'&&!qbankFormEditing())renderQbank();
+  return loaded;
 }
 function prepById(id){return prepData.preps.find(p=>p.id===id);}
 function openPrep(id){rememberPrep();qbMode='company';qbSearch='';qbSearchDocument=false;currentQbCat='prep:'+id;qbEdit={item:null};if(view!=='qbank')switchView('qbank');else renderQbank();}
@@ -2293,13 +2420,16 @@ function openPrep(id){rememberPrep();qbMode='company';qbSearch='';qbSearchDocume
 let prospectData={prospects:[]}, currentProspectId=null, prospectSearch='', prospectScope='all', prospectOrder='newest', prospectLoadError='', prospectSideCollapsed=localStorage.getItem('prospectSideCollapsed')==='1';
 function loadProspectsCache(){const d=cachedData("toudiProspects");if(d&&Array.isArray(d.prospects))prospectData=d;}
 async function initProspectsStorage(){
-  loadProspectsCache();if(apiBase===null)return;
+  loadProspectsCache();if(apiBase===null)return false;
+  let loaded=false;
   try{
-    const res=await fetch(apiBase+'/api/prospects');const disk=await res.json();
+    const res=await fetch(apiBase+'/api/prospects',{cache:'no-store'});const disk=await res.json();
     if(!res.ok||disk.schemaVersion!==1||!Array.isArray(disk.prospects))throw new Error(disk.error||'探查目录加载失败');
     prospectData=disk;prospectLoadError='';
+    loaded=true;
   }catch(e){prospectLoadError=e.message;}
   if(view==='prospect')renderProspect();
+  return loaded;
 }
 function prospectById(id){return prospectData.prospects.find(p=>p.id===id);}
 function prospectVisible(){
@@ -2331,9 +2461,9 @@ function renderProspectMain(el){
   if(!p){el.innerHTML=workspaceEmptyState('prospects',prospectData.prospects.length>0);return;}
   let bodyMd=(p.content||'').replace(/^#\s+.*\n?/,'');
   bodyMd=bodyMd.replace(/\]\(((?:归档|证据)\/[^)]+\.md)\)/g,(_,path)=>`](/api/prospect-file?path=${encodeURIComponent(path)})`);
-  const attachments=(p.attachments||[]).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.label)}</a>`).join(' · ');
-  const archives=(prospectData.archives||[]).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.label)}</a>`).join(' · ');
-  el.innerHTML=`<div class="rv-panel" id="prospectDoc"><div class="rv-panel-head"><h3>${esc(p.title)}</h3></div><div class="pp-meta" style="margin-bottom:12px">${p.researchedAt?'探查日期 '+esc(p.researchedAt):'尚未开展探查'} · ${esc(p.status)}${p.organizedAt?' · 资料整理 '+esc(p.organizedAt):''}</div><div class="pp-md">${renderMd(bodyMd)}</div>${attachments?`<details style="margin-top:24px"><summary>证据专项与历史原件（${p.attachments.length}）</summary><p>${attachments}</p></details>`:''}${archives?`<details style="margin-top:16px"><summary>历史综合资料</summary><p>${archives}</p></details>`:''}</div>`;
+  const attachments=(p.attachments||[]).map(a=>resourceLink(a.url,a.label)).join('');
+  const archives=(prospectData.archives||[]).map(a=>resourceLink(a.url,a.label)).join('');
+  el.innerHTML=`<div class="rv-panel" id="prospectDoc"><div class="rv-panel-head"><h3>${esc(p.title)}</h3></div><div class="pp-meta" style="margin-bottom:12px">${p.researchedAt?'探查日期 '+esc(p.researchedAt):'尚未开展探查'} · ${esc(p.status)}${p.organizedAt?' · 资料整理 '+esc(p.organizedAt):''}</div><div class="pp-md">${renderMd(bodyMd)}</div>${attachments?`<details style="margin-top:24px"><summary>证据专项与历史原件（${p.attachments.length}）</summary><div class="resource-actions">${attachments}</div></details>`:''}${archives?`<details style="margin-top:16px"><summary>历史综合资料</summary><div class="resource-actions">${archives}</div></details>`:''}</div>`;
   const doc=document.getElementById('prospectDoc');const toc=buildTocHtml(doc);if(toc)doc.insertAdjacentHTML('afterbegin',toc);highlightSearch(doc,prospectSearch.trim());
 }
 
@@ -2773,21 +2903,22 @@ async function flushQbank(){
   finally{qbankSaveInFlight=false;if(qbankDirty&&qbankSaveGeneration>sentGeneration&&!qbankConflict)setTimeout(flushQbank,0);}
 }
 async function initQbankStorage(){
-  if(qbankDirty||qbankConflict||qbankFormEditing())return;
+  if(qbankDirty||qbankConflict||qbankFormEditing())return false;
   if(!qbData.categories.length)loadQbankCache();
   qbLoadState='loading';
   let draft=readOwnDraft('qbank');
-  if(apiBase===null){loadQbankCache();qbankWritable=false;qbLoadState=window.__SNAPSHOT__?'ready':'error';if(view==='qbank')renderQbank();return;}
+  if(apiBase===null){loadQbankCache();qbankWritable=false;qbLoadState=window.__SNAPSHOT__?'ready':'error';if(view==='qbank')renderQbank();return false;}
   const startedGeneration=qbankSaveGeneration;
+  let loaded=false;
   try{
     const res=await fetch(apiBase+'/api/questionbank');
     if(!res.ok)throw new Error('bad status');
     const payload=(await res.json())||{};
-    if(qbankDirty||qbankConflict||qbankFormEditing()||qbankSaveGeneration!==startedGeneration)return;
+    if(qbankDirty||qbankConflict||qbankFormEditing()||qbankSaveGeneration!==startedGeneration)return false;
     if(!Array.isArray(payload.categories))throw new Error('invalid payload');
     if(typeof payload.version!=='string'){
       qbData={categories:draft&&Array.isArray(draft.data.categories)?draft.data.categories:payload.categories};qbankWritable=false;qbLoadState='legacy';
-      setReadError('qbank','内容可阅读，编辑暂不可用');if(view==='qbank')renderQbank();return;
+      setReadError('qbank','内容可阅读，编辑暂不可用');if(view==='qbank')renderQbank();return false;
     }
     if(payload.workspaceKey!==toudiWorkspaceStorage.id)throw Error('workspace mismatch');
     discardConfirmedDrafts('qbank',{categories:payload.categories});draft=readOwnDraft('qbank');
@@ -2798,6 +2929,7 @@ async function initQbankStorage(){
     }else{
       qbankDraftBase=null;qbData.categories=payload.categories;setSaveState('qbank','idle','');
     }
+    loaded=true;
   }catch(e){
     qbankWritable=false;qbLoadState='error';
     if(draft&&Array.isArray(draft.data.categories))qbData={categories:draft.data.categories};
@@ -2805,6 +2937,7 @@ async function initQbankStorage(){
     setReadError('qbank','问答库读取失败');
   }
   if(view==='qbank')renderQbank();
+  return loaded;
 }
 function qbCatById(id){return qbData.categories.find(c=>c.id===id);}
 function toggleQbSide(){qbSideCollapsed=!qbSideCollapsed;localStorage.setItem('qbSideCollapsed',qbSideCollapsed?'1':'0');document.getElementById('qbSide').classList.toggle('rv-collapsed',qbSideCollapsed);updateDirectoryControls();}
@@ -2989,6 +3122,7 @@ function updateTopbarTitle(){
     set(p?p.title:'岗位探查');
     return;
   }
+  if(view==='schedule'){set('日程');return;}
   set('投递中控台');
 }
 function switchView(v){
@@ -3010,10 +3144,12 @@ function switchView(v){
   if(v==='review')renderReview();
   if(v==='qbank')renderQbank();
   if(v==='prospect')renderProspect();
+  if(v==='schedule')window.toudiSchedule?.show();else window.toudiSchedule?.hide();
   requestAnimationFrame(restoreViewScroll);
 }
 function updateDashboardChrome(){
   const dashboard=['table','kanban','charts'].includes(view);
+  document.getElementById('recordsOverview').hidden=!dashboard;
   document.getElementById('statsBar').style.display=dashboard?'':'none';
   document.getElementById('dashboardToolbar').style.display=dashboard?'':'none';
   updateBatchBar();
@@ -3110,8 +3246,9 @@ function updateFrozenColumns(){
 window.addEventListener('resize',()=>{if(innerWidth>900)requestAnimationFrame(updateFrozenColumns);});
 function clearAdditional(){filters={};searchQuery='';document.getElementById('searchInput').value='';currentPage=1;selected.clear();render();}
 function searchFilterOptions(input){const group=input.closest('.filter-group');group.dataset.search=input.value;group.querySelectorAll('.filter-item').forEach(el=>{el.hidden=!el.textContent.toLowerCase().includes(input.value.toLowerCase());});if(input.value&&group.querySelector('.zero-options'))group.querySelector('.zero-options').open=true;}
-function openFilters(key){const modal=document.getElementById('filterModal');modal.style.display='flex';buildFilterPanel();if(key){const group=document.querySelector(`.filter-group[data-group="${key}"]`);group?.scrollIntoView({block:'start'});group?.querySelector('input[type=search]')?.focus();}}
-function closeFilters(){document.getElementById('filterModal').style.display='none';}
+let filterReturnFocus=null;
+function openFilters(key){filterReturnFocus=document.activeElement;const modal=document.getElementById('filterModal');modal.style.display='flex';document.querySelectorAll('[aria-controls="filterModal"]').forEach(button=>button.setAttribute('aria-expanded','true'));buildFilterPanel();const group=key?document.querySelector(`.filter-group[data-group="${key}"]`):document.querySelector('#filterPanel .filter-group');if(key)group?.scrollIntoView({block:'start'});(group?.querySelector('input[type=search]')||modal.querySelector('button'))?.focus();}
+function closeFilters(){const modal=document.getElementById('filterModal');if(modal.style.display!=='flex')return;modal.style.display='none';document.querySelectorAll('[aria-controls="filterModal"]').forEach(button=>button.setAttribute('aria-expanded','false'));if(filterReturnFocus?.isConnected)filterReturnFocus.focus();filterReturnFocus=null;}
 function columnLabel(c){return ({_star:'收藏',_exclude:'不适合',_research:'待探查'})[c.key]||c.label||c.key;}
 function renderColumnMenu(){document.getElementById('columnMenu').innerHTML='<strong>表格显示列</strong><button class="btn btn-sm" onclick="showAllColumns()">全部显示</button><div class="column-options">'+COLUMNS.filter(c=>c.key!=='_check').map(c=>`<label><input type="checkbox" data-column-key="${esc(c.key)}" ${workspace.columns.includes(c.key)?'checked':''} onchange="setColumn('${esc(c.key)}',this.checked)">${esc(columnLabel(c))}</label>`).join('')+'</div>'; }
 function toggleColumnMenu(){const m=document.getElementById('columnMenu');m.hidden=!m.hidden;document.getElementById('columnMenuButton').setAttribute('aria-expanded',String(!m.hidden));if(!m.hidden)renderColumnMenu();}
@@ -3146,22 +3283,22 @@ const originalQuick=renderQuickViews;renderQuickViews=function(){originalQuick()
 FILTER_DEFS.push({key:'_deadlineBucket',label:'截止时间',custom:['已过期','7天内','8—14天','14天后','招满即止','日期待核实']});
 const originalBuildGroup=buildFilterGroup;buildFilterGroup=function(label,key,values){const selectedValues=filters[key]||[];const visible=values.filter(([v,c])=>c>0||selectedValues.includes(v)),zero=values.filter(([v,c])=>!c&&!selectedValues.includes(v));let html=originalBuildGroup(label,key,visible).replace('<div class="filter-items">','<input type="search" class="filter-option-search" placeholder="搜索'+label+'选项" aria-label="搜索'+label+'选项" oninput="searchFilterOptions(this)"><div class="filter-items">');if(zero.length)html=html.replace('</div></div>',`<details class="zero-options"><summary>零结果选项（${zero.length}）</summary>${zero.map(([v,c])=>`<label class="filter-item"><input type="checkbox" value="${esc(v)}" data-filter="${key}" onchange="onFilterChange(this)"> ${esc(v)} <span class="count">0</span></label>`).join('')}</details></div></div>`);return html;};
 const originalBuildPanel=buildFilterPanel;buildFilterPanel=function(){if(document.getElementById('filterModal')?.style.display!=='flex')return;const panel=document.getElementById('filterPanel'),saved=Object.fromEntries([...panel.querySelectorAll('.filter-group')].map(g=>[g.dataset.group,{search:g.querySelector('input[type=search]')?.value||'',zero:g.querySelector('.zero-options')?.open||false}]));originalBuildPanel();panel.querySelectorAll('.filter-group').forEach(g=>{const s=saved[g.dataset.group];if(!s)return;const inp=g.querySelector('input[type=search]');inp.value=s.search;searchFilterOptions(inp);if(g.querySelector('.zero-options'))g.querySelector('.zero-options').open=s.zero;});};
-const originalSwitch=switchView;switchView=function(v){ensureViewData(v);if(v==='settings'){if(view==='qbank')rememberQbForm();saveViewScroll();view=v;['tableView','kanbanView','chartsView','reviewView','qbView','prospectView'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('settingsView').style.display='';renderSettings();updateDashboardChrome();document.getElementById('topbarTitle').textContent='设置';}else{document.getElementById('settingsView').style.display='none';originalSwitch(v);}refreshWorkspaceChrome();revealModule();};
-function revealModule(){const id=({table:'tableView',kanban:'kanbanView',charts:'chartsView',qbank:'qbView',review:'reviewView',prospect:'prospectView',settings:'settingsView'})[view],el=document.getElementById(id);if(!el)return;el.classList.remove('module-enter');void el.offsetWidth;el.classList.add('module-enter');}
-function refreshWorkspaceChrome(){const managementEntry=document.getElementById('managementEntry');if(managementEntry)managementEntry.hidden=view==='settings';document.getElementById('settingsShortcut').hidden=view==='settings';updateDirectoryControls();applyTheme();const dashboard=['table','kanban','charts'].includes(view);document.body.classList.toggle('content-module',!dashboard);document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(view));document.getElementById('quickViews').style.display=dashboard?'':'none';document.getElementById('deliverySearchEntry').hidden=!dashboard;document.getElementById('columnMenuButton').hidden=view!=='table'||innerWidth<=900;document.querySelectorAll('.module-nav button').forEach(b=>b.classList.toggle('active',b.dataset.module===(dashboard?'delivery':view)));document.getElementById('deliveryModes').style.display=dashboard?'':'none';if(document.getElementById('sidebar').classList.contains('open'))toggleSidebar();}
+const originalSwitch=switchView;switchView=function(v){ensureViewData(v);if(v==='settings'){window.toudiSchedule?.hide();if(view==='qbank')rememberQbForm();saveViewScroll();view=v;['tableView','kanbanView','chartsView','reviewView','qbView','prospectView'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('settingsView').style.display='';renderSettings();updateDashboardChrome();document.getElementById('topbarTitle').textContent='设置';}else{document.getElementById('settingsView').style.display='none';originalSwitch(v);}refreshWorkspaceChrome();revealModule();};
+function revealModule(){const id=({table:'tableView',kanban:'kanbanView',charts:'chartsView',qbank:'qbView',review:'reviewView',prospect:'prospectView',schedule:'scheduleView',settings:'settingsView'})[view],el=document.getElementById(id);if(!el)return;el.classList.remove('module-enter');void el.offsetWidth;el.classList.add('module-enter');}
+function refreshWorkspaceChrome(){const managementEntry=document.getElementById('managementEntry');if(managementEntry)managementEntry.hidden=['settings','schedule'].includes(view);document.getElementById('settingsShortcut').hidden=view==='settings';updateDirectoryControls();applyTheme();const dashboard=['table','kanban','charts'].includes(view);document.body.classList.toggle('content-module',!dashboard);document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(view));document.getElementById('quickViews').style.display=dashboard?'':'none';document.getElementById('deliverySearchEntry').hidden=!dashboard;document.getElementById('columnMenuButton').hidden=view!=='table'||innerWidth<=900;document.querySelectorAll('.module-nav button').forEach(b=>b.classList.toggle('active',b.dataset.module===(dashboard?'delivery':view)));document.getElementById('deliveryModes').style.display=dashboard?'':'none';if(document.getElementById('sidebar').classList.contains('open'))toggleSidebar();}
 function initWorkspaceUI(){
  if(window.__SNAPSHOT__){document.getElementById('storageBadge').textContent='只读快照 · 个人记录不可编辑';}
  pageSize=Number(workspace.pageSize)||50;
  document.getElementById('tableView').insertAdjacentHTML('afterbegin','<div id="mobileRecords" class="mobile-records"></div>');
- const side=document.getElementById('sidebar');side.querySelector('.sb-header').insertAdjacentHTML('afterend',`<nav class="module-nav" aria-label="工作模块">${[['delivery','投递管理'],['qbank','面试准备'],['prospect','岗位探查'],['review','面试复盘'],['settings','设置']].map(([k,n])=>`<button data-module="${k}" onclick="switchView('${k==='delivery'?'table':k}')">${n}</button>`).join('')}</nav>`);
- const toolbar=document.getElementById('dashboardToolbar');const search=side.querySelector('.sb-search');search.remove();search.querySelector('input').placeholder='搜索公司、岗位或招聘信息…';
- side.querySelector('#quickViews').insertAdjacentHTML('beforebegin','<div id="deliverySearchEntry"><button class="sb-search-entry" onclick="openFilters()">搜索与筛选</button></div>');
+ const side=document.getElementById('sidebar');side.querySelector('.sb-header').insertAdjacentHTML('afterend',`<nav class="module-nav" aria-label="工作模块">${[['delivery','投递管理'],['qbank','面试准备'],['prospect','岗位探查'],['review','面试复盘'],['schedule','日程'],['settings','设置']].map(([k,n])=>`<button data-module="${k}" onclick="switchView('${k==='delivery'?'table':k}')">${n}</button>`).join('')}</nav>`);
+ const toolbar=document.getElementById('dashboardToolbar');
+ side.querySelector('#quickViews').insertAdjacentHTML('beforebegin','<div id="deliverySearchEntry"><button class="sb-search-entry" onclick="openFilters()" aria-haspopup="dialog" aria-controls="filterModal" aria-expanded="false">详细筛选</button></div>');
  toolbar.insertAdjacentHTML('beforeend','<div class="table-tools"><button id="clearConditions" class="btn btn-sm" onclick="clearAdditional()">清除条件</button><button id="columnMenuButton" class="btn btn-sm" aria-expanded="false" onclick="toggleColumnMenu()">显示列</button><div id="columnMenu" hidden></div></div>');
 
  const modes=document.querySelector('.nav-groups .nav-group .view-toggle');modes.id='deliveryModes';document.querySelector('.topbar-actions').prepend(modes);document.querySelector('.nav-groups').hidden=true;
  side.querySelector('.sb-footer .btn-group').remove();
  document.querySelector('.content').insertAdjacentHTML('beforeend','<div id="settingsView" style="display:none"></div>');
- document.body.insertAdjacentHTML('beforeend','<div id="filterModal" class="modal-overlay workspace-filter-modal" style="display:none" onclick="if(event.target===this)closeFilters()"><div class="filter-dialog"><div class="filter-dialog-head"><h2>筛选投递记录</h2><button class="btn" onclick="closeFilters()">完成</button></div><p>在当前快捷视图内筛选，勾选后立即生效。</p><div id="filterDialogBody"></div></div></div>');document.getElementById('filterDialogBody').append(search,document.getElementById('filterPanel'));document.querySelector('#filterModal .filter-dialog').insertAdjacentHTML('beforeend','<div class="filter-dialog-actions"><button class="btn btn-sm" onclick="clearAdditional()">清除附加条件</button><button class="btn btn-sm" onclick="resetFilters()">重置全部</button><button class="btn btn-sm" onclick="saveCurrentView()">保存视图</button></div>');
+ document.body.insertAdjacentHTML('beforeend','<div id="filterModal" class="modal-overlay workspace-filter-modal" style="display:none" onclick="if(event.target===this)closeFilters()"><div class="filter-dialog" role="dialog" aria-modal="true" aria-labelledby="filterDialogTitle"><div class="filter-dialog-head"><h2 id="filterDialogTitle">筛选投递记录</h2><button class="btn" onclick="closeFilters()">完成</button></div><p>在当前搜索与快捷视图内筛选，勾选后立即生效。</p><div id="filterDialogBody"></div></div></div>');document.getElementById('filterDialogBody').append(document.getElementById('filterPanel'));document.querySelector('#filterModal .filter-dialog').insertAdjacentHTML('beforeend','<div class="filter-dialog-actions"><button class="btn btn-sm" onclick="clearAdditional()">清除附加条件</button><button class="btn btn-sm" onclick="resetFilters()">重置全部</button><button class="btn btn-sm" onclick="saveCurrentView()">保存视图</button></div>');
  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend',`<div class="theme-toolbar"><div class="theme-quick-control"><button id="themeQuickToggle" type="button" onclick="toggleThemeQuick()" aria-label="切换主题"></button><button id="themeMenuButton" type="button" aria-label="选择主题模式" aria-haspopup="menu" aria-controls="themeMenu" aria-expanded="false" onclick="toggleThemeMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></button></div><div id="themeMenu" role="menu" aria-label="主题模式" hidden>${[['system','跟随系统'],['light','浅色'],['dark','深色']].map(([key,label])=>`<button type="button" role="menuitemradio" data-theme="${key}" aria-checked="false" onclick="chooseTheme('${key}')"><span>${label}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button>`).join('')}</div></div>`);
  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend','<button id="settingsShortcut" class="btn btn-sm" onclick="switchView(\'settings\')">设置</button>');
  document.querySelector('.topbar-tools button[disabled]').remove();document.querySelector('.topbar-tools').style.display='none';
@@ -3369,8 +3506,8 @@ function showSelectedIndustries(){industryOnlySelected=!industryOnlySelected;con
 
 // One fixed entry point replaces repeated per-workflow Agent fields. Existing exports retain legacy settings.
 let workspaceConnection=null,workspaceConnectionError='',agentGuideText='',workspaceInfoPromise=null;
-const AGENT_START_GUIDE_URL='https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/开始与初始化.md';
-const GENERIC_AGENT_BOOTSTRAP=`请帮我首次接入 TouDi 投递中控台，确认工具、工作区与现有资料。
+const AGENT_START_GUIDE_URL='https://github.com/chenyiwang325-droid/toudi-with-codex/blob/main/docs/开始与初始化.md';
+const GENERIC_AGENT_BOOTSTRAP=`请作为我的 Codex 投递智能体，首次接入 TouDi，确认工具、工作区与现有资料。
 开始指南：${AGENT_START_GUIDE_URL}
 
 招聘信源（可选）：{只有要更新招聘记录时才提供；暂不处理可留空}
@@ -3382,14 +3519,15 @@ const GENERIC_AGENT_BOOTSTRAP=`请帮我首次接入 TouDi 投递中控台，确
 1. 先阅读开始指南。在我已授权的电脑上定位已安装的 TouDi 资料工具，运行 workspace status 确认当前绑定，再读取随包文档及工作区已有规则。无需让我重新填写目录；若无法访问，说明缺少的权限或材料，不扫描无关目录。
 2. 仅当本次涉及招聘记录或新增信源时，读取我的信源，列出实际字段、原始标签、学历词条及更新方式。以产品默认的行业层级和常用学历为基础，用 preference-catalog 核对实际词条；首次使用或新增来源时，只修正分类、同义词和明确学历范围的差异。已有规则继续沿用，只就影响筛选含义的歧义向我确认，再保存自己的 preferenceRules。地区、企业性质等附带信息不列为行业选项；MBA 等特殊、复杂或不明学历要求保留原文并兜底保留。
 3. 有明确后续任务时，读取最新资料及版本，完成所指定的小范围任务，保留既有进度、收藏、备注和无关内容。候选先 validate，再 commit，最后 read 读回；版本冲突保留候选并对账。
-4. 告诉我本次保存了什么、还有什么待确认，并让我在 App 点击“刷新资料”核对正文、标记与附件。后续沿用已确认流程，不重复初始化。
+4. 若本次需要辅助填报，对照我的完整简历维护 profile 资料，保留原文和整段经历的归属，不自行压缩。按辅助填报指南连接同一工作区，使用 ChatGPT 登录的本机 Codex；核对模型推荐 gpt-6-luna，只从实际模型目录选择并保存，不可用时报告，不换用 API 或其他模型。
+5. 告诉我本次保存了什么、还有什么待确认，并让我在 App 查看更新或点击“刷新资料”核对正文、标记与附件。后续沿用已确认流程，不重复初始化。
 
 缺少事实时明确报告，不猜测日期、学历资格或个人经历。没有相应任务授权时，不提交网申、不对外沟通、不发布个人资料。`;
 function agentBootstrapText(){return GENERIC_AGENT_BOOTSTRAP;}
 function agentTaskText(module){
   const tasks={records:['更新招聘记录','招聘信源或待整理记录'],qbank:['整理通用准备','本人真实经历、已有回答和要整理的题目'],preps:['建立或更新公司准备','公司、岗位 JD、实际投递简历和本次面试要求'],prospects:['探查岗位','指定公司/岗位、城市及待核实问题'],reviews:['复盘面试','真实逐字稿或纪要、公司、岗位与日期']};
   const [task,materials]=tasks[module]||tasks.records;
-  return `请帮我在 TouDi 中${task}。
+  return `请作为我的 Codex 投递智能体，在 TouDi 中${task}。
 开始指南：${AGENT_START_GUIDE_URL}
 本次范围：{填写具体对象与需要完成的内容}
 本次材料：{提供${materials}；缺少的事实保留未知}
@@ -3466,15 +3604,16 @@ function renderSettings(){
       ${window.__TOUDI_SERVICE__?.mode==='hosted'?'<section class="settings-section"><h3>访问</h3><form action="/auth/logout" method="post"><button class="btn">退出登录</button></form></section>':''}
     </div>
     <div class="settings-panel" id="settings-panel-agent" role="tabpanel" aria-labelledby="settings-tab-agent">
-      <section class="settings-section"><h3>如何开始</h3><p class="settings-help">先确认 Agent 能访问当前工作区，再按本次任务提供材料。也可以直接在各模块手动新增。</p>
-        <div class="settings-reading agent-start-link"><a href="${AGENT_START_GUIDE_URL}" target="_blank" rel="noopener noreferrer">阅读 GitHub 开始指南 ↗</a><span>逐步操作、可复制消息与日常任务示例</span></div>
+      <section class="settings-section"><h3>与 Codex 开始协作</h3><p class="settings-help">推荐用本机 Codex 初始化和维护资料，Luna 核对招聘表单。各模块也可手动新增、导入和编辑。</p>
+        <div class="settings-reading agent-start-link"><a class="action-link" href="${AGENT_START_GUIDE_URL}" target="_blank" rel="noopener noreferrer"><span>阅读 GitHub 开始指南</span>${navigationIcon()}</a><span>逐步操作、可复制消息与日常任务示例</span></div>
         <ol class="agent-setup-flow">
           <li><span class="setup-number">1</span><div><strong>按任务提供材料</strong><p>更新记录时提供招聘信源；准备面试时提供 JD 与简历；复盘时提供真实逐字稿。只提供本次任务需要的内容。</p></div></li>
-          <li><span class="setup-number">2</span><div><strong>复制启动消息，补充后发送</strong><p>点击下方“复制启动消息”，补充接入状态和可选任务，发给已获本机文件权限的 Agent。它会先查找 TouDi 并确认当前资料。</p></div></li>
+          <li><span class="setup-number">2</span><div><strong>把启动消息发给 Codex</strong><p>用 ChatGPT 账号登录本机 Codex，提供必要文件与命令权限。复制下方消息并补充材料，让 Codex 确认 TouDi 的当前工作区。</p></div></li>
           <li><span class="setup-number">3</span><div><strong>完成一次小范围任务</strong><p>在对应模块点击“交给 Agent”，补充材料与范围。只有更新招聘记录且首次读取或新增信源时，才核对分类；已有流程直接沿用。</p></div></li>
-          <li><span class="setup-number">4</span><div><strong>刷新 App，核对后继续协作</strong><p>Agent 保存并读回后，点击右上角“刷新资料”，检查正文、进度与附件。以后直接告诉它要更新、准备、探查或复盘什么。</p></div></li>
+          <li><span class="setup-number">4</span><div><strong>需要填报时，配置 Luna</strong><p>在辅助填报中安装 Chrome 工具包、连接同一工作区，选择“本机 Codex”，检查连接后选择 gpt-6-luna 并保存。核对使用现有 Codex 额度，不需要 API Key。</p></div></li>
+          <li><span class="setup-number">5</span><div><strong>查看结果，继续安排任务</strong><p>Codex 保存并读回后，App 自动读取更新；也可点“刷新资料”。检查正文、进度与附件，之后直接安排更新、准备、探查或复盘。</p></div></li>
         </ol>
-        ${row('启动消息','复制后填好花括号中的内容，发送给你的 Agent。','<button class="btn" onclick="copyAgentBootstrap()">复制启动消息</button>')}
+        ${row('启动消息','复制后补充材料与范围，发送给本机 Codex。','<button class="btn" onclick="copyAgentBootstrap()">复制启动消息</button>')}
         <details class="settings-disclosure agent-instruction"><summary><span class="disclosure-title">查看要发给 Agent 的消息</span>${disclosureAction()}</summary><div class="setting-detail"><textarea id="agentBootstrap" class="agent-bootstrap" readonly aria-label="Agent 启动消息">${esc(agentBootstrapText())}</textarea></div></details>
         <p class="settings-note">已有资料时，在消息中写“沿用现有信源与流程，先检查连接”，无需重新初始化。消息不包含个人目录或资料值。</p>
       </section>
@@ -3502,5 +3641,6 @@ initServerStorage().then(()=>ensureViewData(view));
 </script>
 <script src="/assets/workbench.js"></script>
 <script src="/assets/filling.js"></script>
+<script src="/assets/schedule.js"></script>
 </body>
 </html>

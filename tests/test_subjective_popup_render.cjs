@@ -1,38 +1,23 @@
 'use strict';
-const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
-let playwright;try{playwright=require('playwright');}catch(_){playwright=require(process.env.TOUDI_PLAYWRIGHT_MODULE || path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'));}
-const root=path.resolve(__dirname,'../app/browser-extension');let browser;
+// Supplementary answer tools moved to settings. No personal browser is used.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),F=require('./profile_ui_fixture.cjs'),L=require('../app/browser-extension/profile-library.js');
+let pw;try{pw=require('playwright')}catch(_){pw=require(path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'))}
+let browser;
 (async()=>{
- browser=await playwright.chromium.launch({headless:true,executablePath:process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
- const page=await browser.newPage({viewport:{width:440,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.route('https://fixture.invalid/**',r=>{const file=path.basename(new URL(r.request().url()).pathname);r.fulfill({body:fs.readFileSync(file==='logo.svg'?path.join(root,'../assets/favicon.svg'):path.join(root,file)),contentType:file.endsWith('.svg')?'image/svg+xml':file.endsWith('.css')?'text/css':file.endsWith('.js')?'application/javascript':'text/html'});});
+ browser=await pw.chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});const page=await browser.newPage({viewport:{width:1240,height:950}}),pack=F.makePack(),records=Object.fromEntries(pack.profiles.map(p=>[p.id,L.copyRecords(pack,p.id)])),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(F.installFixture,{pack,records});
  await page.addInitScript(()=>{
- const preferences={profile:'general',agentMode:'codex',agentModel:'fixture-user-model',autoAgent:false};
- const rows=[{fieldId:'q',label:'个人评价与优劣势',module:'personal',groupLabel:'主观问答',status:'missing',reason:'资料中没有可确认的对应字段。'}];
- const state={startedAt:1,subjectiveFields:['q'],plan:{origin:'https://fixture.invalid',path:'/application',profileId:'general',rows,statusCounts:{missing:1},choices:[]}};
- window.fixtureCalls=[];window.chrome={runtime:{sendMessage:async message=>{
- window.fixtureCalls.push(message);
- if(message.op==='state')return {value:{state:window.fixtureScanned?state:null,profile:{count:1,profiles:[{id:'general',label:'合成资料',count:1}]},preferences,sync:{status:'disconnected'}}};
- if(message.op==='scan'){window.fixtureScanned=true;return {value:state};}
- if(message.op==='answer-generate'){state.answerDraft={fieldId:'q',answer:'我的优势是能够整理需求并推进原型评审。通过项目协作，我逐步学会在方案设计前明确需求和评价标准。',sourceKeys:['project.description'],sourceLabels:['跨学科城市服务需求研究与协作原型评审项目 · 项目职责与协作过程'],uncertainties:['缺少优化前后的实际效果数据，需补充后再填写。'],approved:false};return {value:state};}
- if(message.op==='answer-approve'){state.answerDraft={...state.answerDraft,answer:message.answer,approved:true};return {value:state};}
- return {value:{}};
- }}};
+  const original=chrome.runtime.sendMessage;const state={tabId:19,startedAt:1,subjectiveFields:['q'],plan:{rows:[{fieldId:'q',label:'个人优势',status:'missing'}]}};window.fixtureAgentCalls=[];
+  chrome.runtime.sendMessage=async m=>{
+   fixtureAgentCalls.push(m);
+   if(m.op==='agent-context')return {value:state};
+   if(['answer-task','agent-task','structure-task'].includes(m.op))return {value:{task:'合成有依据的任务'}};
+   if(m.op==='answer-generate'){state.answerDraft={fieldId:'q',answer:'我的优势是结合专业知识整理需求并推进方案。',sourceKeys:['p.body'],sourceLabels:['合成项目职责'],uncertainties:[],approved:false};return {value:state}}
+   if(m.op==='answer-approve'){state.answerDraft={...state.answerDraft,answer:m.answer,approved:true};return {value:state}}
+   if(m.op==='fill'){if(!state.answerDraft?.approved)throw Error('Draft not approved');state.report={summary:{verified:1}};return {value:state}}
+   return original(m);
+  };
  });
- await page.goto('https://fixture.invalid/popup.html');
- await page.locator('#scan').click();
- await page.locator('[data-answer="q"]').click();await page.locator('#answerBox').waitFor({state:'visible'});
- await page.locator('#answerGenerate').click();await page.getByText('回答草稿已生成，请核对依据并编辑后采纳。',{exact:true}).waitFor();
- assert.match(await page.locator('#answerEvidence').innerText(),/需求研究.*项目职责/);assert(!(await page.locator('#answerEvidence').innerText()).includes('project.description'));
- await page.locator('#answerText').fill('我能够整理需求并推进原型评审，同时仍需要通过更多真实项目积累效果验证经验。');
- assert.equal(await page.locator('#answerText').inputValue(),'我能够整理需求并推进原型评审，同时仍需要通过更多真实项目积累效果验证经验。');
- const bounds=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:window.innerWidth,evidenceScroll:document.getElementById('answerEvidence').scrollWidth,evidenceWidth:document.getElementById('answerEvidence').clientWidth}));
- assert(bounds.scroll<=bounds.width,JSON.stringify(bounds));assert(bounds.evidenceScroll<=bounds.evidenceWidth,JSON.stringify(bounds));
- await page.locator('#answerApprove').click();await page.getByText('草稿已采纳，请勾选对应字段再填入。',{exact:true}).waitFor();
- assert.equal(await page.locator('[data-field="q"]').isChecked(),false);assert.equal(await page.locator('#fill').isDisabled(),true);
- assert.equal(await page.evaluate(()=>window.fixtureCalls.some(m=>m.op==='fill')),false);
- await page.evaluate(()=>window.scrollTo(0,0));
- await page.screenshot({path:'/tmp/toudi-subjective-popup.png',fullPage:true});
- assert.deepEqual(errors,[]);
- console.log('PASS rendered subjective popup at 440px: single-question entry, editable draft, readable source names without overflow, adoption remains unchecked, no automatic fill; screenshot /tmp/toudi-subjective-popup.png');
-})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{await browser?.close()});
+ await page.route('https://fixture.invalid/**',r=>{const file=path.basename(new URL(r.request().url()).pathname);return r.fulfill({body:fs.readFileSync(path.join(__dirname,file==='logo.svg'?'../app/assets/favicon.svg':'../app/browser-extension/'+file)),contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html'})});await page.goto('https://fixture.invalid/options.html#agent');await page.locator('#agentTools summary').click();await page.locator('#loadAgentTarget').click();await page.locator('#questionField option').waitFor({state:'attached'});assert.equal(await page.locator('#questionField').inputValue(),'q');
+ await page.locator('#copyQuestionTask').click();assert.equal(await page.evaluate(()=>fixtureCopied),'合成有依据的任务');await page.locator('#generateQuestion').click();await page.locator('#questionDraft').filter({visible:true}).waitFor();await page.waitForFunction(()=>document.querySelector('#questionDraft').value.length>0);assert.equal(await page.evaluate(()=>fixtureAgentCalls.some(m=>m.op==='fill')),false,'Generating an answer alone cannot write');
+ await page.locator('#questionDraft').fill('使用用户编辑的完整回答。');await page.locator('#approveQuestion').click();await page.getByText('回答已填入并检查。',{exact:true}).waitFor();const calls=await page.evaluate(()=>fixtureAgentCalls.filter(m=>['answer-task','answer-generate','answer-approve','fill'].includes(m.op)));assert(calls.every(m=>m.targetTabId===19));assert.equal(calls.find(m=>m.op==='answer-approve').answer,'使用用户编辑的完整回答。');assert.deepEqual(calls.find(m=>m.op==='fill').selected,['q']);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);console.log('PASS settings answer tools: original résumé fallback untouched; bound recruitment target, copy task, generate/edit draft, explicit adoption then write, no automatic draft submission and no overflow');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>browser?.close());

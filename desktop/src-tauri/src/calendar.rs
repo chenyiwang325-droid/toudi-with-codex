@@ -1,0 +1,550 @@
+//! Opt-in EventKit adapter. No authorization request is made by status or sync.
+use chrono::{DateTime, NaiveDate, TimeZone};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::collections::{BTreeMap, HashSet};
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Item {
+    id: String,
+    title: String,
+    start: String,
+    end: Option<String>,
+    all_day: bool,
+    time_zone: String,
+    notes: String,
+    location: String,
+    url: String,
+    status: String,
+    reminder_minutes: Option<i64>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Request {
+    workspace_key: String,
+    calendar_id: String,
+    items: Vec<Item>,
+    revision: String,
+}
+#[derive(Default, Deserialize, Serialize)]
+struct Bindings {
+    entries: BTreeMap<String, Binding>,
+}
+#[derive(Deserialize, Serialize)]
+struct Binding {
+    event_id: String,
+    calendar_id: String,
+    marker: String,
+    snapshot: Value,
+    #[serde(default)]
+    source: Value,
+}
+fn check_binding(
+    b: &Binding,
+    calendar: &str,
+    marker: &str,
+    notes: &str,
+    snapshot: &Value,
+) -> Result<(), String> {
+    if b.calendar_id != calendar || b.marker != marker {
+        return Err("绑定属于其他日历，请先处理原绑定".into());
+    }
+    if !notes.ends_with(marker) || &b.snapshot != snapshot {
+        return Err("系统事件已被外部修改，保留双方内容并请人工核对".into());
+    }
+    Ok(())
+}
+fn denied_results(items: Vec<Item>) -> Vec<Value> {
+    items.into_iter().map(|i| json!({"id":i.id,"ok":false,"operation":"blocked","error":"需要完整日历权限，请主动连接日历"})).collect()
+}
+fn valid_item_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 128
+        && s.as_bytes()[0].is_ascii_alphanumeric()
+        && s.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_' | b':' | b'-'))
+}
+fn valid_key(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 128
+        && s.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+}
+fn times(i: &Item) -> Result<(f64, f64), String> {
+    let zone: chrono_tz::Tz = i.time_zone.parse().map_err(|_| "无效时区")?;
+    let parse = |s: &str| -> Result<f64, String> {
+        if i.all_day {
+            let d = NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|_| "全天日期格式无效")?;
+            if d.format("%Y-%m-%d").to_string() != s {
+                return Err("全天日期格式无效".into());
+            }
+            Ok(zone
+                .from_local_datetime(&d.and_hms_opt(0, 0, 0).unwrap())
+                .single()
+                .ok_or("日期在此时区有歧义")?
+                .timestamp() as f64)
+        } else {
+            Ok(DateTime::parse_from_rfc3339(s)
+                .map_err(|_| "时间必须包含时区")?
+                .timestamp_millis() as f64
+                / 1000.)
+        }
+    };
+    let start = parse(&i.start)?;
+    let end = match &i.end {
+        Some(e) => parse(e)?,
+        None if i.all_day => {
+            let d = NaiveDate::parse_from_str(&i.start, "%Y-%m-%d")
+                .map_err(|_| "日期无效")?
+                .succ_opt()
+                .ok_or("日期越界")?;
+            parse(&d.to_string())?
+        }
+        None => return Err("同步到系统日历需要明确结束时间".into()),
+    };
+    if end <= start {
+        return Err("结束时间必须晚于开始时间".into());
+    }
+    Ok((start, end))
+}
+fn validate(r: &Request) -> Result<(), String> {
+    if !valid_key(&r.workspace_key)
+        || r.calendar_id.is_empty()
+        || r.calendar_id.len() > 512
+        || r.items.len() > 1000
+        || r.revision.len() > 128
+    {
+        return Err("日历请求超出范围".into());
+    }
+    let mut ids = HashSet::new();
+    for i in &r.items {
+        if !valid_item_id(&i.id)
+            || !ids.insert(&i.id)
+            || i.title.trim().is_empty()
+            || i.title.chars().count() > 512
+            || i.notes.chars().count() > 30000
+            || i.location.chars().count() > 2048
+            || i.url.chars().count() > 2048
+            || !matches!(i.status.as_str(), "planned" | "completed" | "cancelled")
+            || i.reminder_minutes
+                .is_some_and(|n| !(0..=43200).contains(&n))
+        {
+            return Err("日程字段无效或重复".into());
+        }
+        if !i.url.is_empty() {
+            let u = reqwest::Url::parse(&i.url).map_err(|_| "链接无效")?;
+            if !matches!(u.scheme(), "https" | "http")
+                || !u.username().is_empty()
+                || u.password().is_some()
+                || u.host_str().is_none()
+            {
+                return Err("仅支持不含凭据的 HTTP(S) 链接".into());
+            }
+        }
+    }
+    Ok(())
+}
+pub async fn calendar_action(action: String, request: Option<Value>) -> Result<Value, String> {
+    if !matches!(
+        action.as_str(),
+        "status" | "authorize" | "calendars" | "sync"
+    ) {
+        return Err("未知日历操作".into());
+    }
+    let request = if action == "sync" {
+        let r: Request = serde_json::from_value(request.ok_or("缺少同步请求")?)
+            .map_err(|_| "同步请求格式无效")?;
+        validate(&r)?;
+        Some(r)
+    } else {
+        None
+    };
+    #[cfg(target_os = "macos")]
+    return tauri::async_runtime::spawn_blocking(move || native::run(&action, request))
+        .await
+        .map_err(|_| "日历任务未完成".to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = request;
+        Ok(
+            json!({"supported":false,"authorization":"unavailable","error":"此平台暂不支持原生日历"}),
+        )
+    }
+}
+#[cfg(target_os = "macos")]
+mod native {
+    use super::*;
+    use objc2::{
+        class, msg_send,
+        rc::Retained,
+        runtime::{AnyObject, Bool},
+        sel,
+    };
+    use objc2_foundation::NSString;
+    use std::{path::PathBuf, sync::Mutex};
+    #[link(name = "EventKit", kind = "framework")]
+    unsafe extern "C" {}
+    static LOCK: Mutex<()> = Mutex::new(());
+    fn string(s: &str) -> Retained<NSString> {
+        NSString::from_str(s)
+    }
+    unsafe fn text(o: *mut AnyObject) -> String {
+        if o.is_null() {
+            return String::new();
+        }
+        let p: *const std::ffi::c_char = msg_send![o, UTF8String];
+        if p.is_null() {
+            String::new()
+        } else {
+            std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
+        }
+    }
+    unsafe fn field(o: &AnyObject, selector: objc2::runtime::Sel) -> String {
+        let p: *mut AnyObject = objc2::msg_send![o,performSelector:selector];
+        text(p)
+    }
+    unsafe fn auth() -> i64 {
+        msg_send![class!(EKEventStore),authorizationStatusForEntityType:0_isize]
+    }
+    fn auth_name(n: i64) -> &'static str {
+        match n {
+            0 => "notDetermined",
+            1 => "restricted",
+            2 => "denied",
+            3 => "fullAccess",
+            4 => "writeOnly",
+            _ => "unknown",
+        }
+    }
+    unsafe fn date(t: f64) -> Retained<AnyObject> {
+        msg_send![class!(NSDate),dateWithTimeIntervalSince1970:t]
+    }
+    unsafe fn snapshot(e: &AnyObject) -> Value {
+        let start: *mut AnyObject = msg_send![e, startDate];
+        let end: *mut AnyObject = msg_send![e, endDate];
+        let s: f64 = msg_send![start, timeIntervalSince1970];
+        let t: f64 = msg_send![end, timeIntervalSince1970];
+        let modified: *mut AnyObject = msg_send![e, lastModifiedDate];
+        let m: f64 = if modified.is_null() {
+            0.
+        } else {
+            msg_send![modified, timeIntervalSince1970]
+        };
+        let all: Bool = msg_send![e, isAllDay];
+        let cal: *mut AnyObject = msg_send![e, calendar];
+        json!({"title":field(e,sel!(title)),"notes":field(e,sel!(notes)),"location":field(e,sel!(location)),"start":s,"end":t,"allDay":all.as_bool(),"modified":m,"calendar":text(msg_send![cal,calendarIdentifier])})
+    }
+    fn path(key: &str) -> Result<PathBuf, String> {
+        let home = std::env::var_os("HOME").ok_or("无法读取本机资料位置")?;
+        Ok(PathBuf::from(home)
+            .join("Library/Application Support/TouDi/calendar-bindings")
+            .join(format!("{key}.json")))
+    }
+    fn persist(p: &std::path::Path, b: &Bindings) -> Result<(), String> {
+        std::fs::create_dir_all(p.parent().unwrap()).map_err(|_| "无法保存日历绑定")?;
+        let tmp = p.with_extension("tmp");
+        let bytes = serde_json::to_vec(b).map_err(|_| "绑定编码失败")?;
+        use std::io::Write;
+        let mut options = std::fs::OpenOptions::new();
+        use std::os::unix::fs::OpenOptionsExt;
+        options.write(true).create(true).truncate(true).mode(0o600);
+        let mut f = options.open(&tmp).map_err(|_| "无法保存日历绑定")?;
+        f.write_all(&bytes)
+            .and_then(|_| f.sync_all())
+            .map_err(|_| "无法保存日历绑定")?;
+        std::fs::rename(tmp, p).map_err(|_| "无法保存日历绑定".to_string())
+    }
+    pub fn run(action: &str, r: Option<Request>) -> Result<Value, String> {
+        let _guard = LOCK.lock().map_err(|_| "日历同步忙")?;
+        objc2::rc::autoreleasepool(|_| unsafe {
+            let store: Retained<AnyObject> = msg_send![class!(EKEventStore), new];
+            if action == "authorize" {
+                let (tx, rx) = std::sync::mpsc::channel();
+                let completion =
+                    block2::RcBlock::new(move |granted: Bool, _error: *mut AnyObject| {
+                        let _ = tx.send(granted.as_bool());
+                    });
+                let modern: Bool = msg_send![&*store,respondsToSelector:sel!(requestFullAccessToEventsWithCompletion:)];
+                if modern.as_bool() {
+                    let _: () =
+                        msg_send![&*store,requestFullAccessToEventsWithCompletion:&*completion];
+                } else {
+                    let _: () = msg_send![&*store,requestAccessToEntityType:0_isize,completion:&*completion];
+                }
+                rx.recv_timeout(std::time::Duration::from_secs(120))
+                    .map_err(|_| "等待日历授权超时，请重新检查权限状态")?;
+            }
+            let authorization = auth_name(auth());
+            if matches!(action, "status" | "authorize") {
+                return Ok(json!({"supported":true,"authorization":authorization}));
+            }
+            if authorization != "fullAccess" {
+                let results = r.map(|r| denied_results(r.items)).unwrap_or_default();
+                return Ok(
+                    json!({"supported":true,"authorization":authorization,"calendars":[],"results":results}),
+                );
+            }
+            let calendars: Retained<AnyObject> = msg_send![&*store,calendarsForEntityType:0_isize];
+            let count: usize = msg_send![&*calendars, count];
+            let mut writable = Vec::new();
+            for idx in 0..count {
+                let c: *mut AnyObject = msg_send![&*calendars,objectAtIndex:idx];
+                let write: Bool = msg_send![c, allowsContentModifications];
+                if write.as_bool() {
+                    writable.push(json!({"id":text(msg_send![c,calendarIdentifier]),"title":text(msg_send![c,title])}));
+                }
+            }
+            if action == "calendars" {
+                return Ok(
+                    json!({"supported":true,"authorization":authorization,"calendars":writable}),
+                );
+            }
+            let r = r.unwrap();
+            let p = path(&r.workspace_key)?;
+            let mut bindings: Bindings = match std::fs::read(&p) {
+                Ok(b) => {
+                    if b.len() > 4_000_000 {
+                        return Err("日历绑定文件过大".into());
+                    }
+                    serde_json::from_slice(&b).map_err(|_| "日历绑定文件损坏，请保留资料并检查")?
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Bindings::default(),
+                Err(_) => return Err("无法读取日历绑定".into()),
+            };
+            persist(&p, &bindings)?;
+            let calendar: Option<Retained<AnyObject>> =
+                msg_send![&*store,calendarWithIdentifier:&*string(&r.calendar_id)];
+            let mut results = Vec::new();
+            for i in r.items {
+                let result = (|| -> Result<Value, String> {
+                    times(&i)?;
+                    let c = calendar.as_ref().ok_or("所选日历已失效")?;
+                    let write: Bool = msg_send![&**c, allowsContentModifications];
+                    if !write.as_bool() {
+                        return Err("所选日历不可写".into());
+                    }
+                    let marker = format!("[TouDi:{}:{}]", r.workspace_key, i.id);
+                    let bound = bindings.entries.get(&i.id);
+                    let event = if let Some(b) = bound {
+                        if b.calendar_id != r.calendar_id || b.marker != marker {
+                            return Err("绑定属于其他日历，请先处理原绑定".into());
+                        }
+                        let e: Option<Retained<AnyObject>> =
+                            msg_send![&*store,eventWithIdentifier:&*string(&b.event_id)];
+                        let e = e.ok_or("系统事件已移除，请核对后解除绑定")?;
+                        check_binding(
+                            b,
+                            &r.calendar_id,
+                            &marker,
+                            &field(&e, sel!(notes)),
+                            &snapshot(&e),
+                        )?;
+                        e
+                    } else {
+                        if i.status == "cancelled" {
+                            return Ok(json!({"id":i.id,"ok":true,"operation":"noop"}));
+                        }
+                        msg_send![class!(EKEvent),eventWithEventStore:&*store]
+                    };
+                    let source = serde_json::to_value(&i).map_err(|_| "日程编码失败")?;
+                    if i.status != "cancelled" && bound.is_some_and(|b| b.source == source) {
+                        return Ok(
+                            json!({"id":i.id,"ok":true,"operation":"unchanged","eventIdentifier":field(&event,sel!(eventIdentifier))}),
+                        );
+                    }
+                    let operation = if i.status == "cancelled" {
+                        "deleted"
+                    } else if bound.is_some() {
+                        "updated"
+                    } else {
+                        "created"
+                    };
+                    let mut error: *mut AnyObject = std::ptr::null_mut();
+                    let ok: Bool = if i.status == "cancelled" {
+                        msg_send![&*store,removeEvent:&*event,span:0_isize,commit:Bool::YES,error:&mut error]
+                    } else {
+                        let (start, end) = times(&i)?;
+                        let _: () = msg_send![&*event,setCalendar:&**c];
+                        let _: () = msg_send![&*event,setTitle:&*string(&i.title)];
+                        let _: () = msg_send![&*event,setStartDate:&*date(start)];
+                        let _: () = msg_send![&*event,setEndDate:&*date(end)];
+                        let _: () = msg_send![&*event,setAllDay:Bool::from(i.all_day)];
+                        let zone: Retained<AnyObject> =
+                            msg_send![class!(NSTimeZone),timeZoneWithName:&*string(&i.time_zone)];
+                        let _: () = msg_send![&*event,setTimeZone:&*zone];
+                        let _: () =
+                            msg_send![&*event,setNotes:&*string(&format!("{}\n{}",i.notes,marker))];
+                        let _: () = msg_send![&*event,setLocation:&*string(&i.location)];
+                        let url: Option<Retained<AnyObject>> = if i.url.is_empty() {
+                            None
+                        } else {
+                            msg_send![class!(NSURL),URLWithString:&*string(&i.url)]
+                        };
+                        let _: () = msg_send![&*event,setURL:url.as_deref()];
+                        let alarms: Retained<AnyObject> = msg_send![class!(NSArray), array];
+                        let _: () = msg_send![&*event,setAlarms:&*alarms];
+                        if let Some(n) = i.reminder_minutes {
+                            let alarm: Retained<AnyObject> =
+                                msg_send![class!(EKAlarm),alarmWithRelativeOffset:-(n as f64)*60.];
+                            let _: () = msg_send![&*event,addAlarm:&*alarm];
+                        }
+                        msg_send![&*store,saveEvent:&*event,span:0_isize,commit:Bool::YES,error:&mut error]
+                    };
+                    if !ok.as_bool() {
+                        return Err(if error.is_null() {
+                            "系统日历保存失败".into()
+                        } else {
+                            text(msg_send![error, localizedDescription])
+                        });
+                    }
+                    let event_id = field(&event, sel!(eventIdentifier));
+                    if i.status == "cancelled" {
+                        bindings.entries.remove(&i.id);
+                    } else {
+                        bindings.entries.insert(
+                            i.id.clone(),
+                            Binding {
+                                event_id: event_id.clone(),
+                                calendar_id: r.calendar_id.clone(),
+                                marker,
+                                source,
+                                snapshot: {let saved: Option<Retained<AnyObject>> = msg_send![&*store, eventWithIdentifier: &*string(&event_id)]; snapshot(saved.as_deref().unwrap_or(&event))},
+                            },
+                        );
+                    }
+                    persist(&p, &bindings)?;
+                    Ok(
+                        json!({"id":i.id,"ok":true,"operation":operation,"eventIdentifier":event_id}),
+                    )
+                })();
+                results.push(result.unwrap_or_else(
+                    |error| json!({"id":i.id,"ok":false,"operation":"blocked","error":error}),
+                ));
+            }
+            Ok(
+                json!({"supported":true,"authorization":authorization,"revision":r.revision,"results":results}),
+            )
+        })
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn item() -> Item {
+        serde_json::from_value(json!({"id":"synthetic_1","title":"示例","start":"2026-10-10","end":null,"allDay":true,"timeZone":"Asia/Shanghai","notes":"","location":"","url":"","status":"planned","reminderMinutes":15})).unwrap()
+    }
+    #[test]
+    fn denied_path_preserves_item_identity() {
+        let results = denied_results(vec![item()]);
+        assert_eq!(results[0]["id"], "synthetic_1");
+        assert_eq!(results[0]["ok"], false);
+        assert_eq!(results[0]["operation"], "blocked");
+    }
+    #[test]
+    fn missing_end_is_item_error_and_does_not_reject_batch() {
+        let mut incomplete = item();
+        incomplete.id = "event.missing:end-1".into();
+        incomplete.all_day = false;
+        incomplete.start = "2026-10-10T10:00:00+08:00".into();
+        let r = Request {
+            workspace_key: "synthetic".into(),
+            calendar_id: "synthetic".into(),
+            items: vec![incomplete, item()],
+            revision: "1".into(),
+        };
+        assert!(validate(&r).is_ok());
+        assert_eq!(
+            times(&r.items[0]).unwrap_err(),
+            "同步到系统日历需要明确结束时间"
+        );
+        assert!(times(&r.items[1]).is_ok());
+    }
+    #[test]
+    fn unified_field_boundaries() {
+        let mut i = item();
+        i.id = "a._:-Z9".into();
+        i.title = "中".repeat(512);
+        i.notes = "文".repeat(30000);
+        i.location = "地".repeat(2048);
+        i.reminder_minutes = Some(43200);
+        let mut r = Request {
+            workspace_key: "synthetic".into(),
+            calendar_id: "synthetic".into(),
+            items: vec![i],
+            revision: "1".into(),
+        };
+        assert!(validate(&r).is_ok());
+        r.items[0].title.push('中');
+        assert!(validate(&r).is_err());
+        assert!(!valid_item_id("_wrong"));
+        assert!(!valid_item_id("../wrong"));
+        assert!(!valid_item_id("a/b"));
+    }
+    #[test]
+    fn exclusive_end() {
+        let (s, e) = times(&item()).unwrap();
+        assert_eq!(e - s, 86400.);
+    }
+    #[test]
+    fn rejects_invalid_dates() {
+        let mut i = item();
+        i.start = "2026-02-30".into();
+        assert!(times(&i).is_err());
+        i.start = "2026-10-10T10:00:00".into();
+        i.all_day = false;
+        assert!(times(&i).is_err());
+    }
+    #[test]
+    fn rejects_scope_and_duplicates() {
+        let i = item();
+        let r = Request {
+            workspace_key: "../outside".into(),
+            calendar_id: "synthetic".into(),
+            items: vec![i.clone()],
+            revision: "1".into(),
+        };
+        assert!(validate(&r).is_err());
+        let mut r = Request {
+            workspace_key: "synthetic".into(),
+            ..r
+        };
+        r.items.push(i);
+        assert!(validate(&r).is_err());
+    }
+    #[test]
+    fn rejects_unsafe_links() {
+        let mut i = item();
+        i.url = "file:///tmp/example".into();
+        let r = Request {
+            workspace_key: "synthetic".into(),
+            calendar_id: "synthetic".into(),
+            items: vec![i],
+            revision: "1".into(),
+        };
+        assert!(validate(&r).is_err());
+    }
+    #[test]
+    fn binding_roundtrip_preserves_conflict_evidence() {
+        let b = Binding {
+            event_id: "synthetic".into(),
+            calendar_id: "example".into(),
+            marker: "[TouDi:example:synthetic]".into(),
+            snapshot: json!({"title":"external"}),
+            source: Value::Null,
+        };
+        let v = serde_json::to_value(&b).unwrap();
+        let b: Binding = serde_json::from_value(v).unwrap();
+        assert!(check_binding(&b, "example", &b.marker, &b.marker, &b.snapshot).is_ok());
+        assert!(check_binding(&b, "other", &b.marker, &b.marker, &b.snapshot).is_err());
+        assert!(check_binding(&b, "example", &b.marker, "unowned", &b.snapshot).is_err());
+        assert!(check_binding(
+            &b,
+            "example",
+            &b.marker,
+            &b.marker,
+            &json!({"title":"local"})
+        )
+        .is_err());
+    }
+}

@@ -10,6 +10,15 @@ import test_filling_profile as fixtures
 
 
 class BrowserCoreTests(unittest.TestCase):
+    def test_reference_variants_do_not_compete_with_canonical_personal_fields(self):
+        original='  Synthetic full original.\nSecond full paragraph.  '
+        facts=[{'key':key,'label':'自我评价','value':value,'module':'personal','recordId':record,'recordLabel':'Synthetic','profiles':['general'],'manual':manual} for key,value,record,manual in [('canonical',original,'summary',False),('reference',original+' reference','reference',True)]]
+        pack={'schemaVersion':1,'profiles':[{'id':'general','label':'Default'}],'facts':facts,'rules':[]}
+        scan={'protocol':1,'origin':'https://example.invalid','path':'/apply','fingerprint':'fixture','fields':[{'id':'summary','module':'personal','label':'自我评价','type':'text','value':''}]}
+        from filling_profile import matching_facts
+        self.assertEqual([f['key'] for f in matching_facts({'facts':facts},scan['fields'][0])],['canonical'])
+        self.run_core("const p=C.profile(C.validatePack(input.pack)),row=C.plan(p,input.scan).rows[0];assert.equal(row.status,'ready');assert.equal(row.factKey,'canonical');assert.equal(row.value,input.original);",{'pack':pack,'scan':scan,'original':original})
+
     def run_core(self,code,value):
         core=Path(__file__).resolve().parents[1]/'app/browser-extension/filling-core.js'
         script="const fs=require('fs'),assert=require('assert/strict'),C=require(process.argv[1]),input=JSON.parse(fs.readFileSync(0,'utf8'));"+code
@@ -46,7 +55,8 @@ class BrowserCoreTests(unittest.TestCase):
             self.assertEqual(rows['date']['value'],'2026-10-06');self.assertEqual(rows['month']['value'],'2026-10')
             self.assertEqual(rows['text']['value'],'至今');self.assertEqual(rows['select']['optionValue'],'now')
             self.assertEqual(rows['format']['value'],'2026/10/06')
-            for id in ('max','min','cap'):self.assertEqual(rows[id]['status'],'manual')
+            for id in ('max','min'):self.assertEqual(rows[id]['status'],'manual')
+            self.assertEqual(rows['cap']['status'],'ready');self.assertEqual(rows['cap']['value'],'2026-10-06')
             self.assertEqual(rows['conflict']['status'],'conflict');self.assertIn('占位',rows['date']['reason'])
             self.run_core("const pack=C.validatePack(input.pack),p=C.profile(pack,'state'),rows=C.plan(p,input.scan,{},new Date(2026,9,6,10)).rows;for(let i=0;i<rows.length;i++)for(const key of ['status','value','factKey','displayValue','optionValue','dateFallbackUsed','resolvedOn'])assert.deepEqual(rows[i][key],input.rows[i][key],rows[i].fieldId+' '+key);assert.equal(p.facts.find(f=>f.module==='project' && f.label==='结束日期').value,'至今');const next=C.plan(p,input.scan,{},new Date(2026,9,7,10));assert.equal(next.rows[0].value,'2026-10-07');const stale=C.plan(p,input.scan,{},new Date(2000,0,1));assert.throws(()=>C.confirm(stale,['date']),/日期已变化/);",{'pack':pack,'scan':scan,'rows':expected['rows']})
             # Choosing an actual end date removes both flags; invalid policies cannot slip through.

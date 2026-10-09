@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+let playwright;try{playwright=require('playwright')}catch(_){playwright=require(process.env.TOUDI_PLAYWRIGHT_MODULE || path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'))}
+const root=path.resolve(__dirname,'../app/browser-extension'),out=process.env.TOUDI_PANEL_EVIDENCE || os.tmpdir();let browser;
+(async()=>{
+ browser=await playwright.chromium.launch({headless:true,executablePath:process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+ const page=await browser.newPage({viewport:{width:400,height:760}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('https://fixture.invalid/**',r=>{const name=path.basename(new URL(r.request().url()).pathname);r.fulfill({body:fs.readFileSync(name==='logo.svg'?path.join(root,'../assets/favicon.svg'):path.join(root,name)),contentType:name.endsWith('.svg')?'image/svg+xml':name.endsWith('.css')?'text/css':name.endsWith('.js')?'application/javascript':'text/html'})});
+ await page.addInitScript(()=>{
+ const records={master:{label:'硕士 · 示例甲大学',school:'示例甲大学',start:'2024-09-01',end:'2027-06-30'},bachelor:{label:'本科 · 示例乙大学',school:'示例乙大学',start:'2020-09-01',end:'2024-06-30'}};
+ const bindings={},preferences={profile:'general',agentMode:'external',agentModel:'',autoAgent:false};window.fixtureCalls=[];
+ function makeState(){
+ const candidates=Object.entries(records).map(([id,r])=>({id,label:r.label}));
+ const groups=['education:first','education:second'].map(groupId=>({groupId,module:'education',label:'教育经历',status:bindings[groupId]?'bound':'unbound',recordId:bindings[groupId] || '',recordLabel:records[bindings[groupId]]?.label || '',reason:bindings[groupId]?'本板块的学校和时间使用同一段教育资料。':'请确认本板块对应的教育经历。',candidates,fieldIds:['school','start','end','unknown'].map(k=>groupId+':'+k)}));
+ const rows=groups.flatMap(g=>['school','start','end','unknown'].map(k=>({fieldId:g.groupId+':'+k,groupId:g.groupId,groupLabel:'教育经历',module:'education',label:({school:'学校',start:'开始日期',end:'结束日期',unknown:'补充字段'})[k],status:!g.recordId?'ambiguous':k==='unknown'?'missing':'ready',factKey:g.recordId&&k!=='unknown'?g.recordId+'.'+k:null,displayValue:records[g.recordId]?.[k] || '',recordBinding:{groupId:g.groupId,status:g.status,recordId:g.recordId},allowedFactKeys:g.recordId?['school','start','end'].map(k=>g.recordId+'.'+k):[],reason:!g.recordId?'整段待对应':'同一记录中的对应字段'})));
+ const choices=Object.entries(records).flatMap(([id,r])=>['school','start','end'].map(k=>({key:id+'.'+k,module:'education',recordId:id,label:r.label+' · '+k}))).concat([{key:'work.start',module:'internship',recordId:'work',label:'实习开始日期'}]);
+ return {startedAt:1,plan:{origin:'https://fixture.invalid',path:'/application',profileId:'general',groups,rows,choices,statusCounts:{ready:rows.filter(r=>r.status==='ready').length,ambiguous:rows.filter(r=>r.status==='ambiguous').length,missing:rows.filter(r=>r.status==='missing').length}}};
+ }
+ window.chrome={runtime:{sendMessage:async m=>{fixtureCalls.push(m);if(m.op==='state')return {value:{profile:{count:7,profiles:[{id:'general',label:'合成资料',count:7}]},preferences,sync:{status:'disconnected'}}};if(m.op==='scan')return {value:makeState()};if(m.op==='auto-fill'){const state=makeState();state.report={summary:{verified:0},results:[]};state.pending=state.plan.rows;state.automation={status:'completed',phase:'done'};return {value:state};}if(m.op==='remap'){Object.assign(bindings,m.recordBindings || {});return {value:makeState()}};return {value:{}};}}};
+ });
+ await page.goto('https://fixture.invalid/popup.html');await page.locator('#fill').click();await page.locator('#result .finish').waitFor();
+ assert.match(await page.locator('#result').innerText(),/本次未新增填写/);assert.equal(await page.locator('[data-record-group],[data-map],[data-field]').count(),0,'The panel cannot force per-record selections');await page.locator('.remaining summary').click();assert(await page.locator('[data-fallback-label]').count()>0);assert.equal(await page.evaluate(()=>fixtureCalls.some(m=>m.op==='remap')),false,'Uncertain records are never resolved by a guessed UI ordering');assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);console.log('PASS grouped fallback panel: uncertain records give concise remaining fields without manual record selectors or guessed cross-record mappings');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>browser?.close());

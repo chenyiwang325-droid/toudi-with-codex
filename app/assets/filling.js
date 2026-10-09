@@ -1,8 +1,8 @@
 // Reuse the extension standard form against the current App workspace.
 (() => {
   if (window.__SNAPSHOT__) return;
-  const guide='https://github.com/chenyiwang325-droid/toudi-workbench/blob/main/docs/辅助填报.md';
-  const release='https://github.com/chenyiwang325-droid/toudi-workbench/releases/latest';
+  const guide='https://github.com/chenyiwang325-droid/toudi-with-codex/blob/main/docs/辅助填报.md';
+  const release='https://github.com/chenyiwang325-droid/toudi-with-codex/releases/latest';
   let dialog,previousFocus;
   async function downloadExtension(){
     try{
@@ -50,7 +50,7 @@
   window.openFilling=async()=>{
     if(!dialog){
       dialog=document.createElement('dialog');dialog.className='filling-dialog';dialog.id='fillingDialog';dialog.setAttribute('aria-labelledby','fillingTitle');
-      dialog.innerHTML='<div class="filling-head"><div><h2 id="fillingTitle">辅助填报 · 共享资料</h2><p>个人资料与填写要求在工作区统一保存</p></div><div class="filling-head-actions"><button class="btn btn-sm" id="fillingOpen">Chrome 连接与设置 ↗</button><button class="btn btn-sm" id="fillingClose">关闭</button></div></div><div class="filling-body"></div><footer class="filling-footer"><a href="'+guide+'" target="_blank" rel="noreferrer">安装与连接指南 ↗</a><a href="'+release+'" target="_blank" rel="noreferrer">下载浏览器工具包 ↗</a><button type="button" id="fillingDownload" class="filling-text-link">导出当前扩展</button></footer>';
+      dialog.innerHTML='<div class="filling-head"><div><h2 id="fillingTitle">辅助填报 · 共享资料</h2><p>个人资料与填写要求在工作区统一保存</p></div><div class="filling-head-actions"><button class="btn btn-sm" id="fillingOpen">Chrome 连接与设置 ↗</button><button class="btn btn-sm" id="fillingClose">关闭</button></div></div><div class="filling-body"></div><footer class="filling-footer"><a class="action-link" href="'+guide+'" target="_blank" rel="noreferrer">安装与连接指南 ↗</a><a class="action-link" href="'+release+'" target="_blank" rel="noreferrer">下载浏览器工具包 ↗</a><button type="button" id="fillingDownload" class="action-link">导出当前扩展</button></footer>';
       document.body.append(dialog);document.getElementById('fillingClose').addEventListener('click',close);
       document.getElementById('fillingOpen').addEventListener('click',openExtension);
       document.getElementById('fillingDownload').hidden=window.__TOUDI_SERVICE__?.mode==='hosted';

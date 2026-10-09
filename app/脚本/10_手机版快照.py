@@ -69,8 +69,16 @@ def build_payload(resources=None):
     html = html.replace('<script src="/assets/workspace-storage.js"></script>', '<script>' + storage.read_text(encoding='utf-8') + '</script>')
     settings_style = Path(HTML_FILE).parent / 'assets' / 'settings.css'
     html = html.replace('<link rel="stylesheet" href="/assets/settings.css">', '<style>' + settings_style.read_text(encoding='utf-8') + '</style>')
+    interface = Path(HTML_FILE).parent / 'browser-extension'
+    html = html.replace('<link rel="stylesheet" href="/browser-extension/interface.css">', '<style>' + (interface / 'interface.css').read_text(encoding='utf-8') + '</style>')
+    html = html.replace('<script src="/browser-extension/interface-motion.js" defer></script>', '<script>' + (interface / 'interface-motion.js').read_text(encoding='utf-8') + '</script>')
     management = Path(HTML_FILE).parent / 'assets' / 'workbench.js'
     html = html.replace('<script src="/assets/workbench.js"></script>', '<script>' + management.read_text(encoding='utf-8').replace('</script', '<\\/script') + '</script>')
+    schedule_assets = Path(HTML_FILE).parent / 'assets'
+    html = html.replace('<link rel="stylesheet" href="/assets/schedule.css">', '<style>' + (schedule_assets / 'schedule.css').read_text(encoding='utf-8') + '</style>')
+    calendar_assets = {name: (schedule_assets / 'vendor' / 'fullcalendar-7.1.1' / name).read_text(encoding='utf-8') for name in ('fullcalendar.js', 'theme.js', 'zh-cn.js', 'skeleton.css', 'theme.css')}
+    calendar_js = 'window.__TOUDI_CALENDAR_ASSETS__=' + json.dumps(calendar_assets, ensure_ascii=False).replace('<', chr(92) + 'u003c') + ';'
+    html = html.replace('<script src="/assets/schedule.js"></script>', '<script>' + calendar_js + (schedule_assets / 'schedule.js').read_text(encoding='utf-8').replace('</script', '<\\/script') + '</script>')
     # Assisted filling uses the local fact source, never the encrypted reading snapshot.
     html = html.replace('<link rel="stylesheet" href="/assets/filling.css">', '').replace('<script src="/assets/filling.js"></script>', '')
     icon = (Path(HTML_FILE).parent / 'assets' / 'favicon.svg').read_bytes()
@@ -97,6 +105,7 @@ def build_payload(resources=None):
         'toudiReviews': {'sessions': reviews.get('sessions') or []},
         'toudiPreps': {'preps': preps.get('preps') or []},
         'toudiQBank': {'categories': qbank.get('categories') or []},
+        'toudiSchedule': read_json(os.path.join(DATA_DIR, '日程数据.json'), {'schemaVersion':1,'timeZone':'Asia/Shanghai','events':[],'calendar':{'enabled':False,'calendarId':''}}),
     }
     prospects_root = Path(DATA_DIR).parent / '岗位探查'
     prospects = read_catalog(prospects_root, edits.get('edits') or {})

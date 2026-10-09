@@ -7,6 +7,7 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -40,8 +41,9 @@ def main():
         separator=';' if os.name=='nt' else ':'
         subprocess.run([options.python,'-m','PyInstaller','--noconfirm','--clean','--onedir','--name','toudi-browser-helper','--distpath',str(output/'native'),'--workpath',str(build/'pyinstaller'),'--specpath',str(build),'--paths',str(stage/'app'),'--paths',str(stage/'app/脚本'),'--add-data',str(stage/'app/脚本')+separator+'脚本','--add-data',str(stage/'app/assets/preference-defaults.json')+separator+'assets','--additional-hooks-dir',str(hooks),str(stage/'app/browser_helper.py')],check=True,env=env)
         subprocess.run([options.python,str(ROOT/'desktop/scripts/privacy.py'),'--deny-root',str(ROOT),'--deny-root',str(Path.home()),str(output/'native/toudi-browser-helper')],check=True)
+        staging=tempfile.TemporaryDirectory(prefix='.connector-',suffix='.noindex',dir=output)
         if sys.platform=='darwin':
-            app=output/'TouDi 浏览器连接.app'
+            app=Path(staging.name)/'TouDi 浏览器连接.app'
             if app.is_symlink():raise ValueError('Generated connector must not be a symbolic link')
             if app.exists():shutil.rmtree(app)
             contents=app/'Contents';mac=contents/'MacOS';mac.mkdir(parents=True)
@@ -58,10 +60,11 @@ def main():
         package=output/'TouDi-browser-macos-arm64.zip' if sys.platform=='darwin' else output/'TouDi-browser-tools.zip'
         with zipfile.ZipFile(package,'w',zipfile.ZIP_DEFLATED) as bundle:
             targets=[extension,output/'使用说明.md']
-            targets.append(output/'TouDi 浏览器连接.app' if sys.platform=='darwin' else output/'native/toudi-browser-helper')
+            targets.append(app if sys.platform=='darwin' else output/'native/toudi-browser-helper')
             for target in targets:
                 for file in ([target] if target.is_file() else sorted(target.rglob('*'))):
-                    if file.is_file():bundle.write(file,str(Path('TouDi-browser')/file.relative_to(output)))
+                    if file.is_file():bundle.write(file,str(Path('TouDi-browser')/target.name/(file.relative_to(target) if target.is_dir() else '')))
+        staging.cleanup()
         print('Built '+str(package))
     print('Extension '+str(extension))
 

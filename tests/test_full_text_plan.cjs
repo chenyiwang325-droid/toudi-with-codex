@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict'),C=require('../app/browser-extension/filling-core.js');
+const values=[782,517,290].map(n=>'完整职责'.repeat(Math.ceil(n/4)).slice(0,n));
+const facts=values.flatMap((value,i)=>[{key:'name'+i,module:'internship',label:'单位',recordId:'r'+i,value:'合成单位'+i},{key:'tasks'+i,module:'internship',label:'职责',recordId:'r'+i,value}]);
+const p=C.profile(C.validatePack({schemaVersion:1,profiles:[{id:'general',label:'合成资料'}],rules:[],facts}));
+const scan={protocol:1,origin:'https://fixture.invalid',path:'/apply',fingerprint:'f',fields:values.map((_,i)=>({id:'f'+i,type:'textarea',module:'work',label:'工作职责',recordHint:'合成单位'+i,maxLength:100,value:''}))};
+const plan=C.plan(p,scan);assert(plan.rows.every(r=>r.status==='ready'));assert.deepEqual(plan.rows.map(r=>r.value),values);
+assert.deepEqual(C.confirm(plan,plan.rows.map(r=>r.fieldId)).actions.map(a=>a.value),values);
+assert(!plan.rows.some(r=>/字数|长度|截断|缩写/.test(r.reason)));
+console.log('PASS full 782/517/290-character facts remain unchanged in ready plans and confirmed actions, regardless of maxlength');

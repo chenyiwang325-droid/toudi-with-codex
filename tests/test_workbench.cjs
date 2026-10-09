@@ -39,6 +39,7 @@ const refreshContext = vm.createContext({
   toudiWorkspaceStorage: {getItem: () => '{}'},
   listUnsavedDrafts: () => [],
   detailInputMemory: new Map(),
+  fieldEditIdx: null,
   byId: () => ({_researchNote: 'saved', 岗位: '岗位'}),
   editsDirty: false, editsConflict: false, editsSaveInFlight: false,
   qbankDirty: false, qbankConflict: false, qbankSaveInFlight: false,

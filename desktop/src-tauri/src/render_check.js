@@ -3,7 +3,7 @@
   await window.__TOUDI_DESKTOP_READY__;
   // A background WKWebView can pause animations; capture the settled layout.
   document.documentElement.dataset.renderDiagnostic = 'true';
-  const target = window.__TOUDI_DIAG_VIEW__;
+  const target = window.__TOUDI_DIAG_VIEW__ || 'table';
   let filling = null;
   if (target === 'filling' && typeof window.openFilling === 'function') {
     await window.__TOUDI_DESKTOP_READY__;
@@ -32,9 +32,23 @@
       noLegacyConnection:!document.getElementById('fillingCopy'),
       extensionSize:(await extension.arrayBuffer()).byteLength};
   } else if (target && typeof switchView === 'function') {
-    const module = target === 'company' ? 'qbank' : ['agent-settings','data-settings','preference-settings','education-preferences','industry-preferences'].includes(target) ? 'settings' : target;
+    const module = target.startsWith('schedule-') ? 'schedule' : target.startsWith('recruitment-') || target === 'refresh-stability' ? 'table' : target === 'company' ? 'qbank' : ['agent-settings','data-settings','preference-settings','education-preferences','industry-preferences'].includes(target) ? 'settings' : target;
     if (typeof ensureViewData === 'function') await ensureViewData(module);
     switchView(module);
+    if (target === 'schedule' || target.startsWith('schedule-')) {
+      await window.toudiSchedule.show();
+      if (target === 'schedule-month') document.querySelector('[data-schedule-mode="dayGridMonth"]').click();
+      await new Promise(resolve=>setTimeout(resolve,1000));
+    }
+    if (target.startsWith('recruitment-') && data.length) {
+      showDetail(data[0]._idx);
+      if (target === 'recruitment-followup') jumpDetailSection('detailFollowup');
+      if (target === 'recruitment-materials') jumpDetailSection('detailMaterials');
+      for (let i=0;i<30;i++) {
+        if (!document.getElementById('detailSchedule')?.textContent.includes('正在读取')) break;
+        await new Promise(resolve=>setTimeout(resolve,100));
+      }
+    }
     if (target === 'agent-settings') switchSettingsTab('agent');
     if (target === 'data-settings') switchSettingsTab('data');
     if (['preference-settings','education-preferences','industry-preferences'].includes(target)) switchSettingsTab('preferences');
@@ -86,6 +100,36 @@
     return {x: rect.x, y: rect.y, width: rect.width, height: rect.height,
       display: style.display, position: style.position, background: style.backgroundColor};
   };
+  const scheduleGeometry = [];
+  let refreshStability = null;
+  if (target === 'refresh-stability') {
+    for (let i=0;i<60 && (workspaceRefreshRunning || workspaceRefreshSnapshots.size<9);i++) await new Promise(resolve=>setTimeout(resolve,100));
+    const button = document.getElementById('workspaceRefreshButton');
+    const row = document.querySelector('#tableBody tr');
+    const mutations = [], samples = [];
+    const observer = new MutationObserver(records=>mutations.push(...records.map(record=>({type:record.type,attribute:record.attributeName}))));
+    observer.observe(button,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['disabled','aria-busy']});
+    let checks = 0;
+    const previousFetch = window.fetch;
+    window.fetch = function (input, ...args) {if(String(input).includes('/api/workspace-changes')) checks++;return previousFetch.call(this,input,...args);};
+    try {
+      for (let i=0;i<24;i++) {
+        samples.push({button:box('#workspaceRefreshButton'),actions:box('.topbar-actions'),content:box('#tableView'),text:button.textContent,disabled:button.disabled});
+        await new Promise(resolve=>setTimeout(resolve,400));
+      }
+    } finally {observer.disconnect();window.fetch=previousFetch;}
+    refreshStability = {checks,mutations,samples,rowPreserved:row===document.querySelector('#tableBody tr'),snapshotCount:workspaceRefreshSnapshots.size};
+  }
+  if (target === 'schedule' || target.startsWith('schedule-')) {
+    for (let i=0;i<4;i++) {
+      scheduleGeometry.push({canvas:box('#scheduleCalendar'),inspector:box('#scheduleInspector'),events:document.querySelectorAll('[data-schedule-event]').length});
+      await new Promise(resolve=>setTimeout(resolve,150));
+    }
+  }
+  const rawErrors = window.__TOUDI_RENDER_ERRORS__ || [];
+  // WebKit reports deferred resize notifications through its error event. Keep
+  // that warning separately; geometry stability and its bounded count are tested.
+  const resizeWarnings = rawErrors.filter(message=>/^ResizeObserver loop (completed with undelivered notifications|limit exceeded)\.?$/.test(message));
   const report = {
     path: location.pathname, title: document.title,
     viewport: {width: innerWidth, height: innerHeight},
@@ -93,7 +137,7 @@
     scripting: typeof switchView === 'function',
     management: !!document.getElementById('managementEntry'),
     service: window.__TOUDI_SERVICE__?.mode || null,
-    filling, markdownTables, fillingDialog:box('#fillingDialog'), fillingBody:box('.filling-body'),
+    filling, markdownTables, refreshStability, fillingDialog:box('#fillingDialog'), fillingBody:box('.filling-body'),
     sidebar: box('.sidebar'), main: box('.main'), topbar: box('.topbar'), table: box('#tableView'),
     managementLayout: box('.management-body'), settings: box('#settingsView'),
     theme: document.documentElement.dataset.theme,
@@ -135,6 +179,8 @@
       reviews: typeof reviewData !== 'undefined' ? reviewData.sessions.length : null,
       prospects: typeof prospectData !== 'undefined' ? prospectData.prospects.length : null
     },
+    schedule: (target === 'schedule' || target.startsWith('schedule-')) ? {canvas:box('#scheduleCalendar'),inspector:box('#scheduleInspector'),events:document.querySelectorAll('[data-schedule-event]').length,title:document.getElementById('scheduleRange')?.textContent,notice:document.getElementById('scheduleNotice')?.textContent,nativeStatus:await window.toudiDesktop.calendar('status'),geometrySamples:scheduleGeometry,monthRows:[...document.querySelectorAll('#scheduleCalendar[data-view="dayGridMonth"] [role="rowgroup"]>[role="row"]:has(>[role="gridcell"][data-date])')].map(el=>({height:el.getBoundingClientRect().height,y:el.getBoundingClientRect().y,cells:el.querySelectorAll('[data-date]').length})),allDay:box('#scheduleCalendar [role="row"]:has(>.schedule-all-day-header)'),more:[...document.querySelectorAll('.schedule-more')].filter(el=>el.getBoundingClientRect().width>0).map(el=>el.textContent)} : null,
+    detail: target.startsWith('recruitment-') ? {modal:box('#detailModal .modal'),header:box('.detail-sticky'),body:box('#detailContent'),scrollHeight:document.getElementById('detailContent').scrollHeight,clientHeight:document.getElementById('detailContent').clientHeight,title:document.getElementById('detailTitle').textContent,panels:[...document.querySelectorAll('#detailContent>[role="tabpanel"]')].filter(el=>!el.hidden).map(el=>el.id),tabs:[...document.querySelectorAll('.detail-shortcuts [role="tab"]')].map(el=>({title:el.textContent,selected:el.getAttribute('aria-selected')})),linkedEvents:document.querySelectorAll('[data-detail-event]').length,calendarAction:box('.detail-entry-actions>button'),recruitmentLinks:document.querySelectorAll('.detail-entry-actions a').length} : null,
     reader: box('#qbMain'), reviewReader: box('#reviewMain'), prospectReader: box('#prospectMain'),
     emptySurface: box('.workspace-empty'),
     readingLayout: box('#qbView .rv-layout, #reviewView .rv-layout, #prospectView .rv-layout'),
@@ -142,7 +188,8 @@
     horizontalOverflow: document.body.scrollWidth > innerWidth,
     cssColor: getComputedStyle(document.documentElement).getPropertyValue('--primary').trim(),
     styles: document.querySelectorAll('style').length,
-    errors: window.__TOUDI_RENDER_ERRORS__ || []
+    resizeWarnings,
+    errors: rawErrors.filter(message=>!resizeWarnings.includes(message))
   };
   window.__TAURI__.core.invoke('native_render_report', {report});
 })();

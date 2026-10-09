@@ -11,13 +11,13 @@
 :root[data-palette="clay"][data-theme="dark"] { --primary: #e0b8a4; --primary-hover: #f0d3c1; --primary-light: #573e33; --primary-faint: #453329; --bg: #27211e; --card: #342b26; --row-alt: #3c312b; --row-hover: #4a3a30; --on-primary: #372016; }
 :root[data-palette="graphite"][data-theme="dark"] { --primary: #c4cdd4; --primary-hover: #e1e7ec; --primary-light: #3c4750; --primary-faint: #2f3a42; --bg: #1d242a; --card: #293139; --row-alt: #2f3942; --row-hover: #3c4852; --on-primary: #23313a; }
 .theme-toolbar { position: relative; }
-.theme-quick-control { display: flex; border: 1px solid var(--border); border-radius: 6px; background: var(--card); }
+.theme-quick-control { display: flex; border: 1px solid var(--border); border-radius: var(--ui-radius-control); background: var(--card); }
 .theme-quick-control button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; height: 32px; padding: 6px 9px; border: 0; background: none; color: var(--text2); font: inherit; font-size: 12px; cursor: pointer; }
 .theme-quick-control button:hover { color: var(--primary); background: var(--bg); }
 .theme-quick-control button:first-child { border-radius: 5px 0 0 5px; }
 .theme-quick-control button:last-child { border-left: 1px solid var(--border); border-radius: 0 5px 5px 0; padding: 6px; }
 .theme-quick-control svg { width: 15px; height: 15px; }
-#themeMenu { position: absolute; z-index: 130; right: 0; top: 40px; width: 160px; padding: 5px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); box-shadow: var(--shadow-md); }
+#themeMenu { position: absolute; z-index: 130; right: 0; top: 40px; width: 160px; padding: 5px; border: 1px solid var(--border); border-radius: var(--ui-radius-control); background: var(--card); box-shadow: var(--shadow-md); }
 #themeMenu[hidden] { display: none !important; }
 #themeMenu button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 9px 10px; border: 0; border-radius: 3px; background: none; font: inherit; font-size: 13px; text-align: left; color: var(--text2); cursor: pointer; }
 #themeMenu button:hover, #themeMenu button[aria-checked="true"] { color: var(--primary); background: var(--primary-faint); }
@@ -40,7 +40,7 @@
   padding: 24px 28px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-surface);
 }
 #settingsView .settings-head { margin-bottom: 20px; }
 #settingsView .settings-head h2 { font-size: var(--setting-title-size); line-height: 32px; font-weight: 600; margin: 0 0 4px; }
@@ -50,8 +50,7 @@
 .settings-tabs button:hover { color: var(--primary); background: var(--bg); }
 .settings-tabs button[aria-selected="true"] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 .settings-panel[hidden] { display: none !important; }
-.settings-panel { animation: settings-panel-in .16s ease-out; }
-@keyframes settings-panel-in { from { opacity: .5; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.settings-panel { animation: ui-content-enter var(--ui-motion-enter) var(--ui-ease); }
 html[data-render-diagnostic="true"] *, html[data-render-diagnostic="true"] *::before, html[data-render-diagnostic="true"] *::after { animation: none !important; transition: none !important; }
 #settingsView .settings-section { padding: 24px 0 0; border: 0; }
 #settingsView .settings-section + .settings-section { padding-top: 24px; }
@@ -65,16 +64,16 @@ html[data-render-diagnostic="true"] *, html[data-render-diagnostic="true"] *::be
 #settingsView .setting-control { display: flex; align-items: center; gap: 8px; justify-content: flex-end; min-width: 0; }
 #settingsView .btn { display: inline-flex; align-items: center; justify-content: center; height: var(--setting-control-height); min-height: var(--setting-control-height); font: inherit; font-size: var(--setting-control-size); line-height: 20px; padding: 0 12px; white-space: nowrap; }
 #settingsView .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
-.settings-segment { display: flex; width: 100%; height: 36px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.settings-segment { display: flex; width: 100%; height: 36px; border: 1px solid var(--border); border-radius: var(--ui-radius-control); overflow: hidden; }
 .settings-segment button { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 0; border-right: 1px solid var(--border); background: var(--card); color: var(--text2); font: inherit; font-size: 13px; line-height: 20px; white-space: nowrap; cursor: pointer; }
 .settings-segment button:last-child { border-right: 0; }
 .settings-segment button:hover { background: var(--bg); }
 .settings-segment button[aria-pressed="true"] { background: var(--primary-light); color: var(--text); font-weight: 600; }
 .settings-segment button:focus-visible { outline-offset: -3px; }
 .settings-select { width: 100%; height: 36px; position: relative; }
-#settingsView .settings-select select { appearance: none; width: 100%; height: 36px; padding: 0 36px 0 12px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
+#settingsView .settings-select select { appearance: none; width: 100%; height: 36px; padding: 0 36px 0 12px; background: var(--card); border: 1px solid var(--border); border-radius: var(--ui-radius-control); color: var(--text); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
 .settings-select svg { position: absolute; right: 12px; top: 10px; width: 16px; height: 16px; color: var(--text2); pointer-events: none; }
-.settings-disclosure { margin: 16px 0 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.settings-disclosure { margin: 16px 0 0; border: 1px solid var(--border); border-radius: var(--ui-radius-control); overflow: hidden; }
 .settings-disclosure > summary { min-height: 48px; padding: 12px 16px; }
 .settings-disclosure > summary strong { font-weight: 500; }
 .setting-detail { padding: 16px; border-top: 1px solid var(--border-light); font-size: 13px; line-height: 20px; }
@@ -88,6 +87,7 @@ html[data-render-diagnostic="true"] *, html[data-render-diagnostic="true"] *::be
 .setup-number { color: var(--text3); font-size: 13px; font-variant-numeric: tabular-nums; text-align: center; }
 .settings-reading { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; line-height: 20px; margin-top: 16px; }
 .settings-reading a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.settings-reading .action-link { text-decoration: none; }
 .settings-reading span { color: var(--text2); }
 .agent-start-link { margin: 0 0 12px; }
 .management-body.recovery-body { display: block; }
@@ -111,7 +111,7 @@ html[data-render-diagnostic="true"] *, html[data-render-diagnostic="true"] *::be
   max-height: calc(100dvh - 40px);
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-surface);
 }
 .pref-dialog-head { align-items: flex-start; padding: 20px 24px 18px; }
 .pref-dialog-head h2 { font-size: 20px; font-weight: 600; line-height: 1.4; }
@@ -248,7 +248,7 @@ details[open] > summary .disclosure-action svg { transform: rotate(90deg); }
 html[data-motion="off"] .disclosure-action svg { transition: none; }
 
 /* Color selection stays separate from light/dark theme mode. */
-.settings-palettes { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); width: 100%; border: 1px solid var(--border); border-radius: 6px; }
+.settings-palettes { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); width: 100%; border: 1px solid var(--border); border-radius: var(--ui-radius-control); }
 .settings-palettes button { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 4px; height: 36px; min-height: 36px; padding: 0 4px; margin: -1px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text2); font: inherit; font-size: 12px; cursor: pointer; }
 .settings-palettes button:hover { background: var(--bg); }
 .settings-palettes button[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); background: var(--primary-faint); position: relative; z-index: 1; font-weight: 600; }

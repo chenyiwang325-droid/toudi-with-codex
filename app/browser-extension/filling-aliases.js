@@ -57,6 +57,8 @@
     ],
     "婚姻状况": [
       "婚姻状况",
+      "婚否",
+      "婚姻状态",
       "marital status"
     ],
     "当前户籍所在地": [
@@ -105,7 +107,12 @@
       "mobile",
       "mobile phone",
       "phone number",
-      "telephone"
+      "telephone",
+      "联系电话",
+      "联系手机",
+      "电话",
+      "联系方式",
+      "contact phone"
     ],
     "学历": [
       "学历",
@@ -136,7 +143,10 @@
       "学院",
       "院系",
       "faculty",
-      "college"
+      "college",
+      "学院名称",
+      "院系名称",
+      "school department"
     ],
     "专业": [
       "专业",
@@ -168,7 +178,9 @@
       "GPA",
       "平均绩点",
       "绩点",
-      "grade point average"
+      "grade point average",
+      "成绩（GPA）",
+      "成绩(GPA)"
     ],
     "年级排名": [
       "年级排名",
@@ -315,19 +327,35 @@
     "主修课程": [
       "主修课程",
       "主要课程",
-      "courses"
+      "courses",
+      "专业课程",
+      "课程"
     ],
     "IT技能": [
       "IT技能",
       "计算机技能",
       "技能特长",
-      "skills"
+      "skills",
+      "特殊技能",
+      "专业技能"
     ],
     "获奖情况": [
       "获奖情况",
       "奖惩情况",
       "荣誉奖励",
       "awards"
+    ],
+    "资格证书": [
+      "资格证书",
+      "职业资格证书",
+      "专业资格证书",
+      "职业资格",
+      "执业资格",
+      "职业证书",
+      "professional certifications",
+      "professional certification",
+      "professional qualification",
+      "vocational qualification"
     ],
     "个人评价": [
       "个人评价",
@@ -353,13 +381,16 @@
       "考试成绩",
       "考试分数",
       "证书成绩",
-      "score"
+      "score",
+      "语言成绩",
+      "外语成绩"
     ],
     "取得日期": [
       "取得日期",
       "获证日期",
       "考试日期",
-      "issue date"
+      "issue date",
+      "获得时间"
     ],
     "组织名称": [
       "组织名称",
@@ -397,12 +428,22 @@
       "award name",
       "award title"
     ],
-    "获奖等级": [
-      "获奖等级",
-      "奖励等级",
-      "奖项等级",
+    "获奖级别": [
       "获奖级别",
-      "award level"
+      "获奖等级",
+      "award level",
+      "award scope"
+    ],
+    "奖项等级": [
+      "奖项等级",
+      "奖励等级",
+      "award rank",
+      "prize rank"
+    ],
+    "奖项类别": [
+      "奖项类别",
+      "奖励类别",
+      "award category"
     ],
     "获奖日期": [
       "获奖日期",
@@ -440,7 +481,8 @@
       "刊物名称",
       "发表机构",
       "journal",
-      "publication venue"
+      "publication venue",
+      "期刊名称/专利号申请号"
     ],
     "发表日期": [
       "发表日期",
@@ -467,6 +509,141 @@
       "DOI",
       "doi",
       "publication url"
+    ],
+    "作者名单": [
+      "作者名单",
+      "作者姓名",
+      "作者",
+      "authors",
+      "author names"
+    ],
+    "发表状态": [
+      "发表状态",
+      "出版状态",
+      "publication status"
+    ],
+    "收录类别": [
+      "收录类别",
+      "收录情况",
+      "检索类型",
+      "检索类别",
+      "论文级别",
+      "indexing"
+    ],
+    "在线发表日期": [
+      "在线发表日期",
+      "在线发布日期",
+      "online publication date"
+    ],
+    "正式出版日期": [
+      "正式出版日期",
+      "见刊日期",
+      "issue publication date"
+    ],
+    "卷期页码": [
+      "卷期页码",
+      "卷期",
+      "卷号期号页码",
+      "volume issue pages"
+    ],
+    "学生干部级别": [
+      "学生干部级别",
+      "学生干部等级",
+      "干部级别",
+      "任职级别",
+      "职务级别",
+      "干部层级"
+    ],
+    "优势与不足": [
+      "优势与不足",
+      "评价自身的优势和不足",
+      "优点与缺点"
+    ],
+    "兴趣爱好": [
+      "兴趣爱好",
+      "个人爱好"
+    ],
+    "紧急联系人姓名": [
+      "紧急联系人姓名",
+      "紧急联系人",
+      "emergency contact name"
+    ],
+    "紧急联系人手机": [
+      "紧急联系人手机",
+      "紧急联系人电话",
+      "紧急联系人联系电话",
+      "紧急联系电话",
+      "emergency contact phone",
+      "emergency phone"
+    ],
+    "紧急联系人关系": [
+      "紧急联系人关系",
+      "与紧急联系人关系",
+      "relationship to emergency contact"
+    ],
+    "紧急联系人单位": [
+      "紧急联系人单位",
+      "紧急联系人工作单位",
+      "emergency contact employer"
+    ],
+    "紧急联系人职务": [
+      "紧急联系人职务",
+      "紧急联系人职位",
+      "emergency contact title"
+    ],
+    "与本人关系": [
+      "与本人关系",
+      "与申请人关系",
+      "亲属关系",
+      "关系",
+      "relationship"
+    ],
+    "工作单位": [
+      "工作单位",
+      "单位",
+      "单位名称",
+      "公司名称",
+      "company",
+      "employer"
+    ],
+    "工作所在地": [
+      "工作所在地",
+      "单位所在地",
+      "工作地点",
+      "工作城市",
+      "work location"
+    ],
+    "语种": [
+      "语种",
+      "语言类型",
+      "外语语种",
+      "language type"
+    ],
+    "证书类型": [
+      "证书类型",
+      "考试类型",
+      "语言证书类型",
+      "certificate type"
+    ],
+    "证明人": [
+      "证明人",
+      "证明人姓名",
+      "推荐人姓名",
+      "referee name",
+      "reference name"
+    ],
+    "证明人电话": [
+      "证明人电话",
+      "证明人手机",
+      "证明人联系方式",
+      "推荐人电话",
+      "referee phone",
+      "reference phone"
+    ],
+    "证明人单位及职务": [
+      "证明人单位及职务",
+      "证明人单位及职位",
+      "referee employer and title"
     ]
   },
   "manualTerms": [
@@ -480,22 +657,10 @@
     "consent",
     "签名",
     "signature",
-    "家庭成员",
-    "父亲",
-    "母亲",
-    "亲属",
-    "紧急联系人",
-    "证明人",
     "上传",
     "upload",
     "照片",
-    "photo",
-    "father",
-    "mother",
-    "family",
-    "emergency contact",
-    "referee",
-    "reference contact"
+    "photo"
   ],
   "sensitiveTerms": [
     "姓名",
@@ -509,7 +674,12 @@
     "身份证",
     "id number",
     "家庭地址",
-    "home address"
+    "home address",
+    "紧急联系人",
+    "emergency contact",
+    "证明人",
+    "referee",
+    "reference contact"
   ],
   "modules": {
     "campus-role": "campus-role",
@@ -532,6 +702,9 @@
     "论文": "publications",
     "发表": "publications",
     "专著": "publications",
+    "family": "family",
+    "家庭": "family",
+    "亲属": "family",
     "教育": "education",
     "education": "education",
     "学历": "education",
@@ -574,12 +747,16 @@
     "project": {
       "名称": [
         "在校科研及实践项目",
-        "实践项目名称"
+        "实践项目名称",
+        "实践名称"
       ],
       "角色": [
         "担任角色"
       ],
       "简述": [
+        "实践描述"
+      ],
+      "项目描述": [
         "实践描述"
       ]
     },
@@ -589,6 +766,44 @@
       ],
       "发表日期": [
         "发布时间"
+      ]
+    },
+    "family": {
+      "姓名": [
+        "成员姓名",
+        "亲属姓名"
+      ],
+      "手机": [
+        "联系电话",
+        "联系电话号码",
+        "手机号码",
+        "电话"
+      ],
+      "工作单位": [
+        "所在单位",
+        "单位名称",
+        "单位"
+      ],
+      "职务": [
+        "职位",
+        "岗位",
+        "职务或职业",
+        "职业"
+      ]
+    },
+    "language": {
+      "语种": [
+        "语言",
+        "外语语种",
+        "语言类型"
+      ],
+      "证书类型": [
+        "证书名称",
+        "考试名称"
+      ],
+      "考试成绩": [
+        "语言成绩",
+        "成绩"
       ]
     }
   },
@@ -609,6 +824,14 @@
     ],
     "internship": [
       "单位"
+    ],
+    "family": [
+      "姓名",
+      "与本人关系"
+    ],
+    "language": [
+      "语言／证书名称",
+      "证书类型"
     ]
   }
-};if(typeof module==="object"&&module.exports)module.exports=value;else r.TouDiFillingVocabulary=value;})(globalThis);
+};if(typeof module=="object"&&module.exports)module.exports=value;else r.TouDiFillingVocabulary=value;})(globalThis);

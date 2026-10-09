@@ -22,6 +22,7 @@ from update_common import atomic_write, data_lock, runtime_keys
 from publish_records import validate as validate_records
 import remote_files
 import profile_store
+import schedule_store
 
 MODULES = {
  'records': ('投递数据/投递记录.json', []),
@@ -33,6 +34,7 @@ MODULES = {
  'settings': ('投递数据/工作区配置.json', {'schemaVersion': 1}),
  'drafts': ('投递数据/草稿数据.json', {}),
  'profile': (profile_store.PROFILE_PATH, profile_store.empty_pack()),
+ 'schedule': (schedule_store.PATH, schedule_store.empty()),
 }
 class Conflict(ValueError): pass
 
@@ -71,6 +73,7 @@ class Workbench:
         if not path.exists(): return copy.deepcopy(default)
         value=json.loads(path.read_text(encoding='utf-8')); self.validate(module,value); return value
     def validate(self,module,value):
+        if module == 'schedule': return schedule_store.validate(value)
         if module == 'profile': return profile_store.validate_pack(value)
         if module=='records': return validate_records(value)
         if not isinstance(value,dict): raise ValueError('JSON root must be an object')
@@ -138,6 +141,36 @@ class Workbench:
         if module in MODULES and module not in ('settings','drafts'):
             values={k:v for k,v in values.items() if k not in (MODULES['settings'][0],MODULES['drafts'][0],profile_store.PROFILE_PATH,profile_store.LEGACY_PATH)}
         return hashlib.sha256(encoded({k:hashlib.sha256(v).hexdigest() for k,v in sorted(values.items())})).hexdigest()
+    def refresh_revisions(self):
+        """Cheap per-module change signals; save bases remain the content SHA contract.
+
+        Include document creation/removal and atomic replacement without re-reading
+        every PDF or full collection on each UI poll. No file paths leave this API.
+        """
+        paths={name:[relative] for name,(relative,_) in MODULES.items() if name!='drafts'}
+        paths['profile'].append(profile_store.LEGACY_PATH)
+        for folder,module in [('岗位探查','prospects'),('面试准备','preps'),('复盘','reviews')]:
+            directory=self.root/folder
+            if directory.is_dir() and not directory.is_symlink():
+                paths[module].extend(p.relative_to(self.root).as_posix() for p in directory.rglob('*')
+                                     if p.suffix.lower() in remote_files.EXTENSIONS and not p.is_symlink())
+        # Registered documents can be used by more than one reader.
+        try: materials=remote_files.registered_materials(self.root)
+        except (ValueError,OSError): materials=[]
+        for module in ('preps','prospects','reviews'): paths[module].extend(materials)
+        out={}
+        for module,relatives in paths.items():
+            signals={}
+            for relative in sorted(set(relatives)):
+                try:
+                    path=self.path(relative); stat=path.stat()
+                    if not path.is_file(): continue
+                    signals[relative]=(stat.st_mtime_ns,stat.st_ctime_ns,stat.st_size,stat.st_ino)
+                except FileNotFoundError: signals[relative]='missing'
+                except (ValueError,OSError): signals[relative]='unavailable'
+            if module=='prospects': signals['edits']=out.get('edits')
+            out[module]=hashlib.sha256(encoded(signals)).hexdigest()
+        return out
     def recover_pending(self):
         from legacy_update import recover
         recover(self.data)
@@ -289,12 +322,14 @@ class Workbench:
                     newkeys=runtime_keys(value)
                     mapping={k:newkeys[i if index is None or i<index else i-1] for i,k in enumerate(keys) if action=='delete' and i!=index} if action=='delete' else {k:newkeys[i] for i,k in enumerate(keys)}
                     self.reassociate(old,value,mapping,changes)
-                elif module in ('preps','prospects','reviews','qbank'):
-                    key={'preps':'preps','prospects':'companies','reviews':'sessions','qbank':'categories'}[module]
+                elif module in ('preps','prospects','reviews','qbank','schedule'):
+                    key={'preps':'preps','prospects':'companies','reviews':'sessions','qbank':'categories','schedule':'events'}[module]
                     if not isinstance(ident,str) or not ident: raise ValueError('id required')
                     if action=='delete':
                         if not any(r['id']==ident for r in value[key]): raise ValueError('item missing')
-                        value[key]=[r for r in value[key] if r['id']!=ident]
+                        if module == 'schedule':
+                            value[key]=[{**r,'status':'cancelled'} if r['id']==ident else r for r in value[key]]
+                        else: value[key]=[r for r in value[key] if r['id']!=ident]
                     elif action in ('upsert','import'):
                         if module=='preps': item=self.prepare(item,changes)
                         elif module=='prospects': item=self.prospect(item,changes)
@@ -361,7 +396,7 @@ class Workbench:
         for source,target in mapping.items():
             if source in original: edits['edits'][target]=original[source]
         changes[MODULES['edits'][0]]=encoded(edits)
-        for module,key in [('preps','preps'),('reviews','sessions')]:
+        for module,key in [('preps','preps'),('reviews','sessions'),('schedule','events')]:
             data=self.read(module)
             for row in data[key]:
                 if row.get('companyKey') in mapping: row['companyKey']=mapping[row['companyKey']]
@@ -416,7 +451,7 @@ class Workbench:
         return result
     def backup(self):
         with data_lock(self.data):
-            self.recover_pending(); self.check_references({}); files=self.inventory(); manifest={'schemaVersion':1,'profileScope':1,'files':{k:hashlib.sha256(v).hexdigest() for k,v in files.items()}}
+            self.recover_pending(); self.check_references({}); files=self.inventory(); manifest={'schemaVersion':1,'profileScope':1,'scheduleScope':1,'files':{k:hashlib.sha256(v).hexdigest() for k,v in files.items()}}
             output=io.BytesIO()
             with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr('manifest.json',encoded(manifest))
@@ -475,8 +510,11 @@ class Workbench:
     def restore(self,raw,base,preview=False):
         files=self.inspect_backup(raw)
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-            profile_scope=json.loads(archive.read('manifest.json')).get('profileScope') == 1
+            manifest=json.loads(archive.read('manifest.json'))
+            profile_scope=manifest.get('profileScope') == 1
+            schedule_scope=manifest.get('scheduleScope') == 1
         preserved=[] if profile_scope else [p for p in (profile_store.PROFILE_PATH,profile_store.LEGACY_PATH) if p not in files and self.path(p).exists()]
+        if not schedule_scope and MODULES['schedule'][0] not in files and self.path(MODULES['schedule'][0]).exists(): preserved.append(MODULES['schedule'][0])
         if preview: return {'ok':True,'files':[{'path':k,'size':len(v)} for k,v in files.items()], 'preserved':preserved}
         with data_lock(self.data):
             self.recover_pending()
