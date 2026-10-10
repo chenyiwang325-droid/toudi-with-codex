@@ -21,7 +21,9 @@ a:hover { text-decoration: underline; }
 .icon-sm svg { width: 14px; height: 14px; }
 .icon-lg svg { width: 20px; height: 20px; }
 .app { display: flex; min-height: 100vh; }
-.sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--card); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 200; overflow-y: auto; overflow-x: hidden; transition: none; color: var(--text2); border-right: 1px solid var(--border); }
+.sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--card); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 200; overflow: hidden; transition: none; color: var(--text2); border-right: 1px solid var(--border); }
+.sidebar>:not(#quickViews) { flex-shrink:0; }
+#quickViews { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
 .main { transition: none; flex: 1; margin-left: var(--sidebar-width); display: flex; flex-direction: column; min-width: 0; max-width: calc(100vw - var(--sidebar-width)); }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: #bccbd0; border-radius: 2px; }
@@ -60,7 +62,7 @@ a:hover { text-decoration: underline; }
 .filter-item input[type="checkbox"] { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
 .filter-item .count { margin-left: auto; font-size: 10px; color: var(--text3); }
 .filter-count-note { color: var(--sb-text); opacity: .75; font-size: 10px; line-height: 1.4; padding: 5px 4px 2px; }
-.sb-footer { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--card); }
+.sb-footer { padding: 12px 16px; margin-top:auto; border-top: 1px solid var(--border); background: var(--card); }
 .storage-badge { margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 7px 8px; border-radius: 5px; background: var(--bg); line-height: 1.4; color: var(--text2); border: 1px solid var(--border); white-space: normal; }
 .storage-badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .storage-badge.ok { color: var(--success); background: var(--success-light); }
@@ -493,10 +495,7 @@ details.qb-co-fold .qb-co-body .qb-group-fold:first-of-type { margin-top: 10px; 
 .detail-sticky h2 { margin: 8px 0; }
 .detail-nav { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .detail-links { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.detail-stages { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .detail-role { font-size: 13px; line-height: 1.5; color: var(--text2); max-height: 70px; overflow: auto; margin-bottom: 10px; }
-.detail-stages button { padding: 6px 9px; border: 1px solid var(--border); background: var(--bg); border-radius: 7px; font: inherit; font-size: 12px; cursor: pointer; }
-.detail-stages button.active { background: var(--primary); border-color: var(--primary); color: white; }
 .detail-section-title { font-size: 14px; margin: 20px 0 10px; }
 .detail-materials { display: flex; flex-wrap: wrap; gap: 8px; }
 .stat-card.result-status { border-left: 0; }
@@ -779,15 +778,15 @@ textarea { font-size: 16px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
 html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after { animation:none !important; transition:none !important; }
 
-#dashboardToolbar { gap:8px; padding:0 0 10px; margin-bottom:10px; border-bottom:1px solid var(--border); }
+#dashboardToolbar { gap:8px; padding:0; margin-bottom:8px; min-height:28px; }
+#dashboardToolbar .btn { min-height:28px; padding:3px 9px; }
+body:not(.content-module) .content { padding-top:12px; }
 #dashboardToolbar .toolbar-left { flex:1; min-width:0; }
-.sb-search-entry { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:5px; background:var(--card); color:var(--text); text-align:left; font:inherit; cursor:pointer; }
-#deliverySearchEntry { padding:14px 12px; }
-.table-tools { position:relative; display:flex; gap:6px; }
+.table-tools { position:relative; display:flex; gap:6px; flex-wrap:wrap; }
 #columnMenu { position:absolute; z-index:30; right:0; top:40px; width:350px; max-height:60vh; overflow:auto; padding:14px; border:1px solid var(--border); border-radius:6px; background:var(--card); box-shadow:var(--shadow-md); }
 #columnMenu strong { margin-right:16px; }
 #columnMenu .column-options { margin-top:12px; grid-template-columns:repeat(2,minmax(0,1fr)); }
-#tableHead [hidden],#tableBody [hidden],#columnMenu[hidden],#deliverySearchEntry[hidden],#columnMenuButton[hidden],#clearConditions[hidden] { display:none!important; }
+#tableHead [hidden],#tableBody [hidden],#columnMenu[hidden],#columnMenuButton[hidden],#clearConditions[hidden],#moduleImportButton[hidden] { display:none!important; }
 .filter-dialog-actions { display:flex; gap:6px; padding:12px 18px; border-top:1px solid var(--border); }
 #filterDialogBody > .sb-search { padding:12px 0; position:sticky; top:0; background:var(--card); z-index:2; }
 #settingsView { max-width:960px; }
@@ -803,25 +802,43 @@ html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="
 html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motion-enter) var(--ui-ease); }
 @media(max-width:900px) { .setting-row { grid-template-columns:minmax(0,1fr) 140px; gap:14px; padding:14px 0; } .setting-control { justify-content:flex-end; } .setting-control select { width:100%; } }
 @media(max-width:389px) { .setting-row { grid-template-columns:minmax(0,1fr); gap:10px; } .setting-control { justify-content:flex-start; } }
-#settingsShortcut[hidden] { display:none!important; }
 
 /* Detail reading surface and preference taxonomy */
 .detail-modal .modal { width:min(820px,100%); max-width:820px; height:100dvh; max-height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding:0; }
-.detail-modal .detail-sticky { position:static; flex-shrink:0; padding:18px 24px 0; }
+.detail-modal .detail-sticky { position:static; flex-shrink:0; padding:16px 24px; }
 .detail-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
 .detail-heading>div:first-child { min-width:0; }
 .detail-heading .detail-nav { flex-wrap:nowrap; flex-shrink:0; }
 .detail-sticky h2 { font-size:20px; line-height:1.4; margin:0; overflow-wrap:anywhere; }
-.detail-shortcuts { display:flex; gap:24px; margin-top:14px; }
-.detail-shortcuts button { padding:10px 0 11px; border:0; border-bottom:2px solid transparent; background:none; color:var(--text2); font:inherit; font-size:13px; cursor:pointer; text-decoration:none; }
-.detail-shortcuts button[aria-selected="true"] { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
 .detail-context { font-size:12px; line-height:1.6; color:var(--text3); margin:6px 0 0; }
 .detail-entry-actions { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-top:14px; }
 .detail-entry-actions .detail-links { gap:8px; }
+.detail-entry-actions>.btn { min-width:76px; white-space:nowrap; flex-shrink:0; }
 #detailContent { flex:1; overflow:auto; min-height:0; padding:0 24px 24px; overscroll-behavior:contain; scrollbar-gutter:stable; }
-.detail-section { padding:18px 0 0; border:0; }
+.detail-section { padding:16px 0; border:0; border-bottom:1px solid var(--border-light); }
+.detail-section:last-child { padding-bottom:0; border-bottom:0; }
+.detail-progress-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.detail-progress-row label { color:var(--text3); font-size:12px; margin-right:4px; }
+.detail-progress-row select { padding:5px 24px 5px 9px; min-height:32px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); font:inherit; font-size:13px; }
+.detail-progress-row .btn { min-height:32px; }
+.detail-followup-notes { margin-top:12px; }
+.detail-followup-notes>summary { cursor:pointer; font-size:13px; color:var(--text2); line-height:24px; }
+.detail-followup-notes>summary span { color:var(--text3); font-size:12px; margin-left:10px; }
+.detail-followup-notes[open]>summary { color:var(--text); }
+.detail-followup-notes .detail-note-block { margin-top:12px; padding-top:0; border-top:0; }
+.detail-material-entries { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.detail-material-entry { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; text-align:left; padding:10px 12px; color:var(--text); border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--card); font:inherit; cursor:pointer; transition:background-color var(--ui-motion-fast) var(--ui-ease),border-color var(--ui-motion-fast) var(--ui-ease); }
+.detail-material-entry strong { display:block; font-size:13px; font-weight:500; }
+.detail-material-entry small { display:block; font-size:11px; color:var(--text3); margin-top:2px; }
+.detail-material-entry svg { width:14px; height:14px; flex-shrink:0; color:var(--text3); }
+.detail-material-entry:hover { background:var(--primary-faint); border-color:var(--primary); }
+.detail-material-entry:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.detail-secondary-links { display:flex; flex-wrap:wrap; gap:16px; margin-top:8px; }
+.detail-secondary-links button { border:0; background:transparent; padding:2px 0; color:var(--text2); font:inherit; font-size:12px; cursor:pointer; display:flex; gap:4px; align-items:center; }
+.detail-secondary-links button:hover { color:var(--primary); }
+.detail-secondary-links svg { width:12px; height:12px; }
 .detail-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-.detail-section-heading h3,.detail-material-group h3 { font-size:14px; line-height:22px; margin:0; font-weight:600; }
+.detail-section-heading h3 { font-size:14px; line-height:22px; margin:0; font-weight:600; }
 .detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; margin:0; }
 .detail-fact { min-width:0; }
 .detail-fact dt,.detail-subtitle { color:var(--text3); font-size:12px; font-weight:500; margin-bottom:4px; }
@@ -830,10 +847,6 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 .detail-prose { font-size:13px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
 .detail-edited { font-size:11px; color:var(--text3); margin-left:6px; white-space:nowrap; }
 .detail-actions,.detail-materials { display:flex; gap:8px; flex-wrap:wrap; }
-.detail-stages { margin-bottom:16px; }
-.detail-stages button.active { color:var(--primary); background:var(--primary-light); }
-.detail-followup { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:16px 0; }
-.detail-followup span { color:var(--text2); font-size:12px; }
 .detail-source { margin-top:12px; padding:16px; border:1px solid var(--border); border-radius:6px; }
 .detail-source h4 { font-size:14px; margin-bottom:10px; }
 .detail-source .detail-facts { margin:12px 0; gap:10px 20px; }
@@ -841,19 +854,15 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 .detail-source-info { margin-top:18px; padding-top:14px; border-top:1px solid var(--border-light); font-size:12px; color:var(--text2); }
 .detail-source-info>summary { cursor:pointer; line-height:24px; }
 .detail-source-info>.detail-facts { margin-top:14px; }
-.detail-related-schedule { margin-top:20px; border-top:1px solid var(--border-light); padding-top:16px; }
+.detail-related-schedule { margin-top:16px; border-top:1px solid var(--border-light); padding-top:12px; }
+.detail-related-schedule .detail-section-heading { margin-bottom:6px; }
 .detail-schedule-row { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; padding:10px 0; text-align:left; border:0; border-bottom:1px solid var(--border-light); color:var(--text2); background:transparent; font:inherit; cursor:pointer; }
 .detail-schedule-row strong { display:block; font-size:13px; line-height:20px; font-weight:500; }
 .detail-schedule-row small { display:block; margin-top:3px; font-size:11px; color:var(--text3); }
 .detail-schedule-row:hover strong { color:var(--primary); text-decoration:underline; text-underline-offset:3px; }
 .detail-note-block { margin-top:20px; padding-top:16px; border-top:1px solid var(--border-light); }
 .detail-note-block .detail-prose { margin:0; }
-.detail-material-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
 .merged-sources > summary { cursor:pointer; color:var(--primary); padding:12px 0 0; font-size:13px; }
-.detail-material-group + .detail-material-group { margin-top:0; }
-.detail-material-group .detail-materials { margin-top:8px; }
-.detail-linked { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-top:10px; }
-.detail-linked .action-link { text-align:left; justify-content:space-between; max-width:100%; }
 .action-link { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:34px; padding:7px 11px; color:var(--primary); background:var(--card); border:1px solid var(--border); border-radius:var(--ui-radius-control,var(--radius-sm)); font:inherit; font-size:13px; font-weight:500; line-height:18px; text-decoration:none; cursor:pointer; transition:background 140ms ease,border-color 140ms ease,box-shadow 140ms ease; }
 .action-link:hover { color:var(--primary); background:var(--primary-faint); border-color:var(--primary); box-shadow:0 2px 6px rgba(0,0,0,.04); }
 .action-link:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
@@ -861,7 +870,6 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 .action-link>span { min-width:0; overflow-wrap:anywhere; }
 .resource-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 #tableBody .table-entry-link { min-height:26px; padding:3px 7px; font-size:12px; text-decoration:none; }
-.detail-linked .action-link { width:100%; }
 #detailContent .research-record { height:104px; min-height:80px; margin:6px 0 8px; }
 .detail-editor { padding-top:0; }
 .detail-field-editor { border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; }
@@ -869,7 +877,7 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 .detail-field-row>span { padding-top:8px; font-size:12px; color:var(--text3); }
 .detail-field-row input,.detail-field-row textarea { min-width:0; width:100%; margin:0; padding:8px 10px; font:inherit; font-size:13px; line-height:20px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); }
 .detail-field-row textarea { resize:vertical; min-height:80px; }
-@media(max-width:600px) { .detail-heading { flex-wrap:wrap; gap:10px; } .detail-heading .detail-nav { width:100%; } .detail-heading .detail-nav button:last-child { margin-left:auto; } .detail-entry-actions { align-items:flex-start; } .detail-material-columns { grid-template-columns:1fr; gap:24px; } }
+@media(max-width:600px) { .detail-heading { flex-wrap:wrap; gap:10px; } .detail-heading .detail-nav { width:100%; } .detail-heading .detail-nav button:last-child { margin-left:auto; } .detail-entry-actions { align-items:flex-start; } }
 .pref-dialog.modal { width:min(760px,100%); max-width:760px; }
 .pref-tabs { display:flex; gap:20px; padding:0 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
 .pref-tabs button { border:0; border-bottom:2px solid transparent; background:none; padding:13px 0 11px; font:inherit; color:var(--text2); cursor:pointer; }
@@ -911,11 +919,10 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 .rv-tab,.qb-side-title { white-space:nowrap; }
 .rv-tabs .rv-collapse-btn { flex-shrink:0; }
 .workspace-refresh-control { position:relative; display:flex; align-items:center; gap:6px; flex:none; }
-.workspace-update-button { position:relative; justify-content:center; width:34px; height:34px; padding:0; flex:none; }
-.workspace-update-button svg { width:16px; height:16px; }
+.workspace-update-button { justify-content:center; white-space:nowrap; }
+.workspace-update-button[hidden] { display:none!important; }
 .workspace-update-button[data-state="pending"] { color:var(--primary); }
 .workspace-update-button[data-state="error"] { color:var(--warning); }
-.workspace-update-dot { position:absolute; top:5px; right:5px; width:6px; height:6px; border-radius:50%; background:currentColor; box-shadow:0 0 0 2px var(--card); }
 .workspace-refresh-note { position:absolute; top:calc(100% + 9px); right:0; z-index:120; width:min(340px,calc(100vw - 32px)); padding:15px 16px; border:1px solid var(--border); border-radius:var(--radius); color:var(--text2); background:var(--card); box-shadow:var(--shadow-lg); font-size:13px; line-height:1.65; }
 .workspace-refresh-note strong { display:block; margin-bottom:5px; color:var(--text); font-size:13px; font-weight:600; }
 .workspace-refresh-note[hidden] { display:none; }
@@ -936,7 +943,7 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
  .reader-module .content { display:flex; flex-direction:column; min-height:0; overflow:hidden; flex:1 1 auto; padding:18px 20px; }
  .reader-module #qbView,.reader-module #reviewView,.reader-module #prospectView { display:flex; flex-direction:column; height:100%; min-height:0; }
  .reader-module .qb-workbar { position:static; }
- .reader-module .qb-workbar,.reader-module #qbLoadNotice,.reader-module #reviewView>button { flex:0 0 auto; }
+ .reader-module .qb-workbar,.reader-module #qbLoadNotice,.reader-module #reviewView>button,.reader-module #prospectView>button { flex:0 0 auto; }
  .reader-module .rv-layout { display:grid; grid-template-columns:auto minmax(0,1fr); grid-template-rows:minmax(0,1fr); flex:1 1 auto; height:auto; min-height:0; overflow:hidden; gap:16px; }
  .reader-module .rv-side:not(.rv-collapsed),.reader-module #prospectSide:not(.rv-collapsed) { width:210px; height:100%; min-height:0; max-height:none; position:static; align-self:stretch; overflow:hidden; }
  .reader-module .rv-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; }
@@ -984,7 +991,7 @@ input:not([type="checkbox"]),textarea,select { transition:background-color var(-
   <button class="sb-edge" id="sbEdge" onclick="toggleSbCollapse()" title="展开侧栏">›</button>
   <div class="main">
     <div class="topbar">
-      <button class="btn btn-sm menu-btn" onclick="toggleSidebar()" title="筛选 / 搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <button class="btn btn-sm menu-btn" onclick="toggleSidebar()" title="打开导航"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <span class="topbar-title" id="topbarTitle">全部</span>
       <div class="topbar-actions">
         <nav class="nav-groups" aria-label="主导航">
@@ -1115,7 +1122,7 @@ input:not([type="checkbox"]),textarea,select { transition:background-color var(-
         </div>
       </div>
 
-      <div id="prospectView" style="display:none">
+      <div id="prospectView" style="display:none"><button class="btn return-list" style="align-self:flex-start;margin-bottom:12px" onclick="switchView(contentReturnView)">返回投递</button>
         <div class="rv-layout">
           <div class="rv-side" id="prospectSide">
             <div class="rv-tabs">
@@ -1913,7 +1920,7 @@ function closeNoteModal(){document.getElementById('noteModal').style.display='no
 function saveNote(){if(!personalMutationAllowed())return;if(currentNoteIdx<0)return;const it=byId(currentNoteIdx);if(!it)return;const text=document.getElementById('noteText').value.trim();const e=editForItem(it);e.note=text;it._note=text;saveEdits();closeNoteModal();render();showToast('备注已修改，正在保存…');}
 
 // ============== DETAIL ==============
-let detailIdx=null,detailReturnFocus=null,detailTab='detailRecruitment',detailLoadId=0;const detailInputMemory=new Map(),detailScrollMemory=new Map();
+let detailIdx=null,detailReturnFocus=null,detailLoadId=0;const detailInputMemory=new Map();
 function rememberDetailInputs(){
   // A closed dialog retains old DOM. After records are reordered/replaced,
   // caching that DOM again can create a phantom draft under its old index.
@@ -1921,16 +1928,28 @@ function rememberDetailInputs(){
   detailInputMemory.set(detailIdx,[...document.querySelectorAll('#detailContent input,#detailContent textarea,#detailContent details[id]')].map(e=>({id:e.id,value:e.value,open:e.open})));
 }
 function stepDetail(delta){const rows=getFiltered();const n=rows.findIndex(r=>r._idx===detailIdx);const next=rows[n+delta];if(next)showDetail(next._idx);}
-function openApplicationMaterial(idx,kind){
-  const item=byId(idx);if(!item)return;contentReturnView=['table','kanban','charts'].includes(view)?view:contentReturnView;closeDetailModal();
+async function openApplicationMaterial(idx,kind){
+  const item=byId(idx);if(!item)return;
+  const request=detailLoadId,key=item._key;
+  await ensureViewData(kind==='prep'?'qbank':kind==='prospect'?'prospect':'review');
+  if(request!==detailLoadId||byId(detailIdx)?._key!==key||document.getElementById('detailModal').style.display!=='flex')return;
+  contentReturnView=['table','kanban','charts'].includes(view)?view:contentReturnView;closeDetailModal();
   if(kind==='prep'){
-    const linked=prepData.preps.filter(p=>p.companyKey===item._key);
+    const linked=prepData.preps.filter(p=>p.companyKey===key);
     if(linked.length===1)openPrep(linked[0].id);else{switchView('qbank');switchPrepMode('company');setPrepSearch(item['名称']);}
+  }else if(kind==='prospect'){
+    const linked=detailProspects(item);prospectScope='all';
+    document.querySelector('.prospect-controls select').value='all';
+    prospectSearch=linked.length===1?'':item['名称'];document.getElementById('prospectSearchInput').value=prospectSearch;
+    if(linked.length===1)openProspect(linked[0].id);else{currentProspectId=null;switchView('prospect');}
   }else{
-    const linked=reviewData.sessions.filter(r=>r.companyKey===item._key);
+    reviewTab='sessions';reviewSearch='';document.getElementById('reviewSearchInput').value='';
+    const linked=reviewData.sessions.filter(r=>r.companyKey===key);
     if(linked.length===1)openReviewSession(linked[0].id);else{currentReviewId=null;reviewSearch=item['名称'];document.getElementById('reviewSearchInput').value=reviewSearch;switchView('review');}
+    switchReviewTab('sessions');
   }
 }
+function detailProspects(item){return prospectData.prospects.filter(p=>p.companyKey===item._key||(!p.companyKey&&(p.company===item['名称']||(p.aliases||[]).includes(item['名称']))));}
 function openGeneralPreparation(){contentReturnView=['table','kanban','charts'].includes(view)?view:contentReturnView;closeDetailModal();switchView('qbank');switchPrepMode('general');}
 function detailFact(item,key,label=key,wide=false){
   const edited=item._rawF&&item._rawF[key]!==undefined;
@@ -1950,13 +1969,13 @@ function mergedSourceHtml(src){
 }
 function detailMaterialsHtml(idx){
   const item=byId(idx);if(!item)return '';
-  const ppLinked=prepData.preps.filter(p=>p.companyKey===item._key),rvLinked=reviewData.sessions.filter(s=>s.companyKey===item._key);
-  return `<div class="detail-material-columns"><div class="detail-material-group"><h3>面试准备</h3><div class="detail-materials"><button class="btn btn-sm" onclick="openApplicationMaterial(${idx},'prep')">公司准备${ppLinked.length?'（'+ppLinked.length+'）':''}</button><button class="btn btn-sm" onclick="openGeneralPreparation()">通用准备</button></div><div class="detail-linked">${ppLinked.map(p=>`<button class="action-link" onclick="closeDetailModal();openPrep('${esc(p.id)}')">${esc(p.position||'准备文档')}${p.cohort?' · '+esc(p.cohort):''}</button>`).join('')}</div></div><div class="detail-material-group"><h3>面试复盘</h3><div class="detail-materials"><button class="btn btn-sm" onclick="openApplicationMaterial(${idx},'review')">公司复盘${rvLinked.length?'（'+rvLinked.length+'）':''}</button><button class="btn btn-sm" onclick="closeDetailModal();switchView('review');switchReviewTab('weakness')">弱项追踪</button></div><div class="detail-linked">${rvLinked.map(r=>`<button class="action-link" onclick="closeDetailModal();openReviewSession('${esc(r.id)}')">${esc(r.date||'')} ${esc(r.round||'面试复盘')}</button>`).join('')}</div></div></div>`;
+  const entries=[['prospect','岗位探查',detailProspects(item).filter(p=>p.filename).length,'份报告'],['prep','面试准备',prepData.preps.filter(p=>p.companyKey===item._key).length,'份准备'],['review','面试复盘',reviewData.sessions.filter(r=>r.companyKey===item._key).length,'场复盘']];
+  return `<div class="detail-material-entries" aria-label="关联材料">${entries.map(([kind,label,count,unit])=>`<button type="button" class="detail-material-entry" data-material="${kind}" onclick="openApplicationMaterial(${idx},'${kind}')"><span><strong>${label}</strong><small>${count?count+' '+unit:'查看或添加'}</small></span>${navigationIcon(true)}</button>`).join('')}</div><div class="detail-secondary-links"><button type="button" onclick="openGeneralPreparation()">通用准备 ${navigationIcon(true)}</button><button type="button" onclick="closeDetailModal();switchView('review');switchReviewTab('weakness')">弱项追踪 ${navigationIcon(true)}</button></div>`;
 }
 async function loadDetailRelations(idx,request){
   const item=byId(idx);if(!item)return;
   const current=()=>request===detailLoadId&&detailIdx===idx&&document.getElementById('detailModal').style.display==='flex';
-  const results=await Promise.allSettled([window.toudiSchedule.refresh({preserveInspector:true}),ensureViewData('qbank'),ensureViewData('review')]);
+  const results=await Promise.allSettled([window.toudiSchedule.refresh({preserveInspector:true}),ensureViewData('qbank'),ensureViewData('review'),ensureViewData('prospect')]);
   if(!current())return;
   const target=document.getElementById('detailSchedule');
   if(results[0].status==='rejected'||window.toudiSchedule.hasError())target.innerHTML='<p class="detail-context">日程暂时无法读取，可在日程页重新读取。</p>';
@@ -1966,16 +1985,13 @@ async function loadDetailRelations(idx,request){
 function showDetail(idx,options={}){
   const opening=document.getElementById('detailModal').style.display!=='flex';if(opening)detailReturnFocus=document.activeElement;
   const previous=detailIdx,scroll=document.getElementById('detailContent').scrollTop;
-  if(options.fresh)detailInputMemory.delete(idx);else rememberDetailInputs();detailIdx=idx;if(opening||previous!==idx){detailTab='detailRecruitment';detailScrollMemory.clear();}
+  if(options.fresh)detailInputMemory.delete(idx);else rememberDetailInputs();detailIdx=idx;
   const item=byId(idx);if(!item)return;
   const sources=Array.isArray(item['归并来源'])?item['归并来源']:[];
-  const panel=(id,body)=>`<section class="detail-section" id="${id}" role="tabpanel" aria-labelledby="tab-${id}" ${detailTab===id?'':'hidden'}>${body}</section>`;
-  let html=panel('detailRecruitment',`<div class="detail-section-heading"><h3>岗位与要求</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div>${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:`<dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'截止时间','招聘截止')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}</dl>`}<details id="detailSourceInfo" class="detail-source-info"><summary>企业信息与招聘来源${sources.length?' · '+sources.length+' 条':''}</summary><dl class="detail-facts">${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl>${sources.length?sources.map(mergedSourceHtml).join(''):''}</details><div class="detail-related-schedule"><div class="detail-section-heading"><h3>日程安排</h3><button class="schedule-link" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加事项</button></div><div id="detailSchedule"><p class="detail-context">正在读取日程…</p></div></div>`);
-  html+=panel('detailFollowup',`<div class="detail-section-heading"><h3>投递进度</h3><button class="btn btn-sm" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button></div><div class="detail-stages">${STATUSES.map(st=>`<button aria-pressed="${item._status===st}" class="${item._status===st?'active':''}" onclick="setStatus(${idx},'${st}');showDetail(${idx})">${st}</button>`).join('')}</div><div class="detail-followup"><button class="btn btn-sm" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><button class="btn btn-sm" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button><span>${item._research?'待探查：核实后再决定是否投递':''}</span></div><div class="detail-note-block"><div class="detail-section-heading"><h3>个人备注</h3><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p></div><div class="detail-note-block"><label class="detail-subtitle" for="researchNote">待核实事项与探查记录</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存探查记录</button></div></div>`);
-  html+=panel('detailMaterials',detailMaterialsHtml(idx));
+  let html=`<section class="detail-section" id="detailFollowup" aria-label="投递跟进"><div class="detail-progress-row"><label for="detailStatus">投递进度</label><select id="detailStatus" onchange="setStatus(${idx},this.value);showDetail(${idx})">${STATUSES.map(st=>`<option ${item._status===st?'selected':''}>${st}</option>`).join('')}${STATUSES.includes(item._status)?'':`<option selected disabled>${esc(item._status||UNKNOWN_STATUS)}</option>`}</select><button class="btn btn-sm" aria-pressed="${item._starred}" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button><button class="btn btn-sm" aria-pressed="${item._research}" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><button class="btn btn-sm" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button></div><details id="detailNotes" class="detail-followup-notes"><summary>跟进记录<span>${item._note||item._researchNote?'查看备注与待核实事项':'添加备注或待核实事项'}</span></summary><div class="detail-note-block"><div class="detail-section-heading"><h3>个人备注</h3><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p></div><div class="detail-note-block"><label class="detail-subtitle" for="researchNote">待核实事项</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存记录</button></div></div></details></section><section class="detail-section" id="detailMaterials" aria-label="准备、探查与复盘">${detailMaterialsHtml(idx)}</section><section class="detail-section" id="detailRecruitment" aria-label="招聘信息"><div class="detail-section-heading"><h3>岗位与要求</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div>${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:`<dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'截止时间','招聘截止')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}</dl>`}<details id="detailSourceInfo" class="detail-source-info"><summary>企业信息与招聘来源${sources.length?' · '+sources.length+' 条':''}</summary><dl class="detail-facts">${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl>${sources.length?sources.map(mergedSourceHtml).join(''):''}</details><div class="detail-related-schedule"><div class="detail-section-heading"><h3>关联日程</h3></div><div id="detailSchedule"><p class="detail-context">正在读取日程…</p></div></div></section>`;
   document.getElementById('detailTitle').textContent=item['名称'];
   document.getElementById('detailMeta').textContent=[item['校招类型']||'招聘记录',item._status,item._starred?'已收藏':''].filter(Boolean).join(' · ');
-  document.getElementById('detailLead').innerHTML=`<div class="detail-entry-actions"><div class="detail-links">${detailEntryLink(item['公告链接'],'招聘公告')}${detailEntryLink(item['网申链接/邮箱'],'投递入口')}</div><button class="btn btn-sm btn-primary" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加到日历</button></div><nav class="detail-shortcuts" role="tablist" aria-label="招聘详情">${[['detailRecruitment','招聘信息'],['detailFollowup','跟进记录'],['detailMaterials','准备与复盘']].map(([id,title])=>`<button id="tab-${id}" role="tab" aria-controls="${id}" aria-selected="${detailTab===id}" tabindex="${detailTab===id?0:-1}" onclick="jumpDetailSection('${id}')">${title}</button>`).join('')}</nav>`;
+  document.getElementById('detailLead').innerHTML=`<div class="detail-entry-actions"><div class="detail-links">${detailEntryLink(item['公告链接'],'招聘公告')}${detailEntryLink(item['网申链接/邮箱'],'投递入口')}</div><button class="btn btn-sm btn-primary" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加日程</button></div>`;
   document.getElementById('detailContent').innerHTML=html;
   (detailInputMemory.get(idx)||[]).forEach(x=>{const e=document.getElementById(x.id);if(e){if(e.tagName==='DETAILS')e.open=x.open;else e.value=x.value;}});
   document.getElementById('detailModal').style.display='flex';
@@ -1984,16 +2000,21 @@ function showDetail(idx,options={}){
   loadDetailRelations(idx,++detailLoadId);
 }
 
-function jumpDetailSection(id){if(!['detailRecruitment','detailFollowup','detailMaterials'].includes(id))return;const content=document.getElementById('detailContent');detailScrollMemory.set(detailTab,content.scrollTop);detailTab=id;document.querySelectorAll('#detailContent>[role="tabpanel"]').forEach(el=>{el.hidden=el.id!==id;});document.querySelectorAll('.detail-shortcuts [role="tab"]').forEach(el=>{const active=el.getAttribute('aria-controls')===id;el.setAttribute('aria-selected',active);el.tabIndex=active?0:-1;});content.scrollTop=detailScrollMemory.get(id)||0;}
-document.querySelector('.detail-sticky').addEventListener('keydown',event=>{const tab=event.target.closest('[role="tab"]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const tabs=[...document.querySelectorAll('.detail-shortcuts [role="tab"]')],i=tabs.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(i+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;jumpDetailSection(tabs[next].getAttribute('aria-controls'));tabs[next].focus();});
+function jumpDetailSection(id){
+  const section=document.getElementById(id);if(!section||!['detailRecruitment','detailFollowup','detailMaterials'].includes(id))return;
+  if(id==='detailFollowup')document.getElementById('detailNotes').open=true;
+  document.getElementById('detailContent').scrollTop=section.offsetTop-document.getElementById('detailContent').offsetTop;
+}
 document.getElementById('detailContent').addEventListener('click',event=>{const button=event.target.closest('[data-detail-event]');if(button)window.toudiSchedule.openLinked(button.dataset.detailEvent);});
 function closeDetailModal(){rememberDetailInputs();document.getElementById('detailModal').style.display='none';if(detailReturnFocus?.isConnected)detailReturnFocus.focus({preventScroll:true});}
 function refreshRecruitmentDetail(key){
   if(!key || document.getElementById('detailModal').style.display!=='flex')return;
   const item=data.find(row=>row._key===key);
   if(!item){closeDetailModal();detailIdx=null;detailInputMemory.clear();return;}
-  const tab=detailTab,scroll=document.getElementById('detailContent').scrollTop;
-  detailIdx=item._idx;showDetail(item._idx,{fresh:true});jumpDetailSection(tab);
+  const scroll=document.getElementById('detailContent').scrollTop;
+  const disclosures=[...document.querySelectorAll('#detailContent details[id]')].map(el=>({id:el.id,open:el.open}));
+  detailIdx=item._idx;showDetail(item._idx,{fresh:true});
+  disclosures.forEach(state=>{const el=document.getElementById(state.id);if(el)el.open=state.open;});
   document.getElementById('detailContent').scrollTop=scroll;
 }
 document.addEventListener('keydown',event=>{const modal=document.getElementById('detailModal');if(modal.style.display!=='flex')return;if(event.key==='Escape'){event.preventDefault();closeDetailModal();return;}if(event.key==='Tab'){const nodes=[...modal.querySelectorAll('button,input,a,summary,textarea,[tabindex]')].filter(e=>!e.disabled&&e.getClientRects().length),first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
@@ -3136,7 +3157,7 @@ function updateTopbarTitle(){
 }
 function switchView(v){
   if(view==='qbank')rememberQbForm();
-  if(['table','kanban','charts'].includes(view)&&['qbank','review'].includes(v))contentReturnView=view;
+  if(['table','kanban','charts'].includes(view)&&['qbank','review','prospect'].includes(v))contentReturnView=view;
   saveViewScroll();
   view=v;document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(v));
   document.getElementById('tableView').style.display=v==='table'?'':'none';
@@ -3294,7 +3315,7 @@ const originalBuildGroup=buildFilterGroup;buildFilterGroup=function(label,key,va
 const originalBuildPanel=buildFilterPanel;buildFilterPanel=function(){if(document.getElementById('filterModal')?.style.display!=='flex')return;const panel=document.getElementById('filterPanel'),saved=Object.fromEntries([...panel.querySelectorAll('.filter-group')].map(g=>[g.dataset.group,{search:g.querySelector('input[type=search]')?.value||'',zero:g.querySelector('.zero-options')?.open||false}]));originalBuildPanel();panel.querySelectorAll('.filter-group').forEach(g=>{const s=saved[g.dataset.group];if(!s)return;const inp=g.querySelector('input[type=search]');inp.value=s.search;searchFilterOptions(inp);if(g.querySelector('.zero-options'))g.querySelector('.zero-options').open=s.zero;});};
 const originalSwitch=switchView;switchView=function(v){ensureViewData(v);if(v==='settings'){window.toudiSchedule?.hide();if(view==='qbank')rememberQbForm();saveViewScroll();view=v;['tableView','kanbanView','chartsView','reviewView','qbView','prospectView'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('settingsView').style.display='';renderSettings();updateDashboardChrome();document.getElementById('topbarTitle').textContent='设置';}else{document.getElementById('settingsView').style.display='none';originalSwitch(v);}refreshWorkspaceChrome();revealModule();};
 function revealModule(){const id=({table:'tableView',kanban:'kanbanView',charts:'chartsView',qbank:'qbView',review:'reviewView',prospect:'prospectView',schedule:'scheduleView',settings:'settingsView'})[view],el=document.getElementById(id);if(!el)return;el.classList.remove('module-enter');void el.offsetWidth;el.classList.add('module-enter');}
-function refreshWorkspaceChrome(){const managementEntry=document.getElementById('managementEntry');if(managementEntry)managementEntry.hidden=['settings','schedule'].includes(view);document.getElementById('settingsShortcut').hidden=view==='settings';updateDirectoryControls();applyTheme();const dashboard=['table','kanban','charts'].includes(view);document.body.classList.toggle('content-module',!dashboard);document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(view));document.getElementById('quickViews').style.display=dashboard?'':'none';document.getElementById('deliverySearchEntry').hidden=!dashboard;document.getElementById('columnMenuButton').hidden=view!=='table'||innerWidth<=900;document.querySelectorAll('.module-nav button').forEach(b=>b.classList.toggle('active',b.dataset.module===(dashboard?'delivery':view)));document.getElementById('deliveryModes').style.display=dashboard?'':'none';if(document.getElementById('sidebar').classList.contains('open'))toggleSidebar();}
+function refreshWorkspaceChrome(){const importButton=document.getElementById('moduleImportButton');if(importButton)importButton.hidden=!['qbank','review','prospect'].includes(view);updateDirectoryControls();applyTheme();const dashboard=['table','kanban','charts'].includes(view);document.body.classList.toggle('content-module',!dashboard);document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(view));document.getElementById('quickViews').style.display=dashboard?'':'none';document.getElementById('columnMenuButton').hidden=view!=='table'||innerWidth<=900;document.querySelectorAll('.module-nav button').forEach(b=>b.classList.toggle('active',b.dataset.module===(dashboard?'delivery':view)));document.getElementById('deliveryModes').style.display=dashboard?'':'none';if(document.getElementById('sidebar').classList.contains('open'))toggleSidebar();}
 function initWorkspaceUI(){
  bindRecordSearch();
  if(window.__SNAPSHOT__){document.getElementById('storageBadge').textContent='只读快照 · 个人记录不可编辑';}
@@ -3302,15 +3323,13 @@ function initWorkspaceUI(){
  document.getElementById('tableView').insertAdjacentHTML('afterbegin','<div id="mobileRecords" class="mobile-records"></div>');
  const side=document.getElementById('sidebar');side.querySelector('.sb-header').insertAdjacentHTML('afterend',`<nav class="module-nav" aria-label="工作模块">${[['delivery','投递管理'],['qbank','面试准备'],['prospect','岗位探查'],['review','面试复盘'],['schedule','日程'],['settings','设置']].map(([k,n])=>`<button data-module="${k}" onclick="switchView('${k==='delivery'?'table':k}')">${n}</button>`).join('')}</nav>`);
  const toolbar=document.getElementById('dashboardToolbar');
- side.querySelector('#quickViews').insertAdjacentHTML('beforebegin','<div id="deliverySearchEntry"><button class="sb-search-entry" onclick="openFilters()" aria-haspopup="dialog" aria-controls="filterModal" aria-expanded="false">详细筛选</button></div>');
- toolbar.insertAdjacentHTML('beforeend','<div class="table-tools"><button id="clearConditions" class="btn btn-sm" onclick="clearAdditional()">清除条件</button><button id="columnMenuButton" class="btn btn-sm" aria-expanded="false" onclick="toggleColumnMenu()">显示列</button><div id="columnMenu" hidden></div></div>');
+ toolbar.insertAdjacentHTML('beforeend','<div class="table-tools"><button id="recordDataEntry" class="btn btn-sm" onclick="openManagement(\'records\')">新增 / 导入</button><button id="clearConditions" class="btn btn-sm" onclick="clearAdditional()">清除条件</button><button id="columnMenuButton" class="btn btn-sm" aria-expanded="false" onclick="toggleColumnMenu()">显示列</button><div id="columnMenu" hidden></div></div>');
 
  const modes=document.querySelector('.nav-groups .nav-group .view-toggle');modes.id='deliveryModes';document.querySelector('.topbar-actions').prepend(modes);document.querySelector('.nav-groups').hidden=true;
  side.querySelector('.sb-footer .btn-group').remove();
  document.querySelector('.content').insertAdjacentHTML('beforeend','<div id="settingsView" style="display:none"></div>');
  document.body.insertAdjacentHTML('beforeend','<div id="filterModal" class="modal-overlay workspace-filter-modal" style="display:none" onclick="if(event.target===this)closeFilters()"><div class="filter-dialog" role="dialog" aria-modal="true" aria-labelledby="filterDialogTitle"><div class="filter-dialog-head"><h2 id="filterDialogTitle">筛选投递记录</h2><button class="btn" onclick="closeFilters()">完成</button></div><p>在当前搜索与快捷视图内筛选，勾选后立即生效。</p><div id="filterDialogBody"></div></div></div>');document.getElementById('filterDialogBody').append(document.getElementById('filterPanel'));document.querySelector('#filterModal .filter-dialog').insertAdjacentHTML('beforeend','<div class="filter-dialog-actions"><button class="btn btn-sm" onclick="clearAdditional()">清除附加条件</button><button class="btn btn-sm" onclick="resetFilters()">重置全部</button><button class="btn btn-sm" onclick="saveCurrentView()">保存视图</button></div>');
- document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend',`<div class="theme-toolbar"><div class="theme-quick-control"><button id="themeQuickToggle" type="button" onclick="toggleThemeQuick()" aria-label="切换主题"></button><button id="themeMenuButton" type="button" aria-label="选择主题模式" aria-haspopup="menu" aria-controls="themeMenu" aria-expanded="false" onclick="toggleThemeMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></button></div><div id="themeMenu" role="menu" aria-label="主题模式" hidden>${[['system','跟随系统'],['light','浅色'],['dark','深色']].map(([key,label])=>`<button type="button" role="menuitemradio" data-theme="${key}" aria-checked="false" onclick="chooseTheme('${key}')"><span>${label}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button>`).join('')}</div></div>`);
- document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend','<button id="settingsShortcut" class="btn btn-sm" onclick="switchView(\'settings\')">设置</button>');
+ side.querySelector('.sb-footer').insertAdjacentHTML('afterbegin',`<div class="theme-toolbar"><div class="theme-quick-control"><button id="themeQuickToggle" type="button" onclick="toggleThemeQuick()" aria-label="切换主题"></button><button id="themeMenuButton" type="button" aria-label="选择主题模式" aria-haspopup="menu" aria-controls="themeMenu" aria-expanded="false" onclick="toggleThemeMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></button></div><div id="themeMenu" role="menu" aria-label="主题模式" hidden>${[['system','跟随系统'],['light','浅色'],['dark','深色']].map(([key,label])=>`<button type="button" role="menuitemradio" data-theme="${key}" aria-checked="false" onclick="chooseTheme('${key}')"><span>${label}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button>`).join('')}</div></div>`);
  document.querySelector('.topbar-tools button[disabled]').remove();document.querySelector('.topbar-tools').style.display='none';
  QUICK_VIEWS.find(q=>q.id==='recommended').label='符合偏好';
  render();switchView(workspace.defaultView);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeFilters();});

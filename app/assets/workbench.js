@@ -576,10 +576,11 @@ saveWorkspace = async function () {
 };
 async function managementInit() {
   managementStyle();
-  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<button id="managementEntry" class="btn btn-sm" onclick="managementForView()">管理资料</button>');
-  document.getElementById('managementEntry').hidden = view === 'settings';
+  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<button id="moduleImportButton" class="btn btn-sm" onclick="managementForView()">导入资料</button>');
+  refreshWorkspaceChrome();
   if (window.__SNAPSHOT__) {
-    document.getElementById('managementEntry').disabled = true;
+    document.getElementById('moduleImportButton').disabled = true;
+    document.getElementById('recordDataEntry').disabled = true;
     return;
   }
   await initServerStorage();
@@ -633,8 +634,8 @@ async function managementInit() {
   }
 }
 function managementForView() {
-  if (view === 'settings') return;
-  openManagement(view === 'qbank' ? qbMode === 'company' ? 'preps' : 'qbank' : view === 'review' ? 'reviews' : view === 'prospect' ? 'prospects' : 'records');
+  const module = view === 'qbank' ? qbMode === 'company' ? 'preps' : 'qbank' : view === 'review' ? 'reviews' : view === 'prospect' ? 'prospects' : null;
+  if (module) startWorkspaceContent(module, true);
 }
 const baseRenderSettings = renderSettings;
 renderSettings = function () {
@@ -882,7 +883,9 @@ function showWorkspaceRefreshNotice(message, state = 'pending') {
   const text = message || '资料已是最新。后台会自动检查更新，你也可以主动刷新。';
   if (notice.querySelector('span').textContent !== text) notice.querySelector('span').textContent = text;
   button.dataset.state = message ? state : 'idle';
-  button.querySelector('.workspace-update-dot').hidden = !message;
+  button.hidden = !message;
+  button.textContent = state === 'error' ? '读取失败' : '更新待显示';
+  if (!message) closeWorkspaceUpdates();
   button.title = message ? (state === 'error' ? '资料读取失败，点击查看' : '有资料更新待显示，点击查看') : '查看资料更新状态';
   button.setAttribute('aria-label', button.title);
 }
@@ -1036,7 +1039,7 @@ async function readWorkspaceUpdates() {
   }
 }
 function installWorkspaceRefresh() {
-  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<div id="workspaceRefreshControl" class="workspace-refresh-control"><button id="workspaceRefreshButton" class="btn btn-sm" onclick="refreshWorkspaceData(true)">刷新资料</button><button id="workspaceUpdatesButton" type="button" class="btn btn-sm workspace-update-button" data-state="idle" aria-label="查看资料更新状态" aria-controls="workspaceRefreshNotice" aria-expanded="false" onclick="toggleWorkspaceUpdates()" title="查看资料更新状态"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><i class="workspace-update-dot" hidden></i></button><div id="workspaceRefreshNotice" class="workspace-refresh-note" hidden><strong>资料更新</strong><span></span></div></div>');
+  document.querySelector('.topbar-actions').insertAdjacentHTML('beforeend', '<div id="workspaceRefreshControl" class="workspace-refresh-control"><button id="workspaceRefreshButton" class="btn btn-sm" onclick="refreshWorkspaceData(true)">刷新资料</button><button id="workspaceUpdatesButton" type="button" class="btn btn-sm workspace-update-button" data-state="idle" hidden aria-controls="workspaceRefreshNotice" aria-expanded="false" onclick="toggleWorkspaceUpdates()">更新待显示</button><div id="workspaceRefreshNotice" class="workspace-refresh-note" role="status" hidden><strong>资料更新</strong><span></span></div></div>');
   showWorkspaceRefreshNotice('');
   document.addEventListener('click', event => { if (!event.target.closest('#workspaceRefreshControl')) closeWorkspaceUpdates(); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { const open = !document.getElementById('workspaceRefreshNotice').hidden; closeWorkspaceUpdates(); if (open) document.getElementById('workspaceUpdatesButton').focus(); } });

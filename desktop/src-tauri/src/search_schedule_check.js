@@ -1,11 +1,19 @@
 /* Opt-in native WKWebView interaction probe. Uses a caller-owned fixture,
    stays hidden and never requests permissions or writes system calendar data. */
 (async()=>{
+  document.documentElement.dataset.renderDiagnostic='true';
   const report={phase:'complete',checks:[],errors:[],actualEventKitWriteTested:false};
   const check=(ok,label)=>{report.checks.push({label,ok:!!ok});if(!ok)throw Error(label);};
   const wait=async fn=>{const until=Date.now()+40000;while(!fn()){if(Date.now()>until)throw Error('Native interaction initialization timed out');await new Promise(resolve=>setTimeout(resolve,100));}};
   try{
     await window.__TOUDI_DESKTOP_READY__;await wait(()=>serverMode&&data.length&&workspaceRefreshSnapshots.size>=7);
+    switchView('table');
+    check(!document.querySelector('#deliverySearchEntry,#settingsShortcut,#managementEntry'),'native global entries are not duplicated');
+    check(document.querySelectorAll('.module-nav [data-module="settings"]').length===1,'native settings stay in the sidebar');
+    const themeRect=document.querySelector('.sb-footer .theme-toolbar').getBoundingClientRect(),toolbarRect=document.getElementById('dashboardToolbar').getBoundingClientRect();
+    report.navigation={themeBottom:themeRect.bottom,toolbarHeight:toolbarRect.height};
+    check(themeRect.height>0&&themeRect.bottom<=innerHeight&&toolbarRect.height>0&&toolbarRect.height<=30,'native appearance shortcut and compact result row fit the viewport');
+    check(document.getElementById('workspaceUpdatesButton').hidden,'native idle update status stays hidden');
     const input=document.getElementById('searchInput'),totals=document.getElementById('statsBar').textContent;
     input.value='合成产品';input.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:true,inputType:'insertCompositionText'}));
     check(searchQuery==='合成产品'&&getFiltered().length===1,'native IME input filters immediately');
@@ -50,6 +58,24 @@
     await wait(()=>calls.some(call=>call.items.some(item=>item.id===saved.id&&item.status==='cancelled'))&&!syncButton.disabled);
     check(window.toudiSchedule.get().events[0].status==='cancelled','native cancellation keeps tombstone and synchronizes');
     window.toudiDesktop.calendar=realCalendar;
+    switchView('table');const detailRow=data.find(row=>row['岗位']==='合成产品岗位')||data[0];showDetail(detailRow._idx);
+    await wait(()=>!document.getElementById('detailSchedule').textContent.includes('正在读取'));
+    check(!document.querySelector('#detailLead [role="tab"]')&&document.querySelectorAll('#detailContent>.detail-section').length===3,'native detail uses continuous sections');
+    check(document.querySelectorAll('[data-material]').length===3&&!document.getElementById('detailNotes').open,'native related materials are visible and long notes start collapsed');
+    check(document.querySelector('.detail-entry-actions>button').textContent==='添加日程','native schedule action describes editing a proposal');
+    document.getElementById('detailNotes').open=true;document.getElementById('researchNote').value='完整的合成未保存记录';
+    await openApplicationMaterial(detailRow._idx,'prep');check(view==='qbank'&&qbMode==='company','native preparation link navigates to its real module');
+    switchView('table');showDetail(detailRow._idx);check(document.getElementById('researchNote').value==='完整的合成未保存记录','native navigation preserves unsaved follow-up text');
+    const eventCount=window.toudiSchedule.get().events.length;
+    document.querySelector('.detail-entry-actions>button').click();await wait(()=>document.getElementById('scheduleForm'));
+    check(document.getElementById('scheduleForm').elements.companyKey.value===detailRow._key&&window.toudiSchedule.get().events.length===eventCount,'native add schedule binds the company without creating an event');
+    document.querySelector('[data-schedule="cancel"]').click();switchView('table');showDetail(detailRow._idx);
+    document.getElementById('researchNote').value=detailRow._researchNote||'';document.getElementById('detailNotes').open=false;
+    await wait(()=>!document.getElementById('detailSchedule').textContent.includes('正在读取'));
+    await new Promise(resolve=>setTimeout(resolve,300));
+    const modal=document.querySelector('#detailModal .modal'),modalRect=modal.getBoundingClientRect(),body=document.getElementById('detailContent');
+    report.detail={width:modalRect.width,height:modalRect.height,opacity:getComputedStyle(modal).opacity,bodyHeight:body.clientHeight,sections:document.querySelectorAll('#detailContent>.detail-section').length};
+    check(report.detail.width>400&&report.detail.height>300&&Number(report.detail.opacity)===1&&report.detail.bodyHeight>0,'native recruitment detail has settled visible geometry');
     report.version=window.toudiDesktop.version;report.records=data.length;
     report.errors=(window.__TOUDI_RENDER_ERRORS__||[]).filter(error=>!String(error).includes('ResizeObserver loop completed'));
     check(report.errors.length===0,'native runtime has no JavaScript errors');

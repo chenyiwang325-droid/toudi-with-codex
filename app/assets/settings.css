@@ -11,6 +11,8 @@
 :root[data-palette="clay"][data-theme="dark"] { --primary: #e0b8a4; --primary-hover: #f0d3c1; --primary-light: #573e33; --primary-faint: #453329; --bg: #27211e; --card: #342b26; --row-alt: #3c312b; --row-hover: #4a3a30; --on-primary: #372016; }
 :root[data-palette="graphite"][data-theme="dark"] { --primary: #c4cdd4; --primary-hover: #e1e7ec; --primary-light: #3c4750; --primary-faint: #2f3a42; --bg: #1d242a; --card: #293139; --row-alt: #2f3942; --row-hover: #3c4852; --on-primary: #23313a; }
 .theme-toolbar { position: relative; }
+.sb-footer .theme-toolbar { width:max-content; max-width:100%; }
+.sb-footer #themeMenu { top:auto; bottom:40px; left:0; right:auto; }
 .theme-quick-control { display: flex; border: 1px solid var(--border); border-radius: var(--ui-radius-control); background: var(--card); }
 .theme-quick-control button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; height: 32px; padding: 6px 9px; border: 0; background: none; color: var(--text2); font: inherit; font-size: 12px; cursor: pointer; }
 .theme-quick-control button:hover { color: var(--primary); background: var(--bg); }

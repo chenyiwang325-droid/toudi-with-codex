@@ -60,8 +60,10 @@ assert.equal(vm.runInContext("workspaceHasDraft('records')", refreshContext), tr
 vm.runInContext('reviewDirty = true', refreshContext);
 assert.equal(vm.runInContext("workspaceHasDraft('reviews')", refreshContext), true);
 vm.runInContext("toudiWorkspaceStorage.getItem = () => JSON.stringify({preps:{base:'original'}})", refreshContext);
-assert.equal(vm.runInContext("workspaceHasDraft('preps')", refreshContext), true);
-console.log('PASS refresh protects stored drafts, dirty reviews and unsaved detail fields');
+assert.equal(vm.runInContext("workspaceHasDraft('preps')", refreshContext), false,'Archived recovery copies do not block current reads');
+vm.runInContext("management = {module:'preps'};document.getElementById = id => ({style:{display:id==='managementOverlay'?'flex':'none'}})", refreshContext);
+assert.equal(vm.runInContext("workspaceHasDraft('preps')", refreshContext), true,'An open editor still protects its pending work');
+console.log('PASS refresh preserves recovery copies and protects live editors, dirty reviews and unsaved detail fields');
 
 const prepContext = vm.createContext({management:{module:'preps',original:null,item:{id:'prep-new',attachments:[],custom:'preserve'}},document:{querySelectorAll:()=>Object.entries({id:'prep-new',company:'合成公司',position:'岗位',companyKey:'',prepBody:''}).map(([key,value])=>({dataset:{mfield:key},value}))}});
 const candidateStart=source.indexOf('function managementCandidate('),candidateEnd=source.indexOf('\nfunction ',candidateStart+1);

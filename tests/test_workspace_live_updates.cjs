@@ -62,12 +62,14 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   await page.locator('#filterPanel input[data-filter="地点"][value="示例城市"]').check();
   await page.getByRole('dialog',{name:'筛选投递记录'}).getByRole('button',{name:'完成',exact:true}).click();
   assert.equal(await page.locator('#recordFilterCount').innerText(),'1');assert.equal(await query.inputValue(),'合成企业');
-  await page.locator('#deliverySearchEntry button').click();assert(await page.locator('#filterPanel input[data-filter="地点"][value="示例城市"]').isChecked(),'Both filter entries use the same conditions');
+  assert.equal(await page.locator('#deliverySearchEntry').count(),0);await page.locator('#recordFilterButton').click();assert(await page.locator('#filterPanel input[data-filter="地点"][value="示例城市"]').isChecked(),'The single filter entry retains its conditions');
   await page.keyboard.press('Escape');await page.evaluate(()=>clearAdditional());
   assert.equal(await query.inputValue(),'');assert(await page.locator('#recordFilterCount').isHidden());
+  assert(await page.locator('#workspaceUpdatesButton').isHidden(),'No idle clock/status entry');
+  await page.evaluate(()=>showWorkspaceRefreshNotice('当前编辑保留，资料更新待显示。'));
   await page.locator('#workspaceUpdatesButton').click();assert(await page.locator('#workspaceRefreshNotice').isVisible());
   assert.deepEqual(await page.locator('#recordsOverview').boundingBox(),overviewBefore,'Opening update status does not move the overview or table');
-  await page.keyboard.press('Escape');assert(await page.locator('#workspaceRefreshNotice').isHidden());
+  await page.keyboard.press('Escape');assert(await page.locator('#workspaceRefreshNotice').isHidden());await page.evaluate(()=>showWorkspaceRefreshNotice(''));
   await page.evaluate(()=>switchView('prospect'));await page.getByText('初始探查正文',{exact:true}).waitFor();
   await page.locator('#prospectSearchInput').fill('合成企业');
   await page.locator('#prospectMain').evaluate(node=>node.scrollTop=400);const scroll=await page.locator('#prospectMain').evaluate(node=>node.scrollTop);
@@ -207,7 +209,8 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   assert(await page.locator('.detail-entry-actions a').first().evaluate(el=>el.getBoundingClientRect().height>=34));
   await commit('records',{action:'replace',data:[{名称:'新增合成企业',岗位:'新岗位'},{名称:'合成企业',岗位:'打开详情时更新后的岗位','公告链接':'https://example.test/notice','网申链接/邮箱':'https://example.test/apply'}]});
   await page.waitForFunction(()=>document.getElementById('detailContent').textContent.includes('打开详情时更新后的岗位'),null,{timeout:12000});
-  assert.equal(await page.evaluate(()=>detailTab),'detailFollowup');
+  assert(await page.locator('#detailNotes').evaluate(el=>el.open),'A read-only refresh preserves the expanded follow-up');
+  assert(await page.locator('#detailRecruitment').isVisible());
   assert.equal(await page.evaluate(()=>byId(detailIdx)._key),'合成企业','Reordering records keeps the open company binding');
   await page.screenshot({path:path.join(out,'详情链接_按钮与原地更新.png')});
   await page.locator('#researchNote').fill('保留未保存的详细记录');
@@ -229,7 +232,7 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   await commit('records',{action:'replace',data:[{名称:'合成企业',岗位:'只读多行文本不阻挡新岗位'}]});
   await page.waitForFunction(()=>data.some(row=>row.岗位==='只读多行文本不阻挡新岗位'),null,{timeout:12000});
   await page.evaluate(()=>showDetail(data.find(row=>row.名称==='合成企业')._idx));
-  await page.getByRole('tab',{name:'跟进记录',exact:true}).click();
+  if(!await page.locator('#detailNotes').evaluate(el=>el.open))await page.locator('#detailNotes>summary').click();
   await page.locator('#researchNote').fill('真正修改的完整文本');
   assert.equal(await page.evaluate(()=>workspaceHasDraft('edits')),true,'Actual note changes remain protected');
   await page.locator('#researchNote').fill('完整第一行\n完整第二行');
@@ -239,7 +242,7 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   await page.evaluate(()=>switchView('prospect'));
   assert.equal(await page.locator('#prospectMain .pp-md a').evaluate(el=>getComputedStyle(el).textDecorationLine),'underline');
   assert.deepEqual(errors,[]);
-  const result={runtimeVersion:signal.version,checks:['Archived personal-data drafts stay intact without blocking fresh records or marks','Closing management preserves its recovery copy and permits automatic updates','Resuming recovery preserves the original save base and protects the active editor','Direct search preserves focus and fixed stage counts','Both detailed-filter entries share the same conditions','Update status popover does not move content','Manual refresh includes commits after a previous manifest','Background checks leave the toolbar unchanged','Manual refresh keeps fixed geometry and joins a running check','Unchanged modules retain their DOM after manual refresh','Focused open reader receives Agent changes without navigation/reload','Markdown-only report update detected','Search, report identity and reader scroll retained','Unrelated draft does not block refresh','Dirty module deferred until draft ends','Shared profile refreshes while open','Inline edits and old save base preserved on conflict','Cancel editor refreshes automatically','Temporary connection failure preserves data and retries','New records appear','Failed module is never acknowledged and other modules still update','Automatic retry recovers without reopening','Slow personal data read completes without a redundant connection probe','Open read-only detail refreshes in place with stable company binding','Actual unsaved detail input is protected','Read-only CRLF notes do not block refresh and real edits remain protected','Action links use buttons and Markdown links stay underlined'],pageErrors:errors};
+  const result={runtimeVersion:signal.version,checks:['Archived personal-data drafts stay intact without blocking fresh records or marks','Closing management preserves its recovery copy and permits automatic updates','Resuming recovery preserves the original save base and protects the active editor','Direct search preserves focus and fixed stage counts','A single detailed-filter entry retains the same conditions','Update status popover does not move content','Manual refresh includes commits after a previous manifest','Background checks leave the toolbar unchanged','Manual refresh keeps fixed geometry and joins a running check','Unchanged modules retain their DOM after manual refresh','Focused open reader receives Agent changes without navigation/reload','Markdown-only report update detected','Search, report identity and reader scroll retained','Unrelated draft does not block refresh','Dirty module deferred until draft ends','Shared profile refreshes while open','Inline edits and old save base preserved on conflict','Cancel editor refreshes automatically','Temporary connection failure preserves data and retries','New records appear','Failed module is never acknowledged and other modules still update','Automatic retry recovers without reopening','Slow personal data read completes without a redundant connection probe','Open read-only detail refreshes in place with stable company binding','Actual unsaved detail input is protected','Read-only CRLF notes do not block refresh and real edits remain protected','Action links use buttons and Markdown links stay underlined'],pageErrors:errors};
   fs.writeFileSync(path.join(out,'App自动更新验收.json'),JSON.stringify(result,null,2)+'\n');console.log('PASS '+JSON.stringify(result));
 })().catch(error=>{console.error(error);process.exitCode=1}).finally(async()=>{
   await browser?.close();if(service && service.exitCode===null){service.stdin.write('shutdown\n');await once(service,'exit');}fs.rmSync(workspace,{recursive:true,force:true});
