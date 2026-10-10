@@ -8,7 +8,8 @@ const out=process.env.TOUDI_SCHEDULE_EVIDENCE||os.tmpdir(),token=crypto.randomBy
 const write=(name,value)=>{const dest=path.join(workspace,name);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,JSON.stringify(value));};
 const date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const job='产品与业务研究岗\n职责一：完整记录业务需求与处理流程。\n职责二：与团队合作完成研究、验证和交付。';
-const record=i=>({名称:'示例企业'+String(i+1).padStart(2,'0'),岗位:i===0?job:'研究与产品岗位',地点:'上海、苏州',应届生:'2027 届',学历要求:'硕士研究生及以上',性质:'国有企业',行业:'信息技术与专业服务',录入时间:date,截止时间:date,校招类型:'校园招聘',公告链接:'https://example.com/announcement','网申链接/邮箱':'https://example.com/apply'});
+const longJob=job+'\n'+Array.from({length:24},(_,i)=>'职责'+(i+3)+'：保留完整岗位原文，结合实际业务开展调研、验证与交付。').join('\n');
+const record=i=>({名称:'示例企业'+String(i+1).padStart(2,'0'),岗位:i===0?job:i===1?longJob:'研究与产品岗位',地点:'上海、苏州',应届生:'2027 届',学历要求:'硕士研究生及以上',性质:'国有企业',行业:'信息技术与专业服务',录入时间:date,截止时间:date,校招类型:'校园招聘',公告链接:'https://example.com/announcement','网申链接/邮箱':'https://example.com/apply'});
 const events=[{id:'test-meeting',title:'示例企业01 · 面试',type:'interview',status:'planned',allDay:false,start:date+'T14:00:00+08:00',end:date+'T15:00:00+08:00',timeZone:'Asia/Shanghai',companyKey:'示例企业01',notes:'完整原始备注。\n逐字保留第二行。',syncToCalendar:false}];
 write('投递数据/投递记录.json',Array.from({length:20},(_,i)=>record(i)).concat({...record(20),截止时间:'日期待定'}));
 write('投递数据/日程数据.json',{schemaVersion:1,timeZone:'Asia/Shanghai',calendar:{enabled:false,calendarId:''},events});
@@ -26,6 +27,7 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  browser=await pw.chromium.launch({headless:true,executablePath:process.env.TOUDI_CHROMIUM});
  const context=await browser.newContext({viewport:{width:1249,height:891},extraHTTPHeaders:{Authorization:'Bearer '+token}}),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
+ const screenshot=async name=>{await page.waitForFunction(()=>{const toast=document.getElementById('toast');return !toast.classList.contains('show')&&getComputedStyle(toast).opacity==='0';});await page.screenshot({path:path.join(out,name),animations:'disabled'});};
  const current=async module=>(await context.request.get(origin+'/api/manage?module='+module)).json();
  const commit=async(module,extra)=>{const base=await current(module);const response=await context.request.post(origin+'/api/manage',{data:{module,base:base.version,workspaceKey:base.workspaceKey,...extra},headers:{Origin:origin}});assert(response.ok(),await response.text());return response.json();};
  await commit('preps',{action:'upsert',item:{id:'example-prep',company:'示例企业01',companyKey:'示例企业01',position:'岗位准备原文',structured:true,markdown:'## 面试准备\n\n完整准备内容。'}});
@@ -36,6 +38,13 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  assert.equal(await page.locator('#deliverySearchEntry,#settingsShortcut,#managementEntry').count(),0,'No duplicate global controls');
  assert.equal(await page.locator('.topbar-actions .theme-toolbar').count(),0);assert(await page.locator('.sb-footer .theme-mode-control').isVisible());
  assert.deepEqual(await page.locator('.theme-mode-control button').evaluateAll(buttons=>buttons.map(el=>el.getAttribute('aria-label'))),['浅色','深色','跟随电脑']);
+ const themeLayout=await page.locator('.theme-mode-control').evaluate(control=>{
+   const r=control.getBoundingClientRect(),nav=document.querySelector('.module-nav button').getBoundingClientRect();
+   const choices=[...control.querySelectorAll('button')].map(button=>{const b=button.getBoundingClientRect(),icon=button.querySelector('svg').getBoundingClientRect();return {width:b.width,iconOffset:Math.abs(icon.x+icon.width/2-b.x-b.width/2)};});
+   return {leftOffset:Math.abs(r.x-nav.x),widthOffset:Math.abs(r.width-nav.width),choices};
+ });
+ assert(themeLayout.leftOffset<.5&&themeLayout.widthOffset<.5,'Appearance rail aligns with both sidebar navigation edges');
+ assert(Math.max(...themeLayout.choices.map(c=>c.width))-Math.min(...themeLayout.choices.map(c=>c.width))<.5&&themeLayout.choices.every(c=>c.iconOffset<.5),'Appearance choices share width and center every icon');
  assert.equal(await page.locator('#themeMenu,#themeMenuButton,#themeQuickToggle').count(),0);
  assert(await page.locator('#storageBadge').isHidden(),'Healthy connection does not occupy the sidebar');
  for(const mode of ['light','dark','system']){
@@ -72,7 +81,7 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  await page.locator('#managementOverlay').getByRole('button',{name:'关闭',exact:true}).click();
  await page.waitForFunction(()=>document.getElementById('workspaceUpdatesButton').hidden);
  assert(await page.locator('.sb-footer .theme-mode-control').evaluate(el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}));
- await page.screenshot({path:path.join(out,'投递管理_紧凑工具行.png')});
+ await screenshot('投递管理_紧凑工具行.png');
  await page.locator('[data-module="schedule"]').click();await page.waitForFunction(()=>!!document.querySelector('[data-schedule-event]'));
  const allDay=await page.locator('#scheduleCalendar [role="row"]:has(>.schedule-all-day-header)').boundingBox();assert(allDay&&allDay.height<=100,'Crowded all-day band is bounded');
  await page.locator('.schedule-more').filter({hasText:'+18 项'}).click();await page.locator('.schedule-popover').waitFor();
@@ -91,8 +100,12 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  await page.setViewportSize({width:1249,height:891});await page.locator('[data-module="delivery"]').click();await page.evaluate(()=>showDetail(0));await page.waitForTimeout(350);
  await page.locator('[data-detail-event="test-meeting"]').waitFor();
  assert.equal(await page.locator('#detailRecruitment .detail-fact.wide dd').first().textContent(),job,'Original role text is intact');
- assert.equal(await page.locator('#detailContent [role=tabpanel],#detailLead [role=tab]').count(),0);
- assert.equal(await page.locator('#detailContent>.detail-section:visible').count(),3);
+ assert.equal(await page.locator('#detailContent [role=tabpanel]').count(),0);
+ assert.deepEqual(await page.locator('#detailContent>.detail-section').evaluateAll(sections=>sections.map(section=>section.id)),['detailRecruitment','detailFollowup','detailMaterials','detailScheduleSection'],'Details follow the reading, tracking, materials and scheduling workflow');
+ assert.deepEqual(await page.locator('#detailContent>.detail-section>.detail-section-heading>h3').allTextContents(),['招聘信息','投递跟进','相关材料','日程安排']);
+ assert.equal(await page.locator('.detail-sticky button').count(),3,'Header is reserved for record navigation and close');
+ assert.equal(await page.locator('#detailRecruitment .action-link-primary').getAttribute('href'),'https://example.com/apply');
+ assert.equal(await page.locator('#detailScheduleSection .detail-schedule-add').count(),1,'Schedule creation belongs to schedule context');
  assert.deepEqual(await page.locator('[data-material]').allTextContents(),['岗位探查','面试准备','面试复盘']);
  assert.equal(await page.locator('#detailMaterials small,.detail-secondary-links').count(),0,'Company details contain no material counters or duplicate global links');
  assert.equal((await page.locator('#detailNotes>summary').textContent()).trim(),'跟进记录');
@@ -102,13 +115,15 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  });
  assert(detailControls.heights.every(height=>height===34),'Progress selector and adjacent actions share the same height');
  assert(detailControls.arrowOffset<.5&&detailControls.arrowRight>=10&&detailControls.appearance==='none','Dropdown arrow is centered with intentional right padding');
- assert((await page.locator('[data-material="prep"]').boundingBox()).height===34,'Company material navigation uses the shared compact control');
+ assert((await page.locator('[data-material="prep"]').boundingBox()).height===40,'Company material navigation is a full-width navigation row');
+ const materialsLayout=await page.locator('#detailMaterials').evaluate(section=>{const heading=section.querySelector('h3').getBoundingClientRect(),group=section.querySelector('nav').getBoundingClientRect();return {left:Math.abs(heading.x-group.x),widths:[...section.querySelectorAll('[data-material]')].map(el=>el.getBoundingClientRect().width)};});
+ assert(materialsLayout.left<.5&&Math.max(...materialsLayout.widths)-Math.min(...materialsLayout.widths)<.5,'Material navigation aligns with its section and uses equal widths');
  await page.locator('#detailStatus').selectOption('已投递');await page.waitForFunction(()=>byId(0)._status==='已投递'&&!editsSaveInFlight);
  assert.equal(await page.locator('#detailStatus').inputValue(),'已投递','Native status selection still changes the real record');
  assert(await page.locator('#detailContent').evaluate(el=>el.scrollHeight<=el.clientHeight),'Typical recruitment detail fits without scrolling');
- await page.screenshot({path:path.join(out,'详情_招聘信息.png')});
+ await screenshot('详情_招聘信息.png');
  await page.locator('#detailNotes>summary').click();await page.locator('#researchNote').fill('尚未保存的原始核实内容。');
- await page.screenshot({path:path.join(out,'详情_展开跟进记录.png')});
+ await screenshot('详情_展开跟进记录.png');
  assert.equal(await page.locator('#researchNote').inputValue(),'尚未保存的原始核实内容。');
  await page.locator('#detailFollowup').getByRole('button',{name:'收藏',exact:true}).click();await page.waitForFunction(()=>byId(0)._starred);assert.equal(await page.locator('#researchNote').inputValue(),'尚未保存的原始核实内容。');
  assert(await page.locator('#detailNotes').evaluate(el=>el.open),'Mark refresh preserves expanded notes and draft');
@@ -125,7 +140,7 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  assert(await page.locator('#detailSourceInfo').getAttribute('open')!==null);await page.locator('#detailRecruitment').getByRole('button',{name:'修改信息',exact:true}).click();
  assert.equal(await page.locator('#fe_岗位').inputValue(),job);await page.locator('#detailRecruitment').getByRole('button',{name:'收起修改',exact:true}).click();
  assert.equal(await page.locator('#detailRecruitment .detail-fact.wide dd').first().textContent(),job);
- await page.locator('.detail-entry-actions').getByRole('button',{name:'添加日程',exact:true}).click();
+ await page.locator('#detailScheduleSection').getByRole('button',{name:'添加日程',exact:true}).click();
  await page.locator('#scheduleForm').waitFor();assert.equal(await page.locator('#scheduleForm [name=companyKey]').inputValue(),'示例企业01');
  assert.equal(await page.locator('#scheduleForm [name=date]').inputValue(),date);assert.equal(await page.locator('#scheduleForm [name=type]').inputValue(),'application');
  assert(await page.locator('#scheduleForm [name=allDay]').isChecked());assert.equal((await current('schedule')).data.events.length,1,'Navigation alone does not create an event');
@@ -139,9 +154,19 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  assert.equal(await page.locator('#scheduleForm [name=companyKey]').inputValue(),'示例企业21');assert.equal(await page.locator('#scheduleForm [name=scheduled]').isChecked(),false,'Unknown deadline does not fabricate a date');
  await page.locator('[data-schedule="cancel"]').first().click();await page.locator('[data-schedule-mode="timeGridWeek"]').click();await page.locator('[data-schedule="today"]').click();
  await page.waitForTimeout(350);await page.screenshot({path:path.join(out,'日历_受控全天栏.png')});
- await page.evaluate(()=>chooseTheme('dark'));await page.waitForTimeout(350);await page.locator('[data-module="delivery"]').click();await page.evaluate(()=>showDetail(0));await page.waitForTimeout(350);await page.screenshot({path:path.join(out,'详情_深色.png')});
+ await page.evaluate(()=>chooseTheme('dark'));await page.waitForTimeout(350);await page.locator('[data-module="delivery"]').click();await page.evaluate(()=>showDetail(0));await page.waitForTimeout(350);await screenshot('详情_深色_展开记录.png');
+ await page.locator('#detailSourceInfo>summary').click();await page.locator('#detailNotes>summary').click();await page.locator('#detailContent').evaluate(el=>el.scrollTop=0);await screenshot('详情_深色.png');
+ await page.setViewportSize({width:1024,height:768});await page.waitForTimeout(350);
+ assert.equal(await page.evaluate(()=>document.body.scrollWidth>innerWidth),false);await page.locator('#detailScheduleSection').scrollIntoViewIfNeeded();assert(await page.locator('.detail-schedule-add').isVisible(),'Compact windows retain the scheduling action');await screenshot('详情_较矮窗口.png');
+ await page.setViewportSize({width:1249,height:891});await page.evaluate(()=>showDetail(1));await page.waitForTimeout(350);
+ assert.equal(await page.locator('#detailRecruitment .detail-fact.wide dd').first().textContent(),longJob,'Long original text is never clipped or abbreviated');
+ assert(await page.locator('#detailContent').evaluate(el=>el.scrollHeight>el.clientHeight),'Long text scrolls inside the detail reader');await page.locator('#detailScheduleSection').scrollIntoViewIfNeeded();assert(await page.locator('.detail-schedule-add').isVisible(),'The last section remains reachable after long original text');await screenshot('详情_长原文末尾.png');
+ await page.evaluate(()=>showDetail(0));await page.waitForTimeout(350);
  await page.evaluate(()=>chooseTheme('light'));await page.setViewportSize({width:390,height:844});await page.waitForTimeout(350);
- assert.equal(await page.evaluate(()=>document.body.scrollWidth>innerWidth),false);assert((await page.locator('.detail-entry-actions button').boundingBox()).width>70);
+ assert.equal(await page.evaluate(()=>document.body.scrollWidth>innerWidth),false);assert((await page.locator('.detail-schedule-add').boundingBox()).width>70);
+ const narrowMaterials=await page.locator('[data-material]').evaluateAll(entries=>entries.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
+ assert(narrowMaterials.every(entry=>Math.abs(entry.x-narrowMaterials[0].x)<.5&&Math.abs(entry.width-narrowMaterials[0].width)<.5)&&narrowMaterials.every((entry,i)=>!i||entry.y>=narrowMaterials[i-1].y+narrowMaterials[i-1].height-.5),'Narrow material navigation stacks without cramped columns');
+ await page.locator('#detailContent').evaluate(el=>el.scrollTop=0);await screenshot('详情_窄窗口.png');
  // Actual data exchange uses the public service, with no separate preview step for one record.
  await page.locator('.detail-nav').getByRole('button',{name:'关闭',exact:true}).click();await page.setViewportSize({width:1249,height:891});
  await page.locator('#recordDataEntry').click();await page.locator('#managementOverlay').waitFor({state:'visible'});
@@ -156,6 +181,7 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  const downloadPromise=page.waitForEvent('download');await page.locator('#managementOverlay').getByRole('button',{name:'导出记录',exact:true}).click();const exported=await downloadPromise;
  assert.equal(exported.suggestedFilename(),'招聘记录.json');const exportedRows=JSON.parse(fs.readFileSync(await exported.path(),'utf8'));assert.deepEqual(exportedRows,addedRecords,'Export contains saved records, not UI rows or drafts');
  await page.locator('#managementBody input[type=file]').setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({records:[]}))});
+ await page.waitForFunction(()=>document.getElementById('managementStatus').textContent.includes('JSON 数组'));
  assert((await page.locator('#managementStatus').innerText()).includes('JSON 数组'));assert.equal((await current('records')).data.length,22);
  const incoming=addedRecords.concat({...record(22),名称:'合成导入企业',岗位:job});
  await page.locator('#managementBody input[type=file]').setInputFiles({name:'招聘记录.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(incoming))});
@@ -172,6 +198,6 @@ fs.writeFileSync(path.join(workspace,'岗位探查/example.md'),'# 示例企业0
  await page.locator('#managementOverlay').getByRole('button',{name:'关闭',exact:true}).click();
  await page.reload();await page.waitForFunction(()=>serverMode&&data.length===5000);assert.equal(await page.locator('.theme-mode-control [aria-pressed=true]').getAttribute('data-theme'),'light','Theme persists after reopening the page');
  assert.deepEqual(errors,[]);
- fs.writeFileSync(path.join(out,'日历与详情交互验收.json'),JSON.stringify({version:signal.version,toolbar,overview,table,recordDialogMs,recordDialogElements,allDayHeight:allDay.height,monthRows:months,errors,checks:['single global setting/filter entry and idle status hidden','three icon appearance modes, keyboard control, system media and persistence','healthy and saving connection badges hidden, errors/disconnection visible','compact result row and manual new/import/export tasks without a full record list','one-click record save retains complete text','fresh JSON export equals saved records','bounded import preview does not write before confirmation','explicit full-file import and 5,000-row bounded dialog','bounded all-day overflow and all 20 entries retained','equal first/middle/last month rows across four months, two resizes and reopen','deadline-to-correct-recruitment-detail','continuous detail sections, original full text','company preparation/prospect/review open the correct real module','notes and disclosure survive marks and material navigation','field editing preserves full original','detail-to-schedule proposal then persisted save','own event-to-recruitment and reverse navigation','unknown deadline remains unplanned','dark theme and narrow layout']},null,2));
+ fs.writeFileSync(path.join(out,'日历与详情交互验收.json'),JSON.stringify({version:signal.version,themeLayout,detailControls,materialsLayout,narrowMaterials,toolbar,overview,table,recordDialogMs,recordDialogElements,allDayHeight:allDay.height,monthRows:months,errors,checks:['single global setting/filter entry and idle status hidden','three icon appearance modes, keyboard control, system media and persistence','healthy and saving connection badges hidden, errors/disconnection visible','compact result row and manual new/import/export tasks without a full record list','one-click record save retains complete text','fresh JSON export equals saved records','bounded import preview does not write before confirmation','explicit full-file import and 5,000-row bounded dialog','bounded all-day overflow and all 20 entries retained','equal first/middle/last month rows across four months, two resizes and reopen','deadline-to-correct-recruitment-detail','continuous detail sections, original full text','company preparation/prospect/review open the correct real module','notes and disclosure survive marks and material navigation','field editing preserves full original','detail-to-schedule proposal then persisted save','own event-to-recruitment and reverse navigation','unknown deadline remains unplanned','dark theme and narrow layout','long original text retains its complete content and last-section access','compact windows scroll naturally and narrow material links form full-width rows']},null,2));
  console.log('PASS '+signal.version+' calendar geometry and recruitment detail workflow');
 })().catch(async error=>{console.error(error);for(const context of browser?.contexts()||[])for(const page of context.pages()){console.error((await page.locator('body').innerText()).slice(-2000));await page.screenshot({path:path.join(out,'日历详情_失败.png')}).catch(()=>{});}process.exitCode=1;}).finally(async()=>{await browser?.close();if(service&&service.exitCode===null){service.stdin.write('shutdown\n');await once(service,'exit');}fs.rmSync(workspace,{recursive:true,force:true});});

@@ -39,7 +39,7 @@ a:hover { text-decoration: underline; }
 .sb-search input { width: 100%; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; transition: border-color .2s, box-shadow .2s; }
 .sb-search input::placeholder { color: var(--text3); }
 .sb-search input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(56,106,112,.15); }
-.sb-section { padding: 10px 10px; }
+.sb-section { padding: 10px 12px; }
 .sb-section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; padding: 17px 14px 8px; }
 .sb-item { display: grid; align-items: center; gap: 8px; padding: 9px 8px; border-radius: var(--radius-sm); color: var(--text2); font-size: 13px; cursor: pointer; transition: background-color var(--ui-motion-fast) var(--ui-ease), color var(--ui-motion-fast) var(--ui-ease), border-color var(--ui-motion-fast) var(--ui-ease); margin-bottom: 1px; border: 0; background: none; width: 100%; text-align: left; font: inherit; min-height: 40px; grid-template-columns: 18px minmax(0,1fr) auto; white-space: nowrap; height: 40px; line-height: 20px;  }
 .sb-item:hover { background: var(--bg); color: var(--sb-text-hover); }
@@ -62,7 +62,7 @@ a:hover { text-decoration: underline; }
 .filter-item input[type="checkbox"] { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
 .filter-item .count { margin-left: auto; font-size: 10px; color: var(--text3); }
 .filter-count-note { color: var(--sb-text); opacity: .75; font-size: 10px; line-height: 1.4; padding: 5px 4px 2px; }
-.sb-footer { padding: 12px 16px; margin-top:auto; border-top: 1px solid var(--border); background: var(--card); }
+.sb-footer { padding: 10px 12px; margin-top:auto; border-top: 1px solid var(--border-light); background: var(--card); }
 .storage-badge { margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 7px 8px; border-radius: 5px; background: var(--bg); line-height: 1.4; color: var(--text2); border: 1px solid var(--border); white-space: normal; }
 .storage-badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .storage-badge[hidden] { display:none; }
@@ -810,19 +810,19 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 .detail-heading .detail-nav { flex-wrap:nowrap; flex-shrink:0; }
 .detail-sticky h2 { font-size:20px; line-height:1.4; margin:0; overflow-wrap:anywhere; }
 .detail-context { font-size:12px; line-height:1.6; color:var(--text3); margin:6px 0 0; }
-.detail-entry-actions { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-top:14px; }
-.detail-entry-actions .detail-links { gap:8px; }
-.detail-entry-actions>.btn { min-width:76px; white-space:nowrap; flex-shrink:0; }
+.detail-recruitment-links { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:14px; }
 #detailContent { flex:1; overflow:auto; min-height:0; padding:0 24px 24px; overscroll-behavior:contain; scrollbar-gutter:stable; }
-.detail-section { padding:16px 0; border:0; border-bottom:1px solid var(--border-light); }
+.detail-section { padding:18px 0; border:0; border-bottom:1px solid var(--border-light); }
 .detail-section:last-child { padding-bottom:0; border-bottom:0; }
 .detail-modal .btn { min-height:34px; padding:6px 10px; font-size:13px; line-height:20px; }
-#detailFollowup { padding-bottom:8px; border-bottom:0; }
-#detailMaterials { padding-top:0; }
-.detail-progress-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-.detail-progress-row label { color:var(--text3); font-size:12px; line-height:20px; margin-right:4px; }
+.detail-progress-row { display:grid; grid-template-columns:160px minmax(0,1fr); gap:12px 24px; align-items:start; }
+.detail-progress-field { display:grid; gap:6px; min-width:0; }
+.detail-progress-field>label,.detail-progress-field>.detail-subtitle { color:var(--text3); font-size:12px; line-height:18px; margin:0; }
+.detail-mark-controls { display:flex; flex-wrap:wrap; gap:6px; }
+.detail-mark-controls .btn { background:var(--bg); border-color:transparent; }
+.detail-mark-controls .btn[aria-pressed="true"] { color:var(--primary); background:var(--primary-faint); border-color:var(--border); }
 .detail-status-control { position:relative; display:inline-flex; flex-shrink:0; }
-.detail-status-control select { appearance:none; -webkit-appearance:none; width:112px; height:34px; padding:6px 34px 6px 10px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); font:inherit; font-size:13px; font-weight:500; line-height:20px; cursor:pointer; }
+.detail-status-control select { appearance:none; -webkit-appearance:none; width:100%; height:34px; padding:6px 34px 6px 10px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); font:inherit; font-size:13px; font-weight:500; line-height:20px; cursor:pointer; }
 .detail-status-control>svg { position:absolute; width:14px; height:14px; right:10px; top:50%; transform:translateY(-50%); color:var(--text2); pointer-events:none; }
 .detail-status-control select:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 .detail-followup-notes { margin-top:8px; }
@@ -834,13 +834,15 @@ details[open]>.detail-disclosure svg { transform:rotate(180deg); }
 .detail-disclosure:hover { color:var(--primary); }
 .detail-disclosure:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:var(--radius-sm); }
 .detail-followup-notes .detail-note-block { margin-top:12px; padding-top:0; border-top:0; }
-.detail-material-entries { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-.detail-material-entry { gap:8px; white-space:nowrap; }
+.detail-note-block .detail-section-heading h4 { font-size:13px; line-height:20px; margin:0; font-weight:600; }
+.detail-material-entries { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border:1px solid var(--border-light); border-radius:var(--ui-radius-control); overflow:hidden; }
+.detail-material-entry { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; min-height:40px; padding:9px 12px; border:0; background:var(--bg); color:var(--text2); font:inherit; font-size:13px; line-height:20px; text-align:left; cursor:pointer; transition:background var(--ui-motion-fast) var(--ui-ease),color var(--ui-motion-fast) var(--ui-ease); }
+.detail-material-entry+.detail-material-entry { border-left:1px solid var(--border-light); }
 .detail-material-entry svg { width:14px; height:14px; flex-shrink:0; }
-.detail-material-entry:hover { background:var(--primary-faint); border-color:var(--primary); }
-.detail-material-entry:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.detail-material-entry:hover { color:var(--primary); background:var(--primary-faint); }
+.detail-material-entry:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
 .detail-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-.detail-section-heading h3 { font-size:14px; line-height:22px; margin:0; font-weight:600; }
+.detail-section-heading h3 { font-size:15px; line-height:22px; margin:0; font-weight:600; }
 .detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; margin:0; }
 .detail-fact { min-width:0; }
 .detail-fact dt,.detail-subtitle { color:var(--text3); font-size:12px; font-weight:500; margin-bottom:4px; }
@@ -853,9 +855,9 @@ details[open]>.detail-disclosure svg { transform:rotate(180deg); }
 .detail-source h4 { font-size:14px; margin-bottom:10px; }
 .detail-source .detail-facts { margin:12px 0; gap:10px 20px; }
 .detail-source .detail-fact dd { font-size:13px; }
-.detail-source-info { margin-top:18px; padding-top:14px; border-top:1px solid var(--border-light); font-size:12px; color:var(--text2); }
+.detail-source-info { margin-top:10px; font-size:12px; color:var(--text2); }
 .detail-source-info>.detail-facts { margin-top:14px; }
-.detail-related-schedule { margin-top:16px; border-top:1px solid var(--border-light); padding-top:12px; }
+.detail-related-schedule { margin:0; }
 .detail-related-schedule .detail-section-heading { margin-bottom:6px; }
 .detail-schedule-row { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; padding:10px 0; text-align:left; border:0; border-bottom:1px solid var(--border-light); color:var(--text2); background:transparent; font:inherit; cursor:pointer; }
 .detail-schedule-row strong { display:block; font-size:13px; line-height:20px; font-weight:500; }
@@ -868,6 +870,8 @@ details[open]>.detail-disclosure svg { transform:rotate(180deg); }
 .action-link:hover { color:var(--primary); background:var(--primary-faint); border-color:var(--primary); box-shadow:0 2px 6px rgba(0,0,0,.04); }
 .action-link:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
 .action-link svg { width:14px; height:14px; flex-shrink:0; }
+.action-link-primary { color:var(--on-primary); background:var(--primary); border-color:var(--primary); }
+.action-link-primary:hover { color:var(--on-primary); background:var(--primary-hover); border-color:var(--primary-hover); }
 .action-link>span { min-width:0; overflow-wrap:anywhere; }
 .resource-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 #tableBody .table-entry-link { min-height:26px; padding:3px 7px; font-size:12px; text-decoration:none; }
@@ -905,6 +909,7 @@ details[open]>.detail-disclosure svg { transform:rotate(180deg); }
 .pref-dialog .modal-actions { align-items:center; }
 .pref-save-hint { margin-right:auto; color:var(--text3); font-size:12px; }
 @media(max-width:600px) { .detail-modal .detail-sticky { padding:12px 16px; } #detailContent { padding:0 16px 20px; } .detail-sticky h2 { font-size:18px; } .detail-facts { gap:14px 16px; } .pref-options { grid-template-columns:1fr; } .pref-tabs { gap:18px; } .pref-save-hint { max-width:150px; } }
+@media(max-width:480px) { .detail-progress-row { grid-template-columns:1fr; } .detail-material-entries { grid-template-columns:1fr; } .detail-material-entry+.detail-material-entry { border-left:0; border-top:1px solid var(--border-light); } }
 
 
 /* Shared empty surfaces keep the existing reading and dashboard structure. */
@@ -1158,7 +1163,7 @@ input:not([type="checkbox"]),textarea,select { transition:background-color var(-
 
 <div id="detailModal" class="modal-overlay detail-modal" style="display:none" onclick="if(event.target===this)closeDetailModal()">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
-    <div class="detail-sticky"><div class="detail-heading"><div><h2 id="detailTitle"></h2><p id="detailMeta" class="detail-context"></p></div><div class="detail-nav"><button class="btn btn-sm" onclick="stepDetail(-1)">上一条</button><button class="btn btn-sm" onclick="stepDetail(1)">下一条</button><button class="btn btn-sm" onclick="closeDetailModal()">关闭</button></div></div><div id="detailLead"></div></div>
+    <div class="detail-sticky"><div class="detail-heading"><div><h2 id="detailTitle"></h2><p id="detailMeta" class="detail-context"></p></div><div class="detail-nav"><button class="btn btn-sm" onclick="stepDetail(-1)">上一条</button><button class="btn btn-sm" onclick="stepDetail(1)">下一条</button><button class="btn btn-sm" onclick="closeDetailModal()">关闭</button></div></div></div>
     <div id="detailContent"></div>
 
   </div>
@@ -1955,10 +1960,10 @@ function detailFact(item,key,label=key,wide=false){
   const edited=item._rawF&&item._rawF[key]!==undefined;
   return `<div class="detail-fact ${wide?'wide':''}"><dt>${esc(label)}${edited?`<span class="detail-edited" title="原始值：${esc(String(item._rawF[key]||'—'))}">已修改</span>`:''}</dt><dd>${esc(item[key]||'未注明')}</dd></div>`;
 }
-function detailEntryLink(value,label){
+function detailEntryLink(value,label,primary=false){
   const v=String(value||'').trim();if(!v)return '';
   const href=/^https?:\/\//i.test(v)?v:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)?'mailto:'+v:'';
-  return href?`<a class="action-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer"><span>${esc(label)}</span>${navigationIcon()}</a>`:`<span class="detail-prose">${esc(label)}：${esc(v)}</span>`;
+  return href?`<a class="action-link${primary?' action-link-primary':''}" href="${esc(href)}" target="_blank" rel="noopener noreferrer"><span>${esc(label)}</span>${navigationIcon()}</a>`:`<span class="detail-prose">${esc(label)}：${esc(v)}</span>`;
 }
 function navigationIcon(internal=false){return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${internal?'<path d="M4 10h12m-5-5 5 5-5 5"/>':'<path d="M5 15 15 5M6 5h9v9"/>'}</svg>`;}
 function resourceLink(url,label){return `<a class="action-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer"><span>${esc(label)}</span>${navigationIcon()}</a>`;}
@@ -1969,14 +1974,34 @@ function mergedSourceHtml(src){
 }
 function detailChevronIcon(){return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>';}
 function detailDisclosureHtml(label){return `<summary class="detail-disclosure"><span>${esc(label)}</span>${detailChevronIcon()}</summary>`;}
+function detailRecruitmentHtml(idx,item){
+  const sources=Array.isArray(item['归并来源'])?item['归并来源']:[];
+  const links=detailEntryLink(item['网申链接/邮箱'],'投递入口',true)+detailEntryLink(item['公告链接'],'招聘公告');
+  return `<section class="detail-section" id="detailRecruitment" aria-labelledby="detailRecruitmentTitle">
+    <div class="detail-section-heading"><h3 id="detailRecruitmentTitle">招聘信息</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div>
+    ${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:`<dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'截止时间','招聘截止')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}</dl>`}
+    ${links?`<div class="detail-recruitment-links" aria-label="招聘入口">${links}</div>`:''}
+    <details id="detailSourceInfo" class="detail-source-info">${detailDisclosureHtml('企业信息与招聘来源'+(sources.length?' · '+sources.length+' 条':''))}<dl class="detail-facts">${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl>${sources.map(mergedSourceHtml).join('')}</details>
+  </section>`;
+}
 function detailFollowupHtml(idx,item){
   const options=STATUSES.map(st=>`<option ${item._status===st?'selected':''}>${st}</option>`).join('')+(STATUSES.includes(item._status)?'':`<option selected disabled>${esc(item._status||UNKNOWN_STATUS)}</option>`);
-  return `<section class="detail-section" id="detailFollowup" aria-label="投递跟进"><div class="detail-progress-row"><label for="detailStatus">投递进度</label><span class="detail-status-control"><select id="detailStatus" onchange="setStatus(${idx},this.value);showDetail(${idx})">${options}</select>${detailChevronIcon()}</span><button class="btn btn-sm" aria-pressed="${item._starred}" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button><button class="btn btn-sm" aria-pressed="${item._research}" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><button class="btn btn-sm" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button></div><details id="detailNotes" class="detail-followup-notes">${detailDisclosureHtml('跟进记录')}<div class="detail-note-block"><div class="detail-section-heading"><h3>个人备注</h3><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p></div><div class="detail-note-block"><label class="detail-subtitle" for="researchNote">待核实事项</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存记录</button></div></div></details></section>`;
+  return `<section class="detail-section" id="detailFollowup" aria-labelledby="detailFollowupTitle">
+    <div class="detail-section-heading"><h3 id="detailFollowupTitle">投递跟进</h3></div>
+    <div class="detail-progress-row">
+      <div class="detail-progress-field"><label for="detailStatus">投递进度</label><span class="detail-status-control"><select id="detailStatus" onchange="setStatus(${idx},this.value);showDetail(${idx})">${options}</select>${detailChevronIcon()}</span></div>
+      <div class="detail-progress-field" role="group" aria-labelledby="detailMarksLabel"><span id="detailMarksLabel" class="detail-subtitle">个人标记</span><div class="detail-mark-controls"><button class="btn btn-sm" aria-pressed="${item._starred}" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button><button class="btn btn-sm" aria-pressed="${item._research}" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><button class="btn btn-sm" aria-pressed="${item._excluded}" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button></div></div>
+    </div>
+    <details id="detailNotes" class="detail-followup-notes">${detailDisclosureHtml('跟进记录')}<div class="detail-note-block"><div class="detail-section-heading"><h4>个人备注</h4><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p></div><div class="detail-note-block"><label class="detail-subtitle" for="researchNote">待核实事项</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存记录</button></div></div></details>
+  </section>`;
 }
 function detailMaterialsHtml(idx){
   if(!byId(idx))return '';
   const entries=[['prospect','岗位探查'],['prep','面试准备'],['review','面试复盘']];
-  return `<div class="detail-material-entries" aria-label="本公司材料">${entries.map(([kind,label])=>`<button type="button" class="btn btn-sm detail-material-entry" data-material="${kind}" onclick="openApplicationMaterial(${idx},'${kind}')"><span>${label}</span>${navigationIcon(true)}</button>`).join('')}</div>`;
+  return `<section class="detail-section" id="detailMaterials" aria-labelledby="detailMaterialsTitle"><div class="detail-section-heading"><h3 id="detailMaterialsTitle">相关材料</h3></div><nav class="detail-material-entries" aria-label="本公司材料">${entries.map(([kind,label])=>`<button type="button" class="detail-material-entry" data-material="${kind}" onclick="openApplicationMaterial(${idx},'${kind}')"><span>${label}</span>${navigationIcon(true)}</button>`).join('')}</nav></section>`;
+}
+function detailScheduleHtml(idx){
+  return `<section class="detail-section detail-related-schedule" id="detailScheduleSection" aria-labelledby="detailScheduleTitle"><div class="detail-section-heading"><h3 id="detailScheduleTitle">日程安排</h3><button class="btn btn-sm detail-schedule-add" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加日程</button></div><div id="detailSchedule"><p class="detail-context">正在读取日程…</p></div></section>`;
 }
 async function loadDetailRelations(idx,request){
   const item=byId(idx);if(!item)return;
@@ -1992,11 +2017,9 @@ function showDetail(idx,options={}){
   const previous=detailIdx,scroll=document.getElementById('detailContent').scrollTop;
   if(options.fresh)detailInputMemory.delete(idx);else rememberDetailInputs();detailIdx=idx;
   const item=byId(idx);if(!item)return;
-  const sources=Array.isArray(item['归并来源'])?item['归并来源']:[];
-  let html=`${detailFollowupHtml(idx,item)}<section class="detail-section" id="detailMaterials" aria-label="准备、探查与复盘">${detailMaterialsHtml(idx)}</section><section class="detail-section" id="detailRecruitment" aria-label="招聘信息"><div class="detail-section-heading"><h3>岗位与要求</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div>${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:`<dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'截止时间','招聘截止')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}</dl>`}<details id="detailSourceInfo" class="detail-source-info">${detailDisclosureHtml('企业信息与招聘来源'+(sources.length?' · '+sources.length+' 条':''))}<dl class="detail-facts">${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl>${sources.length?sources.map(mergedSourceHtml).join(''):''}</details><div class="detail-related-schedule"><div class="detail-section-heading"><h3>关联日程</h3></div><div id="detailSchedule"><p class="detail-context">正在读取日程…</p></div></div></section>`;
+  const html=detailRecruitmentHtml(idx,item)+detailFollowupHtml(idx,item)+detailMaterialsHtml(idx)+detailScheduleHtml(idx);
   document.getElementById('detailTitle').textContent=item['名称'];
   document.getElementById('detailMeta').textContent=[item['校招类型']||'招聘记录',item._status,item._starred?'已收藏':''].filter(Boolean).join(' · ');
-  document.getElementById('detailLead').innerHTML=`<div class="detail-entry-actions"><div class="detail-links">${detailEntryLink(item['公告链接'],'招聘公告')}${detailEntryLink(item['网申链接/邮箱'],'投递入口')}</div><button class="btn btn-sm btn-primary" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加日程</button></div>`;
   document.getElementById('detailContent').innerHTML=html;
   (detailInputMemory.get(idx)||[]).forEach(x=>{const e=document.getElementById(x.id);if(e){if(e.tagName==='DETAILS')e.open=x.open;else e.value=x.value;}});
   document.getElementById('detailModal').style.display='flex';
@@ -2006,7 +2029,7 @@ function showDetail(idx,options={}){
 }
 
 function jumpDetailSection(id){
-  const section=document.getElementById(id);if(!section||!['detailRecruitment','detailFollowup','detailMaterials'].includes(id))return;
+  const section=document.getElementById(id);if(!section||!['detailRecruitment','detailFollowup','detailMaterials','detailScheduleSection'].includes(id))return;
   if(id==='detailFollowup')document.getElementById('detailNotes').open=true;
   document.getElementById('detailContent').scrollTop=section.offsetTop-document.getElementById('detailContent').offsetTop;
 }

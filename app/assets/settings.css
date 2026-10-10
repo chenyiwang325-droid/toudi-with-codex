@@ -10,11 +10,11 @@
 :root[data-palette="forest"][data-theme="dark"] { --primary: #b5d0bf; --primary-hover: #d6e8dd; --primary-light: #32493e; --primary-faint: #2b3c34; --bg: #1c2421; --card: #27342d; --row-alt: #2c3b32; --row-hover: #354b3e; --on-primary: #1a3024; }
 :root[data-palette="clay"][data-theme="dark"] { --primary: #e0b8a4; --primary-hover: #f0d3c1; --primary-light: #573e33; --primary-faint: #453329; --bg: #27211e; --card: #342b26; --row-alt: #3c312b; --row-hover: #4a3a30; --on-primary: #372016; }
 :root[data-palette="graphite"][data-theme="dark"] { --primary: #c4cdd4; --primary-hover: #e1e7ec; --primary-light: #3c4750; --primary-faint: #2f3a42; --bg: #1d242a; --card: #293139; --row-alt: #2f3942; --row-hover: #3c4852; --on-primary: #23313a; }
-.sb-footer .theme-toolbar { width:max-content; max-width:100%; }
-.theme-mode-control { display:inline-flex; gap:2px; padding:3px; border:1px solid var(--border); border-radius:var(--ui-radius-control); background:var(--card); }
-.theme-mode-control button { display:inline-flex; align-items:center; justify-content:center; width:32px; height:30px; padding:0; border:0; border-radius:4px; background:transparent; color:var(--text3); cursor:pointer; transition:background var(--ui-motion-fast) var(--ui-ease),color var(--ui-motion-fast) var(--ui-ease); }
-.theme-mode-control button:hover { color:var(--text); background:var(--bg); }
-.theme-mode-control button[aria-pressed="true"] { color:var(--primary); background:var(--primary-light); }
+.sb-footer .theme-toolbar { width:100%; min-width:0; }
+.theme-mode-control { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; width:100%; padding:3px; border:1px solid var(--border-light); border-radius:var(--ui-radius-control); background:var(--bg); }
+.theme-mode-control button { display:inline-flex; align-items:center; justify-content:center; width:100%; min-width:0; height:30px; padding:0; border:0; border-radius:5px; background:transparent; color:var(--text3); cursor:pointer; transition:background var(--ui-motion-fast) var(--ui-ease),color var(--ui-motion-fast) var(--ui-ease),box-shadow var(--ui-motion-fast) var(--ui-ease); }
+.theme-mode-control button:hover { color:var(--text); background:var(--card); }
+.theme-mode-control button[aria-pressed="true"] { color:var(--text); background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.08); }
 .theme-mode-control svg { width:16px; height:16px; }
 .theme-toolbar button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 /* Settings primitives: shared row, control, type and spacing contracts. */

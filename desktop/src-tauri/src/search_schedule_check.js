@@ -16,6 +16,8 @@
     check(document.getElementById('workspaceUpdatesButton').hidden,'native idle update status stays hidden');
     check(document.getElementById('storageBadge').hidden,'native healthy connection has no permanent badge');
     check([...document.querySelectorAll('.theme-mode-control button')].map(el=>el.getAttribute('aria-label')).join('|')==='浅色|深色|跟随电脑'&&!document.getElementById('themeMenu'),'native appearance uses three direct icon choices');
+    const appearance=document.querySelector('.theme-mode-control').getBoundingClientRect(),navigation=document.querySelector('.module-nav button').getBoundingClientRect(),choiceWidths=[...document.querySelectorAll('.theme-mode-control button')].map(el=>el.getBoundingClientRect().width);
+    check(Math.abs(appearance.x-navigation.x)<.5&&Math.abs(appearance.width-navigation.width)<.5&&Math.max(...choiceWidths)-Math.min(...choiceWidths)<.5,'native appearance rail aligns to sidebar edges with equal choices');
     for(const mode of ['dark','system','light']){
       document.querySelector('.theme-mode-control [data-theme="'+mode+'"]').click();
       check(workspace.theme===mode&&document.querySelector('.theme-mode-control [aria-pressed="true"]').dataset.theme===mode,'native appearance choice '+mode+' updates the selected control');
@@ -73,7 +75,8 @@
     window.toudiDesktop.calendar=realCalendar;
     switchView('table');const detailRow=data.find(row=>row['岗位']==='合成产品岗位')||data[0];showDetail(detailRow._idx);
     await wait(()=>!document.getElementById('detailSchedule').textContent.includes('正在读取'));
-    check(!document.querySelector('#detailLead [role="tab"]')&&document.querySelectorAll('#detailContent>.detail-section').length===3,'native detail uses continuous sections');
+    check([...document.querySelectorAll('#detailContent>.detail-section')].map(el=>el.id).join('|')==='detailRecruitment|detailFollowup|detailMaterials|detailScheduleSection','native detail follows recruitment, tracking, materials and schedule order');
+    check(document.querySelectorAll('.detail-sticky button').length===3&&document.querySelectorAll('#detailScheduleSection .detail-schedule-add').length===1,'native detail actions stay inside their task context');
     check(document.querySelectorAll('[data-material]').length===3&&!document.getElementById('detailNotes').open,'native related materials are visible and long notes start collapsed');
     check([...document.querySelectorAll('[data-material]')].map(el=>el.textContent.trim()).join('|')==='岗位探查|面试准备|面试复盘'&&!document.querySelector('#detailMaterials small,.detail-secondary-links'),'native company material links have no counters or global shortcuts');
     const status=document.getElementById('detailStatus'),statusRect=status.getBoundingClientRect(),arrowRect=document.querySelector('.detail-status-control>svg').getBoundingClientRect();
@@ -81,12 +84,12 @@
     check(report.statusControl.height===34&&report.statusControl.buttonHeights.every(height=>height===34)&&report.statusControl.arrowOffset<.5&&report.statusControl.appearance==='none','native status selector has consistent dimensions and a centered arrow');
     check(document.querySelector('#detailNotes>summary').textContent.trim()==='跟进记录','native follow-up disclosure shows only its action label');
     check(document.querySelectorAll('#detailNotes>.detail-disclosure,#detailSourceInfo>.detail-disclosure').length===2,'native detail disclosures share the same visual control');
-    check(document.querySelector('.detail-entry-actions>button').textContent==='添加日程','native schedule action describes editing a proposal');
+    check(document.querySelector('.detail-schedule-add').textContent==='添加日程','native schedule action describes editing a proposal');
     document.getElementById('detailNotes').open=true;document.getElementById('researchNote').value='完整的合成未保存记录';
     await openApplicationMaterial(detailRow._idx,'prep');check(view==='qbank'&&qbMode==='company','native preparation link navigates to its real module');
     switchView('table');showDetail(detailRow._idx);check(document.getElementById('researchNote').value==='完整的合成未保存记录','native navigation preserves unsaved follow-up text');
     const eventCount=window.toudiSchedule.get().events.length;
-    document.querySelector('.detail-entry-actions>button').click();await wait(()=>document.getElementById('scheduleForm'));
+    document.querySelector('.detail-schedule-add').click();await wait(()=>document.getElementById('scheduleForm'));
     check(document.getElementById('scheduleForm').elements.companyKey.value===detailRow._key&&window.toudiSchedule.get().events.length===eventCount,'native add schedule binds the company without creating an event');
     document.querySelector('[data-schedule="cancel"]').click();switchView('table');showDetail(detailRow._idx);
     document.getElementById('researchNote').value=detailRow._researchNote||'';document.getElementById('detailNotes').open=false;

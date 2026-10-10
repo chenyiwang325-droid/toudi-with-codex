@@ -204,9 +204,9 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   assert(await page.evaluate(()=>serverMode&&apiBase!==null));await context.unroute('**/api/edits');
   // Read-only details update in place. Real unsaved inputs remain protected.
   await page.evaluate(()=>{showDetail(data.find(row=>row.名称==='合成企业')._idx);jumpDetailSection('detailFollowup');});
-  assert(await page.locator('.detail-entry-actions a.action-link').first().isVisible());
-  assert.equal(await page.locator('.detail-entry-actions a').first().evaluate(el=>getComputedStyle(el).textDecorationLine),'none');
-  assert(await page.locator('.detail-entry-actions a').first().evaluate(el=>el.getBoundingClientRect().height>=34));
+  assert(await page.locator('.detail-recruitment-links a.action-link').first().isVisible());
+  assert.equal(await page.locator('.detail-recruitment-links a').first().evaluate(el=>getComputedStyle(el).textDecorationLine),'none');
+  assert(await page.locator('.detail-recruitment-links a').first().evaluate(el=>el.getBoundingClientRect().height>=34));
   await commit('records',{action:'replace',data:[{名称:'新增合成企业',岗位:'新岗位'},{名称:'合成企业',岗位:'打开详情时更新后的岗位','公告链接':'https://example.test/notice','网申链接/邮箱':'https://example.test/apply'}]});
   await page.waitForFunction(()=>document.getElementById('detailContent').textContent.includes('打开详情时更新后的岗位'),null,{timeout:12000});
   assert(await page.locator('#detailNotes').evaluate(el=>el.open),'A read-only refresh preserves the expanded follow-up');
