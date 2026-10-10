@@ -82,6 +82,11 @@ fn check_binding(
 fn denied_results(items: Vec<Item>) -> Vec<Value> {
     items.into_iter().map(|i| json!({"id":i.id,"ok":false,"operation":"blocked","error":"需要完整日历权限，请主动连接日历"})).collect()
 }
+fn authorization_request_needed(action: &str, status: i64) -> bool {
+    // Permission is stored by macOS, not an App preference. Only an explicit
+    // initial request or write-only upgrade should call the permission API.
+    action == "authorize" && matches!(status, 0 | 4)
+}
 fn valid_item_id(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 128
@@ -297,7 +302,7 @@ mod native {
         let _guard = LOCK.lock().map_err(|_| "日历同步忙")?;
         objc2::rc::autoreleasepool(|_| unsafe {
             let store: Retained<AnyObject> = msg_send![class!(EKEventStore), new];
-            if action == "authorize" {
+            if authorization_request_needed(action, auth()) {
                 let (tx, rx) = std::sync::mpsc::channel();
                 let completion =
                     block2::RcBlock::new(move |granted: Bool, error: *mut AnyObject| {
@@ -481,6 +486,19 @@ mod tests {
     use super::*;
     fn item() -> Item {
         serde_json::from_value(json!({"id":"synthetic_1","title":"示例","start":"2026-10-10","end":null,"allDay":true,"timeZone":"Asia/Shanghai","notes":"","location":"","url":"","status":"planned","reminderMinutes":15})).unwrap()
+    }
+    #[test]
+    fn authorization_is_idempotent_and_never_requested_by_reads_or_sync() {
+        for status in 0..=5 {
+            for action in ["status", "calendars", "sync"] {
+                assert!(!authorization_request_needed(action, status));
+            }
+        }
+        assert!(authorization_request_needed("authorize", 0));
+        assert!(authorization_request_needed("authorize", 4));
+        for status in [1, 2, 3, 5] {
+            assert!(!authorization_request_needed("authorize", status));
+        }
     }
     #[test]
     fn denied_path_preserves_item_identity() {

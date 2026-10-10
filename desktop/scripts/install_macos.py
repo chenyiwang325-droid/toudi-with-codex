@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from local_signing import initialize_identity, load_identity, sign_app
 
 IDENTIFIER='io.github.chenyiwang325-droid.toudi'
 
@@ -24,6 +25,7 @@ def main():
     parser.add_argument('package',type=Path)
     parser.add_argument('--destination',type=Path,default=Path.home()/'Applications/TouDi.app')
     parser.add_argument('--backup-dir',type=Path,default=Path.home()/'Library/Application Support/TouDi/install-backups')
+    parser.add_argument('--setup-local-signing',action='store_true',help='Explicitly create a local code-signing identity; requires user approval of certificate setup')
     args=parser.parse_args()
     if sys.platform!='darwin': raise ValueError('This installer is for macOS')
     package=args.package.resolve();target=args.destination.expanduser().absolute()
@@ -34,6 +36,10 @@ def main():
         staging=Path(temporary);run('ditto','-x','-k',package,staging)
         candidate=staging/'TouDi.app';version=identity(candidate)
         run('codesign','--verify','--deep','--strict',candidate)
+        signing=initialize_identity() if args.setup_local_signing else load_identity()
+        if signing:
+            sign_app(candidate,signing)
+            print('Persistent local signing identity verified; future installs reuse this identity.')
         previous=staging/'previous.app'
         if target.exists():
             old_version=identity(target);args.backup_dir.mkdir(parents=True,exist_ok=True)
