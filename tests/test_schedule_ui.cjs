@@ -30,11 +30,15 @@ const write=(relative,data)=>{const target=path.join(workspace,relative);fs.mkdi
   const date=await page.locator('#scheduleForm [name="date"]').inputValue();
   await page.locator('#scheduleCompanyQuery').fill('示例企业A');
   await page.locator('#scheduleCompanyList [role=option]').filter({hasText:'示例企业A'}).click();
+  const meetingInfo='会议号：123 456 789\n入会密码：0123';
+  await page.locator('#scheduleForm [name="meetingInfo"]').fill(meetingInfo);
+  assert(await page.locator('#scheduleForm').evaluate(form=>form.checkValidity()),'A meeting number is valid form input');
   await page.locator('#scheduleForm [name="notes"]').fill('完整备注：核对岗位职责、整理项目经历。\n保留第二行。');
   await page.locator('#scheduleForm [type="submit"]').click();
   await page.getByText('日程已保存',{exact:true}).waitFor();
   let current=await get('schedule');assert.equal(current.data.events.length,1);const id=current.data.events[0].id;
   assert.equal(current.data.events[0].notes,'完整备注：核对岗位职责、整理项目经历。\n保留第二行。');
+  assert.equal(current.data.events[0].meetingInfo,meetingInfo);assert.equal(current.data.events[0].url,'');
   await page.reload();await page.waitForFunction(()=>serverMode);await page.locator('[data-module="schedule"]').click();await page.waitForFunction(()=>document.querySelector('[data-schedule-event]'));
   await page.locator('[data-module="delivery"]').click();await page.locator('[data-module="schedule"]').click();
   await page.waitForFunction(()=>document.querySelector('[data-schedule-event]'));
@@ -42,6 +46,26 @@ const write=(relative,data)=>{const target=path.join(workspace,relative);fs.mkdi
   assert(await page.locator('[data-schedule-event="'+id+'"]').count(),'Reopening retains the mounted calendar');
   await page.locator(`[data-schedule-event="${id}"]`).first().click();
   assert.equal(await page.locator('#scheduleForm [name="notes"]').inputValue(),current.data.events[0].notes);
+  assert.equal(await page.locator('#scheduleForm [name="meetingInfo"]').inputValue(),meetingInfo);
+  await page.screenshot({path:path.join(out,'日程_会议号与入会说明.png')});
+  // Old URL-only events open in the same field; changing to a number removes the stale URL.
+  const legacyLink='https://example.invalid/join?meeting=123456789';
+  await page.locator('#scheduleForm [name="meetingInfo"]').fill(legacyLink);
+  await page.locator('#scheduleForm [type="submit"]').click();await page.waitForFunction(()=>!window.toudiSchedule.hasDraft());
+  assert.equal((await get('schedule')).data.events[0].url,legacyLink);
+  const legacy=(await get('schedule')).data;delete legacy.events[0].meetingInfo;
+  await commit('schedule',{action:'replace',data:legacy});
+  await page.waitForFunction(()=>!('meetingInfo' in window.toudiSchedule.get().events[0]),null,{timeout:12000});
+  await page.locator(`[data-schedule-event="${id}"]`).first().click();
+  assert.equal(await page.locator('#scheduleForm [name="meetingInfo"]').inputValue(),legacyLink);
+  await page.locator('#scheduleForm [name="meetingInfo"]').fill(meetingInfo);
+  await page.locator('#scheduleForm [type="submit"]').click();await page.waitForFunction(()=>!window.toudiSchedule.hasDraft());
+  assert.equal((await get('schedule')).data.events[0].url,'');
+  await page.evaluate(()=>window.__SNAPSHOT__=true);await page.locator(`[data-schedule-event="${id}"]`).first().click();
+  assert((await page.locator('#scheduleInspector .schedule-notes').allTextContents()).includes(meetingInfo));
+  assert.equal(await page.locator('#scheduleInspector a.action-link').count(),0,'A meeting number is not a fake clickable URL');
+  await page.evaluate(()=>window.__SNAPSHOT__=false);
+  await page.locator('[data-schedule="cancel"]').first().click();await page.locator(`[data-schedule-event="${id}"]`).first().click();
   await page.screenshot({path:path.join(out,'日程_周历与编辑.png')});
   const inspector=await page.locator('#scheduleInspector').boundingBox(),canvas=await page.locator('#scheduleCalendar').boundingBox();
   assert(Math.abs(inspector.y-canvas.y)<2);assert(Math.abs(inspector.height-canvas.height)<2);
@@ -82,8 +106,10 @@ const write=(relative,data)=>{const target=path.join(workspace,relative);fs.mkdi
   await page.locator('[data-schedule="cancel"]').first().click();await page.getByText('外部最新事项',{exact:true}).first().waitFor({timeout:12000});
   // Draft restoration after navigation/reload remains bound to the original version.
   await page.locator(`[data-schedule-id="${id}"]`).first().click();await page.locator('#scheduleForm [name="title"]').fill('可恢复的编辑');
+  await page.evaluate(()=>{const draft=listUnsavedDrafts().find(entry=>entry.domain==='schedule').draft;draft.data.form.url=draft.data.form.meetingInfo;delete draft.data.form.meetingInfo;writeDraft('schedule',draft.base,draft.data);});
   await page.reload();await page.waitForFunction(()=>serverMode);await page.locator('[data-module="schedule"]').click();await page.locator('[data-schedule="restore"]').waitFor();
   await page.locator('[data-schedule="restore"]').click();assert.equal(await page.locator('#scheduleForm [name="title"]').inputValue(),'可恢复的编辑');
+  assert.equal(await page.locator('#scheduleForm [name="meetingInfo"]').inputValue(),meetingInfo,'A blocked URL-field draft recovers its meeting number');
   await page.locator('#scheduleForm [type="submit"]').click();await page.waitForFunction(()=>!window.toudiSchedule.hasDraft());
   assert.equal(await page.evaluate(()=>listUnsavedDrafts().filter(row=>row.domain==='schedule').length),0);
   // Native sync UI tested with a deterministic bridge; actual EventKit permission is separate.
@@ -94,7 +120,9 @@ const write=(relative,data)=>{const target=path.join(workspace,relative);fs.mkdi
   await page.waitForFunction(()=>window.__scheduleCalls.some(call=>call.action==='sync'&&call.request.items.length===1));
   const call=await page.evaluate(()=>window.__scheduleCalls.filter(call=>call.action==='sync'&&call.request.items.length===1).at(-1));
   assert.equal(call.request.items[0].id,id);assert.equal(call.request.items[0].notes,current.data.events[0].notes);
-  const ics=await context.request.get(origin+'/api/schedule.ics');assert(ics.ok());assert((await ics.text()).includes('BEGIN:VEVENT'));
+  assert.equal(call.request.items[0].meetingInfo,meetingInfo);assert.equal(call.request.items[0].url,'');
+  const ics=await context.request.get(origin+'/api/schedule.ics');assert(ics.ok());const icsText=(await ics.text()).replace(/\r\n /g,'');assert(icsText.includes('BEGIN:VEVENT'));
+  assert(icsText.includes('入会信息：会议号：123 456 789\\n入会密码：0123'));assert(!icsText.includes('\r\nURL:'));
   await page.locator('[data-schedule-mode="agenda"]').click();
   await page.locator('[data-schedule-id="'+id+'"]').first().click();await page.locator('[data-schedule="delete"]').click();
   await page.waitForFunction(()=>window.__scheduleCalls.some(call=>call.action==='sync'&&call.request.items[0]?.status==='cancelled'));
@@ -118,6 +146,6 @@ const write=(relative,data)=>{const target=path.join(workspace,relative);fs.mkdi
   await page.waitForFunction(()=>window.toudiSchedule.get().calendar.enabled===false);
   assert.equal(await page.locator('#scheduleNotice').isVisible(),false,'Optional connection config defaults safely');
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'日程浏览器验收.json'),JSON.stringify({runtime:signal.version,checks:['empty calendar layout','CRUD + readback + reload','original full notes','shared company association','week/month/list','actual mouse drag and resize persisted','unplanned precision','source date precision','Agent live update','conflict preserves both sides','durable draft recovery','native bridge contract','cancel keeps tombstone and syncs removal','ICS excludes cancelled items','restore cancelled item through Agent','ICS export','dark mode','compact desktop and narrow viewport'],errors},null,2));
+  fs.writeFileSync(path.join(out,'日程浏览器验收.json'),JSON.stringify({runtime:signal.version,checks:['empty calendar layout','CRUD + readback + reload','meeting ID and multiline instructions saved intact','legacy URL-only records preserved','replacing URL with meeting ID clears stale link','read-only meeting information display','original full notes','shared company association','week/month/list','actual mouse drag and resize persisted','unplanned precision','source date precision','Agent live update','conflict preserves both sides','old URL-field draft recovery','native bridge includes meetingInfo with unchanged notes','cancel keeps tombstone and syncs removal','ICS excludes cancelled items','restore cancelled item through Agent','ICS export retains meeting information without invalid URL','dark mode','compact desktop and narrow viewport'],errors},null,2));
   console.log('PASS '+signal.version+' schedule workflow');
 })().catch(async error=>{console.error(error);for(const context of browser?.contexts()||[])for(const page of context.pages()){console.error((await page.locator('body').innerText()).slice(-6000));await page.screenshot({path:path.join(out,'日程_失败排查.png')}).catch(()=>{});}process.exitCode=1}).finally(async()=>{await browser?.close();if(service&&service.exitCode===null){service.stdin.write('shutdown\n');await once(service,'exit');}fs.rmSync(workspace,{recursive:true,force:true});});

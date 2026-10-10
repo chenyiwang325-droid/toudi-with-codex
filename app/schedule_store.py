@@ -56,7 +56,7 @@ def validate(pack):
         raise ValueError('日程 events 必须为数组，最多 10000 项')
     ids = set()
     allowed = {'id', 'title', 'type', 'status', 'start', 'end', 'allDay', 'timeZone',
-               'companyKey', 'prepId', 'reviewId', 'location', 'url', 'notes',
+               'companyKey', 'prepId', 'reviewId', 'location', 'url', 'meetingInfo', 'notes',
                'priority', 'estimatedMinutes', 'reminderMinutes', 'syncToCalendar'}
     for event in rows:
         if not isinstance(event, dict) or set(event) - allowed:
@@ -84,7 +84,7 @@ def validate(pack):
             first = parse_time(start)
             if end is not None and parse_time(end) <= first:
                 raise ValueError('结束时间必须晚于开始时间')
-        for key in ('companyKey', 'prepId', 'reviewId', 'location', 'url', 'notes'):
+        for key in ('companyKey', 'prepId', 'reviewId', 'location', 'url', 'meetingInfo', 'notes'):
             if key in event and (not isinstance(event[key], str) or len(event[key]) > (30000 if key == 'notes' else 2048)):
                 raise ValueError('日程关联或说明格式无效')
         if event.get('url'):
@@ -141,8 +141,11 @@ def export_ics(pack, workspace_key, ids=None):
             lines.append('DTSTART:' + parse_time(row['start']).astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ'))
             if row.get('end'):
                 lines.append('DTEND:' + parse_time(row['end']).astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ'))
-        for field, prop in [('location', 'LOCATION'), ('notes', 'DESCRIPTION')]:
-            if row.get(field): lines.append(prop + ':' + text(row[field]))
+        if row.get('location'): lines.append('LOCATION:' + text(row['location']))
+        description = row.get('notes', '')
+        if row.get('meetingInfo'):
+            description += ('\n\n' if description else '') + '入会信息：' + row['meetingInfo']
+        if description: lines.append('DESCRIPTION:' + text(description))
         if row.get('url'): lines.append('URL:' + row['url'].replace('\r', '').replace('\n', ''))
         if row.get('reminderMinutes') is not None:
             lines += ['BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + text(row['title']),

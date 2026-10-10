@@ -16,6 +16,8 @@ struct Item {
     notes: String,
     location: String,
     url: String,
+    #[serde(default)]
+    meeting_info: String,
     status: String,
     reminder_minutes: Option<i64>,
 }
@@ -81,6 +83,17 @@ fn check_binding(
 }
 fn denied_results(items: Vec<Item>) -> Vec<Value> {
     items.into_iter().map(|i| json!({"id":i.id,"ok":false,"operation":"blocked","error":"需要完整日历权限，请主动连接日历"})).collect()
+}
+fn calendar_notes(i: &Item, marker: &str) -> String {
+    let mut notes = i.notes.clone();
+    if !i.meeting_info.is_empty() {
+        if !notes.is_empty() {
+            notes.push_str("\n\n");
+        }
+        notes.push_str("入会信息：");
+        notes.push_str(&i.meeting_info);
+    }
+    format!("{notes}\n{marker}")
 }
 fn authorization_request_needed(action: &str, status: i64) -> bool {
     // Permission is stored by macOS, not an App preference. Only an explicit
@@ -155,6 +168,7 @@ fn validate(r: &Request) -> Result<(), String> {
             || i.notes.chars().count() > 30000
             || i.location.chars().count() > 2048
             || i.url.chars().count() > 2048
+            || i.meeting_info.chars().count() > 2048
             || !matches!(i.status.as_str(), "planned" | "completed" | "cancelled")
             || i.reminder_minutes
                 .is_some_and(|n| !(0..=43200).contains(&n))
@@ -427,7 +441,7 @@ mod native {
                             msg_send![class!(NSTimeZone),timeZoneWithName:&*string(&i.time_zone)];
                         let _: () = msg_send![&*event,setTimeZone:&*zone];
                         let _: () =
-                            msg_send![&*event,setNotes:&*string(&format!("{}\n{}",i.notes,marker))];
+                            msg_send![&*event,setNotes:&*string(&calendar_notes(&i,&marker))];
                         let _: () = msg_send![&*event,setLocation:&*string(&i.location)];
                         let url: Option<Retained<AnyObject>> = if i.url.is_empty() {
                             None
@@ -486,6 +500,45 @@ mod tests {
     use super::*;
     fn item() -> Item {
         serde_json::from_value(json!({"id":"synthetic_1","title":"示例","start":"2026-10-10","end":null,"allDay":true,"timeZone":"Asia/Shanghai","notes":"","location":"","url":"","status":"planned","reminderMinutes":15})).unwrap()
+    }
+    #[test]
+    fn meeting_information_is_plain_text_and_preserves_full_notes() {
+        let mut i = item();
+        assert!(i.meeting_info.is_empty(), "Older requests without meetingInfo remain supported");
+        i.notes = "完整备注\n保留第二行。".into();
+        let marker = "[TouDi:synthetic:synthetic_1]";
+        assert_eq!(calendar_notes(&i, marker), format!("{}\n{marker}", i.notes));
+        i.meeting_info = "123 456 789\n密码：0123".into();
+        let r = Request {
+            workspace_key: "synthetic".into(),
+            calendar_id: "synthetic".into(),
+            items: vec![i.clone()],
+            revision: "1".into(),
+        };
+        assert!(validate(&r).is_ok());
+        assert!(i.url.is_empty());
+        assert_eq!(calendar_notes(&i, marker), format!("{}\n\n入会信息：{}\n{marker}", i.notes, i.meeting_info));
+        i.notes.clear();
+        assert_eq!(calendar_notes(&i, marker), format!("入会信息：{}\n{marker}", i.meeting_info));
+    }
+    #[test]
+    fn meeting_info_has_its_own_boundary_and_does_not_relax_url_validation() {
+        let mut r = Request {
+            workspace_key: "synthetic".into(),
+            calendar_id: "synthetic".into(),
+            items: vec![item()],
+            revision: "1".into(),
+        };
+        r.items[0].meeting_info = "文".repeat(2048);
+        r.items[0].notes = "文".repeat(30000);
+        assert!(validate(&r).is_ok());
+        r.items[0].meeting_info.push('文');
+        assert!(validate(&r).is_err());
+        r.items[0].meeting_info = "123456789".into();
+        r.items[0].url = "123456789".into();
+        assert!(validate(&r).is_err());
+        r.items[0].url = "https://example.invalid/join".into();
+        assert!(validate(&r).is_ok());
     }
     #[test]
     fn authorization_is_idempotent_and_never_requested_by_reads_or_sync() {

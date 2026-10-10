@@ -50,10 +50,34 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(result['prepId'],'old-material')
     def test_invalid_input_leaves_disk_unchanged(self):
         self.save(action='upsert',item=event());before=self.w.inventory()
-        for changes in ({'start':'2026-02-30T10:00:00Z'}, {'start':'2026-10-09T10:00:00'}, {'end':'2026-10-09T09:00:00+08:00'}, {'timeZone':'bad/zone'}, {'priority':True}, {'url':'https://name:password@example.invalid/'}, {'id':'../escape'}):
+        for changes in ({'start':'2026-02-30T10:00:00Z'}, {'start':'2026-10-09T10:00:00'}, {'end':'2026-10-09T09:00:00+08:00'}, {'timeZone':'bad/zone'}, {'priority':True}, {'url':'https://name:password@example.invalid/'}, {'meetingInfo':123456789}, {'meetingInfo':'x'*2049}, {'id':'../escape'}):
             with self.subTest(changes=changes), self.assertRaises(ValueError): self.save(action='upsert',item=event(**changes))
         self.assertEqual(self.w.inventory(),before)
         with self.assertRaises(ValueError): self.w.validate('schedule',{**schedule_store.empty(),'events':[event(),event()]})
+    def test_meeting_number_and_instructions_survive_save_restart_and_backup(self):
+        info='会议号：123 456 789\n入会密码：0123\n请提前五分钟进入会议。'
+        self.save(action='upsert',item=event(meetingInfo=info,url=''))
+        self.assertEqual(workbench.Workbench(self.w.root).read('schedule')['events'][0]['meetingInfo'],info)
+        backup=self.w.backup()
+        self.save(action='upsert',item={'id':'synthetic-item','meetingInfo':'修改后的会议号'})
+        self.w.restore(backup,self.w.version())
+        self.assertEqual(self.w.read('schedule')['events'][0]['meetingInfo'],info)
+    def test_meeting_information_exports_as_description_not_invalid_url(self):
+        info='123 456 789\n密码：0123；保留原文'
+        self.save(action='upsert',item=event(meetingInfo=info,url=''))
+        content=schedule_store.export_ics(self.w.read('schedule'),'synthetic').decode().replace('\r\n ','')
+        self.assertIn('DESCRIPTION:'+schedule_store.text(event()['notes']+'\n\n入会信息：'+info),content)
+        self.assertNotIn('\r\nURL:',content)
+    def test_legacy_url_and_new_url_information_remain_exportable(self):
+        link='https://example.invalid/join?meeting=123456789'
+        self.save(action='upsert',item=event(url=link))
+        content=schedule_store.export_ics(self.w.read('schedule'),'synthetic').decode().replace('\r\n ','')
+        self.assertIn('URL:'+link,content)
+        self.assertNotIn('meetingInfo',self.w.read('schedule')['events'][0])
+        self.save(action='upsert',item={'id':'synthetic-item','meetingInfo':link})
+        result=workbench.Workbench(self.w.root).read('schedule')['events'][0]
+        self.assertEqual(result['url'],link)
+        self.assertEqual(result['meetingInfo'],link)
     def test_unplanned_and_point_dates_preserve_precision(self):
         self.save(action='upsert',item=event(start=None,end=None))
         self.assertEqual(self.w.read('schedule')['events'][0]['start'],None)
