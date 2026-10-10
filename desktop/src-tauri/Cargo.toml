@@ -1,6 +1,6 @@
 [package]
 name = "toudi"
-version = "0.6.4"
+version = "0.6.5"
 description = "TouDi personal application workbench"
 authors = ["TouDi contributors"]
 edition = "2021"

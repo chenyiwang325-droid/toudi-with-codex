@@ -28,7 +28,8 @@ const write=(relative,data)=>{const target=path.join(workspace,relative);fs.mkdi
   await page.locator('#scheduleForm [name="title"]').fill('示例企业A · 面试');
   await page.locator('#scheduleForm [name="type"]').selectOption('interview');
   const date=await page.locator('#scheduleForm [name="date"]').inputValue();
-  await page.locator('#scheduleForm [name="companyKey"]').selectOption('示例企业A');
+  await page.locator('#scheduleCompanyQuery').fill('示例企业A');
+  await page.locator('#scheduleCompanyList [role=option]').filter({hasText:'示例企业A'}).click();
   await page.locator('#scheduleForm [name="notes"]').fill('完整备注：核对岗位职责、整理项目经历。\n保留第二行。');
   await page.locator('#scheduleForm [type="submit"]').click();
   await page.getByText('日程已保存',{exact:true}).waitFor();

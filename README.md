@@ -26,7 +26,7 @@
 
 ## 开始使用
 
-**默认使用方式是 TouDi App、Codex 和 Chrome 扩展，个人资料保存在电脑上。** 当前源码为 **v0.6.4 macOS Apple Silicon 预览版**；可下载平台与版本以 [Releases 实际附件](https://github.com/chenyiwang325-droid/toudi-with-codex/releases)为准。App 自带运行组件，不需要另外启动 Python 服务。
+**默认使用方式是 TouDi App、Codex 和 Chrome 扩展，个人资料保存在电脑上。** 当前源码为 **v0.6.5 macOS Apple Silicon 预览版**；可下载平台与版本以 [Releases 实际附件](https://github.com/chenyiwang325-droid/toudi-with-codex/releases)为准。App 自带运行组件，不需要另外启动 Python 服务。
 
 1. **安装 TouDi。** 下载对应安装包，按[桌面安装说明](docs/桌面安装与使用.md)打开。首次使用从空工作区开始；已有资料继续使用原工作区。
 2. **让 Codex 初始化。** 在本机 Codex 中提供招聘信源、简历和本次任务，发送[开始指南中的启动消息](docs/开始与初始化.md#3-让-codex-完成初始化)。Codex 确认绑定工作区、整理资料，并根据指定信源核对默认分类。

@@ -1024,7 +1024,7 @@ input:not([type="checkbox"]),textarea,select { transition:background-color var(-
       <div class="stats-bar" id="statsBar"></div>
       <div class="record-query" role="search" aria-label="检索投递记录">
         <svg class="query-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-        <input type="search" id="searchInput" placeholder="搜索公司、岗位…" aria-label="搜索投递记录" autocomplete="off" oninput="if(!event.isComposing)onSearch()" oncompositionend="onSearch()">
+      <input type="search" id="searchInput" placeholder="搜索公司、岗位…" aria-label="搜索投递记录" autocomplete="off">
         <button type="button" class="query-filter" id="recordFilterButton" onclick="openFilters()" aria-haspopup="dialog" aria-controls="filterModal" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--bg)"/><circle cx="15" cy="12" r="2" fill="var(--bg)"/><circle cx="9" cy="18" r="2" fill="var(--bg)"/></svg><span>筛选</span><span id="recordFilterCount" class="query-filter-count" hidden></span></button>
       </div>
     </div>
@@ -1625,6 +1625,15 @@ function onFilterChange(input) {
 }
 
 function onSearch() { searchQuery = document.getElementById('searchInput').value.trim().toLowerCase(); currentPage = 1; selected.clear(); render(); }
+function bindRecordSearch(){
+  const input=document.getElementById('searchInput');
+  if(!input||input.dataset.searchBound)return;
+  input.dataset.searchBound='true';
+  // Keep the same filter contract for native WebKit, IME input and the search
+  // field's clear button. Rendering retains the input node and its focus.
+  for(const name of ['input','search','change'])input.addEventListener(name,onSearch);
+  input.addEventListener('compositionend',()=>{onSearch();requestAnimationFrame(onSearch);});
+}
 
 function resetFilters() {
   filters = {}; searchQuery = ''; currentQV = 'all';
@@ -3287,6 +3296,7 @@ const originalSwitch=switchView;switchView=function(v){ensureViewData(v);if(v===
 function revealModule(){const id=({table:'tableView',kanban:'kanbanView',charts:'chartsView',qbank:'qbView',review:'reviewView',prospect:'prospectView',schedule:'scheduleView',settings:'settingsView'})[view],el=document.getElementById(id);if(!el)return;el.classList.remove('module-enter');void el.offsetWidth;el.classList.add('module-enter');}
 function refreshWorkspaceChrome(){const managementEntry=document.getElementById('managementEntry');if(managementEntry)managementEntry.hidden=['settings','schedule'].includes(view);document.getElementById('settingsShortcut').hidden=view==='settings';updateDirectoryControls();applyTheme();const dashboard=['table','kanban','charts'].includes(view);document.body.classList.toggle('content-module',!dashboard);document.body.classList.toggle('reader-module',['qbank','review','prospect'].includes(view));document.getElementById('quickViews').style.display=dashboard?'':'none';document.getElementById('deliverySearchEntry').hidden=!dashboard;document.getElementById('columnMenuButton').hidden=view!=='table'||innerWidth<=900;document.querySelectorAll('.module-nav button').forEach(b=>b.classList.toggle('active',b.dataset.module===(dashboard?'delivery':view)));document.getElementById('deliveryModes').style.display=dashboard?'':'none';if(document.getElementById('sidebar').classList.contains('open'))toggleSidebar();}
 function initWorkspaceUI(){
+ bindRecordSearch();
  if(window.__SNAPSHOT__){document.getElementById('storageBadge').textContent='只读快照 · 个人记录不可编辑';}
  pageSize=Number(workspace.pageSize)||50;
  document.getElementById('tableView').insertAdjacentHTML('afterbegin','<div id="mobileRecords" class="mobile-records"></div>');

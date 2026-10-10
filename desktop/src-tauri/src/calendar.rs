@@ -50,7 +50,31 @@ fn check_binding(
     if b.calendar_id != calendar || b.marker != marker {
         return Err("绑定属于其他日历，请先处理原绑定".into());
     }
-    if !notes.ends_with(marker) || &b.snapshot != snapshot {
+    let mut expected = b.snapshot.as_object().cloned().ok_or("日历绑定内容无效")?;
+    let mut actual = snapshot.as_object().cloned().ok_or("系统日历内容无效")?;
+    // EventKit/iCloud can update modification metadata without changing the
+    // event. Compare the content we own, including URL, time zone and alarms.
+    expected.remove("modified");
+    actual.remove("modified");
+    for key in ["url", "timeZone"] {
+        if actual.contains_key(key) && !expected.contains_key(key) {
+            let value = b.source.get(key).filter(|value| value.is_string())
+                .ok_or("旧日历绑定缺少完整内容，请核对后处理")?;
+            expected.insert(key.into(), value.clone());
+        }
+    }
+    if actual.contains_key("alarms") && !expected.contains_key("alarms") {
+        let value = b.source.get("reminderMinutes")
+            .ok_or("旧日历绑定缺少提醒信息，请核对后处理")?;
+        let alarms = if value.is_null() {
+            json!([])
+        } else {
+            let minutes = value.as_i64().ok_or("旧日历绑定提醒信息无效")?;
+            json!([{"relative":-(minutes as f64)*60.,"absolute":null}])
+        };
+        expected.insert("alarms".into(), alarms);
+    }
+    if !notes.ends_with(marker) || expected != actual {
         return Err("系统事件已被外部修改，保留双方内容并请人工核对".into());
     }
     Ok(())
@@ -225,17 +249,31 @@ mod native {
         let end: *mut AnyObject = msg_send![e, endDate];
         let s: f64 = msg_send![start, timeIntervalSince1970];
         let t: f64 = msg_send![end, timeIntervalSince1970];
-        let modified: *mut AnyObject = msg_send![e, lastModifiedDate];
-        let m: f64 = if modified.is_null() {
-            0.
-        } else {
-            msg_send![modified, timeIntervalSince1970]
-        };
         let all: Bool = msg_send![e, isAllDay];
         let cal: *mut AnyObject = msg_send![e, calendar];
-        json!({"title":field(e,sel!(title)),"notes":field(e,sel!(notes)),"location":field(e,sel!(location)),"start":s,"end":t,"allDay":all.as_bool(),"modified":m,"calendar":text(msg_send![cal,calendarIdentifier])})
+        let url: *mut AnyObject = msg_send![e, URL];
+        let url = if url.is_null() { String::new() } else { text(msg_send![url, absoluteString]) };
+        let zone: *mut AnyObject = msg_send![e, timeZone];
+        let zone = if zone.is_null() { String::new() } else { text(msg_send![zone, name]) };
+        let native_alarms: *mut AnyObject = msg_send![e, alarms];
+        let mut alarms = Vec::new();
+        if !native_alarms.is_null() {
+            let count: usize = msg_send![native_alarms, count];
+            for idx in 0..count {
+                let alarm: *mut AnyObject = msg_send![native_alarms, objectAtIndex:idx];
+                let relative: f64 = msg_send![alarm, relativeOffset];
+                let date: *mut AnyObject = msg_send![alarm, absoluteDate];
+                let absolute: Option<f64> = if date.is_null() { None } else { Some(msg_send![date, timeIntervalSince1970]) };
+                alarms.push(json!({"relative":relative,"absolute":absolute}));
+            }
+            alarms.sort_by_key(Value::to_string);
+        }
+        json!({"title":field(e,sel!(title)),"notes":field(e,sel!(notes)),"location":field(e,sel!(location)),"start":s,"end":t,"allDay":all.as_bool(),"calendar":text(msg_send![cal,calendarIdentifier]),"url":url,"timeZone":zone,"alarms":alarms})
     }
     fn path(key: &str) -> Result<PathBuf, String> {
+        if let Some(root) = std::env::var_os("TOUDI_APP_HOME") {
+            return Ok(PathBuf::from(root).join("calendar-bindings").join(format!("{key}.json")));
+        }
         let home = std::env::var_os("HOME").ok_or("无法读取本机资料位置")?;
         Ok(PathBuf::from(home)
             .join("Library/Application Support/TouDi/calendar-bindings")
@@ -262,8 +300,9 @@ mod native {
             if action == "authorize" {
                 let (tx, rx) = std::sync::mpsc::channel();
                 let completion =
-                    block2::RcBlock::new(move |granted: Bool, _error: *mut AnyObject| {
-                        let _ = tx.send(granted.as_bool());
+                    block2::RcBlock::new(move |granted: Bool, error: *mut AnyObject| {
+                        let message = if error.is_null() { None } else { Some(text(msg_send![error, localizedDescription])) };
+                        let _ = tx.send((granted.as_bool(), message));
                     });
                 let modern: Bool = msg_send![&*store,respondsToSelector:sel!(requestFullAccessToEventsWithCompletion:)];
                 if modern.as_bool() {
@@ -272,8 +311,17 @@ mod native {
                 } else {
                     let _: () = msg_send![&*store,requestAccessToEntityType:0_isize,completion:&*completion];
                 }
-                rx.recv_timeout(std::time::Duration::from_secs(120))
+                let (granted, error) = rx.recv_timeout(std::time::Duration::from_secs(120))
                     .map_err(|_| "等待日历授权超时，请重新检查权限状态")?;
+                if let Some(error) = error {
+                    return Ok(json!({"supported":true,"authorization":auth_name(auth()),"granted":granted,"error":error}));
+                }
+                if !granted && auth() == 0 {
+                    return Ok(json!({"supported":true,"authorization":"notDetermined","granted":false,"error":"macOS 未完成日历授权，请检查系统提示；若没有提示，请更新 App 后重试。"}));
+                }
+                // Refresh this store after the OS changes authorization. Never
+                // carry pre-authorization event caches into the authorized read.
+                if granted { let _: () = msg_send![&*store, reset]; }
             }
             let authorization = auth_name(auth());
             if matches!(action, "status" | "authorize") {
@@ -546,5 +594,27 @@ mod tests {
             &json!({"title":"local"})
         )
         .is_err());
+    }
+    #[test]
+    fn metadata_changes_preserve_semantic_binding_and_legacy_owned_fields() {
+        let mut source = item();
+        source.url = "https://example.invalid/event".into();
+        let marker = "[TouDi:example:synthetic]";
+        let old = json!({"title":"示例","notes":format!("完整备注\n{marker}"),"location":"示例地点","start":1.,"end":2.,"allDay":false,"calendar":"example","modified":100.});
+        let b = Binding {event_id:"synthetic".into(),calendar_id:"example".into(),marker:marker.into(),snapshot:old.clone(),source:serde_json::to_value(&source).unwrap()};
+        let mut current = old;
+        current["modified"] = json!(200.);
+        current["url"] = json!(source.url);
+        current["timeZone"] = json!(source.time_zone);
+        current["alarms"] = json!([{"relative":-900.,"absolute":null}]);
+        assert!(check_binding(&b,"example",marker,current["notes"].as_str().unwrap(),&current).is_ok());
+        for field in ["title","notes","location","start","end","allDay","calendar","url","timeZone","alarms"] {
+            let mut changed = current.clone();
+            changed[field] = json!("external change");
+            assert!(check_binding(&b,"example",marker,current["notes"].as_str().unwrap(),&changed).is_err(),"{field}");
+        }
+        let mut incomplete = b;
+        incomplete.source = Value::Null;
+        assert!(check_binding(&incomplete,"example",marker,current["notes"].as_str().unwrap(),&current).is_err());
     }
 }

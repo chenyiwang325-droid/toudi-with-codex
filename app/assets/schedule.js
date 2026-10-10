@@ -10,7 +10,9 @@
   let rangeTitle='';
   let mode='timeGridWeek', editing=null, form=null, editorBase='', saving=false, dirty=false, lastError='';
   let activeRecovery=null;
+  let previewChanging=false, companyData=null, companyIndex=[];
   let nativeStatus=null, nativeCalendars=[], syncRunning=false, syncResults=[], lastSync='', connectionOpen=false;
+  let connectionTask=null, connectionBusy='';
   const host=document.createElement('section'); host.id='scheduleView'; host.style.display='none';
   host.innerHTML=`<div class="schedule-toolbar"><div class="schedule-navigation"><button class="btn" data-schedule="today">今天</button><button class="btn schedule-icon" data-schedule="prev" aria-label="上一周或月">${arrow(false)}</button><button class="btn schedule-icon" data-schedule="next" aria-label="下一周或月">${arrow(true)}</button><h2 id="scheduleRange">日程</h2></div><div class="schedule-tools"><div class="schedule-tabs" role="group" aria-label="日程视图">${[['timeGridWeek','周'],['dayGridMonth','月'],['agenda','列表']].map(([key,name])=>`<button data-schedule-mode="${key}" aria-pressed="${mode===key}">${name}</button>`).join('')}</div><button class="btn" data-schedule="connect">日历连接</button><button class="btn btn-primary" data-schedule="new">新增事项</button></div></div><div id="scheduleNotice" class="schedule-notice" role="status" hidden></div><div class="schedule-layout"><div class="schedule-canvas"><div id="scheduleCalendar"></div><div id="scheduleAgenda" hidden></div></div><aside id="scheduleInspector" aria-label="事项与编辑"></aside></div><footer class="schedule-footer"><span id="scheduleSummary"></span><span id="scheduleSyncStatus"></span><button class="schedule-link" data-schedule="export">导出日历</button></footer>`;
   document.querySelector('.content').append(host);
@@ -30,7 +32,7 @@
     if([-3600000,3600000].some(delta=>day(epoch+delta,zone)===date&&time(epoch+delta,zone)===clock))throw Error('该时间在当前时区重复出现，请通过 Agent 指定带偏移的时间');
     return new Date(epoch).toISOString();
   }
-  function notice(message,actions=''){const box=$('scheduleNotice');box.hidden=!message;box.innerHTML=message?`<span>${esc(message)}</span>${actions}`:'';}
+  function notice(message,actions='',owner=''){const box=$('scheduleNotice');box.dataset.owner=owner;box.hidden=!message;box.innerHTML=message?`<span>${esc(message)}</span>${actions}`:'';}
   function exactSourceDay(input){
     const value=String(input||'').trim();
     const parts=value.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)||value.match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日$/)||value.match(/^(\d{4})(\d{2})(\d{2})$/);
@@ -97,10 +99,18 @@
           // The all-day lane counts the more link as one of its three rows.
           views:{dayGridMonth:{dayMaxEvents:true,dayMaxEventRows:true},timeGrid:{dayMaxEvents:false,dayMaxEventRows:3}},
           moreLinkText:num=>`+${num} 项`,moreLinkClass:'schedule-more',popoverClass:'schedule-popover',
-          eventOrder:'-priority,start,allDay,title',eventMinHeight:28,selectMirror:true,events:calendarEvents(),
+          eventOrder:'-priority,start,allDay,title',eventMinHeight:28,selectMirror:true,unselectAuto:false,events:calendarEvents(),
           dayLaneClass:info=>info.isToday?'schedule-today':'',
-          dateClick:info=>open(null,{date:info.dateStr.slice(0,10),startTime:info.allDay?'09:00':info.dateStr.slice(11,16),allDay:info.allDay}),
-          select:info=>{open(null,{date:info.startStr.slice(0,10),endDate:info.allDay?addDay(info.endStr.slice(0,10),-1):info.endStr.slice(0,10),startTime:info.allDay?'09:00':info.startStr.slice(11,16),endTime:info.allDay?'10:00':info.endStr.slice(11,16),allDay:info.allDay});calendar.unselect();},
+          dateClick:info=>{
+            const start=info.allDay?info.dateStr.slice(0,10)+'T09:00':info.dateStr.slice(0,16),end=new Date(Date.parse(start+'Z')+60*60000).toISOString();
+            open(null,{date:start.slice(0,10),endDate:end.slice(0,10),startTime:start.slice(11,16),endTime:end.slice(11,16),allDay:info.allDay});
+          },
+          select:info=>{
+            if(previewChanging)return;
+            const seed={scheduled:true,hasEnd:true,date:info.startStr.slice(0,10),endDate:info.allDay?addDay(info.endStr.slice(0,10),-1):info.endStr.slice(0,10),startTime:info.allDay?'09:00':info.startStr.slice(11,16),endTime:info.allDay?'10:00':info.endStr.slice(11,16),allDay:info.allDay,timeZone:pack.timeZone};
+            if(editing&&form){collect();Object.assign(form,seed);for(const [name,value] of Object.entries(seed)){const node=$('scheduleForm')?.elements[name];if(node){if(node.type==='checkbox')node.checked=value;else node.value=value;}}changed();renderEditor();}
+            else open(null,seed);
+          },
           eventClick:info=>{info.jsEvent.preventDefault();info.event.extendedProps.source?showSource(info.event.extendedProps.companyKey):open(info.event.id);},
           eventDrop:changeDate,eventResize:changeDate,
           datesSet:info=>{const first=info.startStr.slice(0,10),last=addDay(info.endStr.slice(0,10),-1);rangeTitle=mode==='timeGridWeek'?first.replace(/-/g,' / ')+' — '+last.slice(5).replace('-',' / '):info.view.title;$('scheduleRange').textContent=rangeTitle;},
@@ -123,7 +133,7 @@
   function update(){
     if(!loaded)return;
     $('scheduleCalendar').dataset.view=mode;
-    if(calendar){calendar.setOption('timeZone',pack.timeZone);calendar.setOption('editable',writable()&&!saving);calendar.batchRendering(()=>{calendar.getEventSources().forEach(source=>source.remove());calendar.addEventSource(calendarEvents());});}
+    if(calendar){calendar.setOption('timeZone',pack.timeZone);calendar.setOption('editable',writable()&&!saving);calendar.batchRendering(()=>{calendar.getEventSources().forEach(source=>source.remove());calendar.addEventSource(calendarEvents());});updatePreview();}
     $('scheduleCalendar').hidden=mode==='agenda';$('scheduleAgenda').hidden=mode!=='agenda';
     if(mode==='agenda')agenda();
     host.querySelectorAll('[data-schedule-mode]').forEach(button=>button.setAttribute('aria-pressed',button.dataset.scheduleMode===mode));
@@ -159,20 +169,77 @@
     host.classList.add('schedule-panel-open');editing=id||'new';form=event?formFor(event):defaults(seed);editorBase=version;dirty=false;connectionOpen=false;notice('');renderEditor();
   }
   function optionRows(list,value){return list.map(([id,text])=>`<option value="${esc(id)}" ${id===value?'selected':''}>${esc(text)}</option>`).join('');}
+  function clearPreview(){
+    if(!calendar)return;
+    previewChanging=true;try{calendar.unselect();}finally{previewChanging=false;}
+    delete $('scheduleCalendar').dataset.previewStart;delete $('scheduleCalendar').dataset.previewEnd;
+  }
+  function updatePreview(){
+    if(!calendar)return;
+    if(!editing||!form?.scheduled){clearPreview();return;}
+    try{
+      const start=form.allDay?form.date:localISO(form.date,form.startTime,form.timeZone);
+      // An undetermined end stays undetermined in the saved record. Only its
+      // visual preview occupies one slot, so a draft never creates an event.
+      const end=form.allDay?addDay(form.endDate,1):form.hasEnd?localISO(form.endDate,form.endTime,form.timeZone):new Date(new Date(start).getTime()+30*60000).toISOString();
+      if(!start||!end||(form.allDay?end<=start:new Date(end)<=new Date(start))){clearPreview();return;}
+      previewChanging=true;try{calendar.select({start,end,allDay:form.allDay});}finally{previewChanging=false;}
+      $('scheduleCalendar').dataset.previewStart=start;$('scheduleCalendar').dataset.previewEnd=end;
+    }catch(_){clearPreview();}
+  }
+  function companyChoices(query){
+    if(companyData!==data){companyData=data;companyIndex=data.map(row=>({key:row._key,title:row.名称||'',detail:[row.岗位,row.地点].filter(Boolean).join(' · '),search:[row.名称,row.岗位,row.地点].join(' ').toLocaleLowerCase()}));}
+    const words=query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean),matches=[];
+    for(const row of companyIndex){if(words.every(word=>row.search.includes(word)))matches.push(row);if(matches.length===20)break;}
+    return matches;
+  }
+  function bindCompanyPicker(){
+    const editor=$('scheduleForm'),input=$('scheduleCompanyQuery'),list=$('scheduleCompanyList'),clear=$('scheduleCompanyClear'),wrap=input.closest('.schedule-company-picker');
+    let choices=[],active=-1;
+    const close=()=>{list.hidden=true;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');active=-1;};
+    function select(key){
+      editor.elements.companyKey.value=key;form.companyKey=key;
+      input.value=key?(rowByKey(key)?.名称||'原招聘记录已移除'):'';input.dataset.boundTitle=input.value;
+      clear.hidden=!key;close();changed();updateCompanyLinks();
+    }
+    function show(){
+      choices=companyChoices(input.value);active=-1;
+      list.innerHTML=choices.length?choices.map((row,i)=>`<button type="button" role="option" aria-selected="${row.key===form.companyKey}" id="scheduleCompanyOption${i}" data-company-key="${esc(row.key)}"><strong>${esc(row.title)}</strong><small>${esc(row.detail)}</small></button>`).join(''):'<p class="schedule-picker-empty">未找到公司，可试试岗位或地点</p>';
+      list.hidden=false;input.setAttribute('aria-expanded','true');input.removeAttribute('aria-activedescendant');
+      const body=wrap.closest('.schedule-inspector-body');wrap.classList.toggle('schedule-picker-up',body.getBoundingClientRect().bottom-wrap.getBoundingClientRect().bottom<180);
+    }
+    input.addEventListener('focus',show);
+    input.addEventListener('input',event=>{event.stopPropagation();show();});
+    input.addEventListener('change',event=>event.stopPropagation());
+    input.addEventListener('keydown',event=>{
+      if(event.isComposing)return;
+      if(event.key==='Escape'){event.preventDefault();close();input.value=input.dataset.boundTitle;return;}
+      if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();if(list.hidden)show();if(!choices.length)return;active=(active+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length;list.querySelectorAll('[role=option]').forEach((node,i)=>node.classList.toggle('active',i===active));input.setAttribute('aria-activedescendant','scheduleCompanyOption'+active);$('scheduleCompanyOption'+active).scrollIntoView({block:'nearest'});}
+      else if(event.key==='Enter'&&!list.hidden){event.preventDefault();if(choices[active>=0?active:0])select(choices[active>=0?active:0].key);}
+    });
+    list.addEventListener('mousedown',event=>event.preventDefault());
+    list.addEventListener('click',event=>{const button=event.target.closest('[data-company-key]');if(button)select(button.dataset.companyKey);});
+    clear.addEventListener('click',()=>{select('');input.focus();});
+    wrap.addEventListener('focusout',()=>{if(!wrap.contains(document.activeElement)){close();input.value=input.dataset.boundTitle;}});
+  }
+  function updateCompanyLinks(){
+    const editor=$('scheduleForm'),row=rowByKey(form.companyKey),link=$('scheduleCompanyRecord');
+    link.hidden=!row;if(row)link.dataset.scheduleRecord=row._idx;else delete link.dataset.scheduleRecord;
+    for(const [name,items,labelFor] of [['prepId',prepData?.preps||[],row=>row.position||row.company||row.title||'准备文档'],['reviewId',reviewData?.sessions||[],row=>(row.company||'')+' '+(row.date||'')]]){
+      const matches=items.filter(item=>!form.companyKey||item.companyKey===form.companyKey),value=form[name];
+      editor.elements[name].innerHTML=optionRows([['','不关联'],...matches.map(item=>[item.id,labelFor(item)]),...(value&&!matches.some(item=>item.id===value)?[[value,'已关联材料']]:[])],value);
+    }
+  }
   function renderEditor(){
     const field=(name,title,type='text')=>`<label>${title}<input name="${name}" type="${type}" value="${esc(form[name])}"></label>`;
-    const companyRows=[['','不关联公司'],...data.map(row=>[row._key,row.名称])];if(form.companyKey&&!rowByKey(form.companyKey))companyRows.push([form.companyKey,'原招聘记录已移除']);
     const preps=(prepData?.preps||[]).filter(row=>!form.companyKey||row.companyKey===form.companyKey), reviews=(reviewData?.sessions||[]).filter(row=>!form.companyKey||row.companyKey===form.companyKey);
-    $('scheduleInspector').innerHTML=`<div class="schedule-inspector-head"><h3>${editing==='new'?'新增事项':'编辑事项'}</h3><button class="schedule-close" data-schedule="cancel" aria-label="收起编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><form id="scheduleForm" class="schedule-editor"><div class="schedule-inspector-body">${field('title','标题')}<div class="schedule-fields"><label>类型<select name="type">${optionRows(Object.entries(TYPES),form.type)}</select></label><label>状态<select name="status">${optionRows(Object.entries(STATUS),form.status)}</select></label></div><div class="schedule-checks"><label><input type="checkbox" name="scheduled" ${form.scheduled?'checked':''}>安排日期</label><label><input type="checkbox" name="allDay" ${form.allDay?'checked':''}>全天</label></div><div class="schedule-dates" ${form.scheduled?'':'hidden'}><div class="schedule-fields">${field('date','开始日期','date')}${field('endDate','结束日期','date')}</div><div class="schedule-fields" ${form.allDay?'hidden':''}>${field('startTime','开始时间','time')}${field('endTime','结束时间','time')}</div><label class="schedule-check" ${form.allDay?'hidden':''}><input name="hasEnd" type="checkbox" ${form.hasEnd?'checked':''}>结束时间已确定</label></div><label>关联公司<select name="companyKey">${optionRows(companyRows,form.companyKey)}</select></label>${field('location','地点')}${field('url','会议或投递链接','url')}<label>备注<textarea name="notes" rows="3">${esc(form.notes)}</textarea></label><div class="schedule-fields"><label>日历提醒<select name="reminderMinutes">${optionRows([['','不提醒'],['0','开始时'],['10','提前 10 分钟'],['30','提前 30 分钟'],['60','提前 1 小时'],['1440','提前 1 天']],String(form.reminderMinutes))}</select></label><label>优先级<select name="priority">${optionRows([['0','普通'],['1','优先'],['2','重要']],String(form.priority))}</select></label></div><label class="schedule-check"><input type="checkbox" name="syncToCalendar" ${form.syncToCalendar?'checked':''}>同步到本机日历</label><details class="schedule-details"><summary>关联材料与计划信息</summary><label>准备文档<select name="prepId">${optionRows([['','不关联'],...preps.map(row=>[row.id,row.position||row.company||row.title||'准备文档']),...(form.prepId&&!preps.some(row=>row.id===form.prepId)?[[form.prepId,'已关联材料']]:[])],form.prepId)}</select></label><label>复盘记录<select name="reviewId">${optionRows([['','不关联'],...reviews.map(row=>[row.id,(row.company||'')+' '+(row.date||'')]),...(form.reviewId&&!reviews.some(row=>row.id===form.reviewId)?[[form.reviewId,'已关联材料']]:[])],form.reviewId)}</select></label>${field('estimatedMinutes','预计用时（分钟）','number')}<label>时区<select name="timeZone">${optionRows([...new Set([pack.timeZone,form.timeZone,'Asia/Shanghai','UTC'])].map(zone=>[zone,zone]),form.timeZone)}</select></label></details><p id="scheduleFormError" class="schedule-error" role="alert"></p></div><div class="schedule-editor-footer">${editing!=='new'?'<button type="button" class="schedule-link" data-schedule="delete">取消事项</button>':''}<span></span><button type="button" class="btn" data-schedule="cancel">取消</button><button type="submit" class="btn btn-primary">保存</button></div></form>`;
-    const companyField=$('scheduleForm').querySelector('[name="companyKey"]').parentElement;
-    const recordLink=document.createElement('button');recordLink.type='button';recordLink.className='schedule-link schedule-record-link';recordLink.textContent='查看招聘详情';companyField.append(recordLink);
-    function updateRecordLink(){const row=rowByKey($('scheduleForm').elements.companyKey.value);recordLink.hidden=!row;if(row)recordLink.dataset.scheduleRecord=row._idx;else delete recordLink.dataset.scheduleRecord;}
-    updateRecordLink();$('scheduleForm').elements.companyKey.addEventListener('change',updateRecordLink);
+    $('scheduleInspector').innerHTML=`<div class="schedule-inspector-head"><h3>${editing==='new'?'新增事项':'编辑事项'}</h3><button class="schedule-close" data-schedule="cancel" aria-label="收起编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><form id="scheduleForm" class="schedule-editor"><div class="schedule-inspector-body">${field('title','标题')}<div class="schedule-fields"><label>类型<select name="type">${optionRows(Object.entries(TYPES),form.type)}</select></label><label>状态<select name="status">${optionRows(Object.entries(STATUS),form.status)}</select></label></div><div class="schedule-checks"><label><input type="checkbox" name="scheduled" ${form.scheduled?'checked':''}>安排日期</label><label><input type="checkbox" name="allDay" ${form.allDay?'checked':''}>全天</label></div><div class="schedule-dates" ${form.scheduled?'':'hidden'}><div class="schedule-fields">${field('date','开始日期','date')}${field('endDate','结束日期','date')}</div><div class="schedule-fields" ${form.allDay?'hidden':''}>${field('startTime','开始时间','time')}${field('endTime','结束时间','time')}</div><label class="schedule-check" ${form.allDay?'hidden':''}><input name="hasEnd" type="checkbox" ${form.hasEnd?'checked':''}>结束时间已确定</label></div><div class="schedule-company"><label for="scheduleCompanyQuery">关联公司</label><input type="hidden" name="companyKey" value="${esc(form.companyKey)}"><div class="schedule-company-picker"><div class="schedule-company-input"><input id="scheduleCompanyQuery" type="search" role="combobox" aria-label="检索关联公司" aria-autocomplete="list" aria-expanded="false" aria-controls="scheduleCompanyList" autocomplete="off" placeholder="输入公司、岗位或地点" value="${esc(form.companyKey?(rowByKey(form.companyKey)?.名称||'原招聘记录已移除'):'')}" data-bound-title="${esc(form.companyKey?(rowByKey(form.companyKey)?.名称||'原招聘记录已移除'):'')}"><button id="scheduleCompanyClear" type="button" aria-label="解除公司关联" ${form.companyKey?'':'hidden'}>×</button></div><div id="scheduleCompanyList" class="schedule-company-list" role="listbox" aria-label="公司检索结果" hidden></div></div><button id="scheduleCompanyRecord" type="button" class="schedule-link schedule-record-link" hidden>查看招聘详情</button></div>${field('location','地点')}${field('url','会议或投递链接','url')}<label>备注<textarea name="notes" rows="3">${esc(form.notes)}</textarea></label><div class="schedule-fields"><label>日历提醒<select name="reminderMinutes">${optionRows([['','不提醒'],['0','开始时'],['10','提前 10 分钟'],['30','提前 30 分钟'],['60','提前 1 小时'],['1440','提前 1 天']],String(form.reminderMinutes))}</select></label><label>优先级<select name="priority">${optionRows([['0','普通'],['1','优先'],['2','重要']],String(form.priority))}</select></label></div><label class="schedule-check"><input type="checkbox" name="syncToCalendar" ${form.syncToCalendar?'checked':''}>同步到本机日历</label><details class="schedule-details"><summary>关联材料与计划信息</summary><label>准备文档<select name="prepId">${optionRows([['','不关联'],...preps.map(row=>[row.id,row.position||row.company||row.title||'准备文档']),...(form.prepId&&!preps.some(row=>row.id===form.prepId)?[[form.prepId,'已关联材料']]:[])],form.prepId)}</select></label><label>复盘记录<select name="reviewId">${optionRows([['','不关联'],...reviews.map(row=>[row.id,(row.company||'')+' '+(row.date||'')]),...(form.reviewId&&!reviews.some(row=>row.id===form.reviewId)?[[form.reviewId,'已关联材料']]:[])],form.reviewId)}</select></label>${field('estimatedMinutes','预计用时（分钟）','number')}<label>时区<select name="timeZone">${optionRows([...new Set([pack.timeZone,form.timeZone,'Asia/Shanghai','UTC'])].map(zone=>[zone,zone]),form.timeZone)}</select></label></details><p id="scheduleFormError" class="schedule-error" role="alert"></p></div><div class="schedule-editor-footer">${editing!=='new'?'<button type="button" class="schedule-link" data-schedule="delete">取消事项</button>':''}<span></span><button type="button" class="btn" data-schedule="cancel">取消</button><button type="submit" class="btn btn-primary">保存</button></div></form>`;
+    bindCompanyPicker();updateCompanyLinks();updatePreview();
     $('scheduleForm').addEventListener('submit',event=>{event.preventDefault();save();});
-    $('scheduleForm').addEventListener('input',changed);$('scheduleForm').addEventListener('change',event=>{changed();if(['scheduled','allDay','companyKey'].includes(event.target.name))renderEditor();});
+    $('scheduleForm').addEventListener('input',changed);$('scheduleForm').addEventListener('change',event=>{changed();if(['scheduled','allDay'].includes(event.target.name))renderEditor();});
   }
   function collect(){if(!$('scheduleForm'))return;for(const node of $('scheduleForm').elements){if(!node.name)continue;form[node.name]=node.type==='checkbox'?node.checked:node.value;}}
-  function changed(){collect();if(form.scheduled&&form.endDate<form.date){form.endDate=form.date;$('scheduleForm').elements.endDate.value=form.date;}dirty=true;writeDraft('schedule',editorBase,{editing,form:clone(form)});setSaveState('schedule','idle','日程编辑已暂存');}
+  function changed(){collect();if(form.scheduled&&form.endDate<form.date){form.endDate=form.date;$('scheduleForm').elements.endDate.value=form.date;}dirty=true;updatePreview();writeDraft('schedule',editorBase,{editing,form:clone(form)});setSaveState('schedule','idle','日程编辑已暂存');}
   function eventFromForm(){
     collect();if(!form.title.trim())throw Error('请输入事项标题');
     if(form.syncToCalendar&&(!form.scheduled||(!form.allDay&&!form.hasEnd)))throw Error('同步到本机日历需要确定开始和结束时间');
@@ -191,7 +258,7 @@
     catch(error){$('scheduleFormError').textContent=error.message;dirty=true;writeDraft('schedule',editorBase,{editing,form:clone(form)});setSaveState('schedule',error.message.includes('冲突')?'conflict':'error',error.message);}
   }
   async function commit(payload){saving=true;setSaveState('schedule','saving','正在保存日程…');try{const result=await managementRequest('schedule',payload);pack=readPack(result.data);version=String(result.version);setSaveState('schedule','saved','日程已保存');return result;}finally{saving=false;}}
-  function finishEdit(){if(activeRecovery){if(localStorage.getItem(activeRecovery.key)===activeRecovery.raw){confirmedDrafts.set(activeRecovery.key,JSON.stringify(canonicalJson(activeRecovery.draft)));localStorage.removeItem(activeRecovery.key);scheduleDraftMirror();}activeRecovery=null;}const draft=readOwnDraft('schedule');if(draft)clearOwnDraft('schedule',draft.revision);editing=null;form=null;dirty=false;editorBase='';notice('');}
+  function finishEdit(){if(activeRecovery){if(localStorage.getItem(activeRecovery.key)===activeRecovery.raw){confirmedDrafts.set(activeRecovery.key,JSON.stringify(canonicalJson(activeRecovery.draft)));localStorage.removeItem(activeRecovery.key);scheduleDraftMirror();}activeRecovery=null;}const draft=readOwnDraft('schedule');if(draft)clearOwnDraft('schedule',draft.revision);editing=null;form=null;dirty=false;editorBase='';clearPreview();notice('');}
   function cancel(){if(saving)return;host.classList.remove('schedule-connection-open');finishEdit();connectionOpen=false;setSaveState('schedule','idle');inspector();checkDrafts();refresh();}
   async function remove(){
     if(saving||editing==='new'||!writable())return;
@@ -210,18 +277,56 @@
   function showReadOnly(event){host.classList.add('schedule-panel-open');$('scheduleInspector').innerHTML=`<div class="schedule-inspector-head"><h3>${esc(event.title)}</h3><button class="schedule-close" data-schedule="cancel" aria-label="收起详情">${arrow(true)}</button></div><div class="schedule-inspector-body"><p>${esc([TYPES[event.type],STATUS[event.status],label(event)].filter(Boolean).join(' · '))}</p><p>${esc(event.start?event.allDay?event.start:day(event.start)+' '+time(event.start):'尚未排期')}</p><p class="schedule-notes">${esc(event.notes||'')}</p>${event.url?`<a class="action-link" href="${esc(event.url)}" target="_blank" rel="noopener noreferrer">打开链接</a>`:''}<p class="schedule-help">只读快照；在桌面 App 中编辑。</p></div>`;}
   async function connection(){
     if(dirty){notice('请先保存或取消当前编辑。');return;}
-    connectionOpen=true;editing=null;host.classList.add('schedule-connection-open','schedule-panel-open');
+    connectionOpen=true;editing=null;form=null;clearPreview();host.classList.add('schedule-connection-open','schedule-panel-open');
+    if(connectionTask){renderConnection();return connectionTask;}
+    connectionBusy='正在检查日历权限…';renderConnection();
     const bridge=window.toudiDesktop?.calendar;
-    if(bridge){try{nativeStatus=await bridge('status');if(nativeStatus.authorization==='fullAccess'){const result=await bridge('calendars');nativeCalendars=result.calendars||[];}}catch(error){nativeStatus={supported:true,error:String(error)};}}
-    renderConnection();
+    connectionTask=(async()=>{
+      nativeCalendars=[];
+      if(bridge){try{nativeStatus=await bridge('status');if(nativeStatus.authorization==='fullAccess'){connectionBusy='正在读取可写日历…';if(connectionOpen)renderConnection();const result=await bridge('calendars');nativeStatus=result;nativeCalendars=result.calendars||[];}}catch(error){nativeStatus={supported:true,error:String(error)};}}
+    })();
+    try{await connectionTask;}finally{connectionTask=null;connectionBusy='';if(connectionOpen)renderConnection();}
   }
   function renderConnection(){
     const supported=!!window.toudiDesktop?.calendar && nativeStatus?.supported;
     const authorized=supported&&nativeStatus.authorization==='fullAccess';
-    $('scheduleInspector').innerHTML=`<div class="schedule-inspector-head"><h3>日历连接</h3><button class="schedule-close" data-schedule="cancel" aria-label="关闭">${arrow(true)}</button></div><div class="schedule-inspector-body"><h4>本机日历</h4><p class="schedule-help">将勾选同步的事项写入一个日历。日程以中控台为准；系统日历的外部修改会保留并提示核对。</p>${!supported?'<p>在 macOS 桌面 App 中连接本机日历。此入口可以导出 .ics 文件供日历导入。</p>':authorized?`<label class="schedule-field">目标日历<select id="scheduleNativeCalendar">${optionRows([['','请选择'],...nativeCalendars.map(row=>[row.id,row.title+(row.source?' · '+row.source:'')])],pack.calendar.calendarId)}</select></label><div class="schedule-connection-actions"><button class="btn btn-primary" data-schedule="enable-sync">${pack.calendar.enabled?'保存连接':'启用同步'}</button>${pack.calendar.enabled?'<button class="btn" data-schedule="sync">立即同步</button><button class="schedule-link" data-schedule="disconnect">停止同步</button>':''}</div>`:`<p>${nativeStatus?.authorization==='denied'?'日历权限未获准，请在系统设置中允许 TouDi 访问日历。':'连接需要日历完整访问权限，用于更新已有事项和避免重复。'}</p><button class="btn btn-primary" data-schedule="authorize">连接本机日历</button>`}${nativeStatus?.error?`<p class="schedule-error">${esc(String(nativeStatus.error))}</p>`:''}<h4>导出日历文件</h4><p class="schedule-help">导出已安排日期的事项，手动导入其他日历。导入文件不建立自动同步。</p><button class="btn" data-schedule="export">导出 .ics</button><div id="scheduleSyncResults">${syncResultHtml()}</div></div>`;
+    const denied=['denied','restricted'].includes(nativeStatus?.authorization);
+    const content=connectionBusy?`<p class="schedule-connection-progress" role="status">${esc(connectionBusy)}</p>`:!supported?'<p>在 macOS 桌面 App 中连接本机日历。此入口可以导出 .ics 文件供日历导入。</p>':authorized?`<p class="schedule-help">日历权限已获准。选定目标后，在事项编辑中勾选“同步到本机日历”。</p>${nativeCalendars.length?`<label class="schedule-field">目标日历<select id="scheduleNativeCalendar">${optionRows([['','请选择'],...nativeCalendars.map(row=>[row.id,row.title+(row.source?' · '+row.source:'')])],pack.calendar.calendarId)}</select></label><div class="schedule-connection-actions"><button class="btn btn-primary" data-schedule="enable-sync" ${syncRunning?'disabled':''}>${pack.calendar.enabled?'保存连接':'启用同步'}</button>${pack.calendar.enabled?`<button class="btn" data-schedule="sync" ${syncRunning?'disabled':''}>${syncRunning?'正在同步…':'立即同步'}</button><button class="schedule-link" data-schedule="disconnect" ${syncRunning?'disabled':''}>停止同步</button>`:''}</div>`:'<p>没有可写日历。请先在 macOS“日历”中添加或启用一个日历，再重新检查。</p>'}<button class="schedule-link" data-schedule="connect">重新检查权限与日历</button>`:`<p>${nativeStatus?.authorization==='restricted'?'本机限制了日历访问。请检查系统权限或设备管理限制。':denied?'日历权限未获准。请在系统设置中将 TouDi 的日历权限设为完整访问，然后回来重新检查。':'连接需要日历完整访问权限，用于更新已有事项和避免重复。'}</p><div class="schedule-connection-actions">${denied?'<button class="btn btn-primary" data-schedule="calendar-settings">打开日历权限设置</button><button class="btn" data-schedule="connect">重新检查权限</button>':'<button class="btn btn-primary" data-schedule="authorize">连接本机日历</button>'}</div>`;
+    $('scheduleInspector').innerHTML=`<div class="schedule-inspector-head"><h3>日历连接</h3><button class="schedule-close" data-schedule="cancel" aria-label="关闭">${arrow(true)}</button></div><div class="schedule-inspector-body"><h4>本机日历</h4><p class="schedule-help">将勾选同步的事项写入一个日历。日程以中控台为准；系统日历的外部修改会保留并提示核对。</p>${content}${nativeStatus?.error?`<p class="schedule-error" role="alert">${esc(String(nativeStatus.error))}</p>`:''}<h4>导出日历文件</h4><p class="schedule-help">导出已安排日期的事项，手动导入其他日历。导入文件不建立自动同步。</p><button class="btn" data-schedule="export">导出 .ics</button><div id="scheduleSyncResults">${syncResultHtml()}</div></div>`;
   }
   function syncResultHtml(){return syncResults.length?`<h4>同步结果</h4>${syncResults.map(result=>`<div class="schedule-sync-row"><strong>${esc(pack.events.find(event=>event.id===result.id)?.title||'事项')}</strong><span>${esc(result.ok?({created:'已添加',updated:'已更新',unchanged:'已一致',deleted:'已取消',noop:'无需变更'}[result.operation]||'已同步'):result.error||'未同步')}</span></div>`).join('')}`:'';}
-  async function authorize(){try{nativeStatus=await window.toudiDesktop.calendar('authorize');await connection();}catch(error){notice(String(error));}}
+  async function authorize(){
+    if(connectionBusy)return;
+    if(connectionTask)await connectionTask;
+    if(connectionBusy||!connectionOpen)return;
+    connectionBusy='等待 macOS 日历授权，请在系统提示中选择允许…';renderConnection();
+    try{nativeStatus=await window.toudiDesktop.calendar('authorize');if(nativeStatus.authorization==='fullAccess'){connectionBusy='';await connection();}}
+    catch(error){nativeStatus={supported:true,error:String(error)};}
+    finally{connectionBusy='';if(connectionOpen)renderConnection();}
+  }
+  async function recheckConnection(){
+    if(!connectionOpen||connectionBusy||connectionTask||syncRunning||!window.toudiDesktop?.calendar)return;
+    const state=()=>JSON.stringify({supported:nativeStatus?.supported,authorization:nativeStatus?.authorization,error:nativeStatus?.error,calendars:nativeCalendars});
+    const before=state(),choice=$('scheduleNativeCalendar')?.value;
+    connectionTask=(async()=>{
+      try{
+        const status=await window.toudiDesktop.calendar('status');
+        if(status.authorization==='fullAccess'){
+          const result=await window.toudiDesktop.calendar('calendars');nativeStatus=result;nativeCalendars=result.calendars||[];
+        }else{nativeStatus=status;nativeCalendars=[];}
+      }catch(error){nativeStatus={supported:true,error:String(error)};}
+    })();
+    try{await connectionTask;}finally{
+      connectionTask=null;
+      // Keep controls and their current selection while the window regains focus.
+      // Replacing the clicked button here can discard its pending mouseup/click.
+      if(connectionOpen&&!connectionBusy&&state()!==before){
+        renderConnection();const select=$('scheduleNativeCalendar');
+        if(select&&choice&&nativeCalendars.some(row=>row.id===choice))select.value=choice;
+      }
+    }
+  }
+  async function calendarSettings(){try{await window.toudiDesktop.calendar('settings');}catch(error){notice('未能打开系统设置：'+String(error));}}
   async function enableSync(enabled){
     if(!writable()||saving)return;
     const id=enabled?$('scheduleNativeCalendar')?.value:pack.calendar.calendarId;if(enabled&&!id){notice('请选择一个可写日历。');return;}
@@ -236,10 +341,23 @@
       items.push(Object.fromEntries(['id','title','start','end','allDay','timeZone','notes','location','url','status','reminderMinutes'].map(key=>[key,event[key]??(key==='end'||key==='reminderMinutes'?null:key==='timeZone'?pack.timeZone:'')])));
     }
     const signature=JSON.stringify({calendar:pack.calendar,items});if(!manual&&signature===lastSync)return;
+    if(!items.length){syncResults=skipped;lastSync=skipped.length?'':signature;if($('scheduleNotice').dataset.owner==='calendar-sync')notice('');$('scheduleSyncStatus').textContent=skipped.length?`${skipped.length} 项时间未确定`:'日历已连接 · 暂无勾选同步的事项';if(connectionOpen)renderConnection();return;}
     syncRunning=true;$('scheduleSyncStatus').textContent='正在同步本机日历…';
-    try{const results=[];for(let offset=0;offset<items.length;offset+=1000){const result=await window.toudiDesktop.calendar('sync',{workspaceKey:toudiWorkspaceStorage.id,calendarId:pack.calendar.calendarId,items:items.slice(offset,offset+1000),revision:version});results.push(...(result.results||[]));}syncResults=[...results,...skipped];const failed=syncResults.filter(row=>!row.ok);lastSync=failed.length?'':signature;$('scheduleSyncStatus').textContent=failed.length?`${failed.length} 项未同步 · 在日历连接中查看`:'本机日历已同步';if(connectionOpen)$('scheduleSyncResults').innerHTML=syncResultHtml();if(manual&&!failed.length)showToast('本机日历已同步');}
-    catch(error){$('scheduleSyncStatus').textContent='本机日历未同步';notice('日程已保存在中控台，系统日历同步失败：'+String(error));}
-    finally{syncRunning=false;}
+    if(connectionOpen)renderConnection();
+    try{
+      const results=[];
+      for(let offset=0;offset<items.length;offset+=1000){
+        const batch=items.slice(offset,offset+1000),result=await window.toudiDesktop.calendar('sync',{workspaceKey:toudiWorkspaceStorage.id,calendarId:pack.calendar.calendarId,items:batch,revision:version});
+        if(!result.supported||result.authorization!=='fullAccess')throw Error('日历完整访问权限不可用，请在日历连接中重新检查权限');
+        const rows=Array.isArray(result.results)?result.results:[];
+        for(const item of batch){const matching=rows.filter(row=>row.id===item.id);results.push(matching.length===1?matching[0]:{id:item.id,ok:false,error:'系统日历未返回该事项的确认结果，请重试同步'});}
+      }
+      syncResults=[...results,...skipped];const failed=syncResults.filter(row=>row.ok!==true);lastSync=failed.length?'':signature;
+      if($('scheduleNotice').dataset.owner==='calendar-sync')notice('');
+      $('scheduleSyncStatus').textContent=failed.length?`${failed.length} 项未同步 · 在日历连接中查看`:`${results.length} 项已同步到本机日历`;
+      if(manual&&!failed.length)showToast(`${results.length} 项已同步到本机日历`);
+    }catch(error){lastSync='';syncResults=[...items.map(item=>({id:item.id,ok:false,error:String(error)})),...skipped];$('scheduleSyncStatus').textContent='本机日历未同步';notice('日程已保存在中控台，系统日历同步失败：'+String(error),'','calendar-sync');}
+    finally{syncRunning=false;if(connectionOpen)renderConnection();}
   }
   async function exportCalendar(){if(window.__SNAPSHOT__){notice('请在桌面 App 导出日历文件。');return;}try{const response=await fetch((apiBase||'')+'/api/schedule.ics',{cache:'no-store'});if(!response.ok)throw Error('日历导出失败');downloadBlob(await response.blob(),'TouDi日程.ics');}catch(error){notice(error.message);}}
   host.addEventListener('click',async event=>{
@@ -248,7 +366,7 @@
     if(button.dataset.scheduleCompany){open(null,recordDefaults(button.dataset.scheduleCompany));return;}
     if(button.dataset.scheduleRecord){showDetail(Number(button.dataset.scheduleRecord));return;}
     if(button.dataset.scheduleMode){mode=button.dataset.scheduleMode;if(mode!=='agenda')calendar?.changeView(mode);update();return;}
-    const actions={today:()=>calendar?.today(),prev:()=>calendar?.prev(),next:()=>calendar?.next(),new:()=>open(null),cancel,delete:remove,retry:show,connect:connection,authorize,'enable-sync':()=>enableSync(true),disconnect:()=>enableSync(false),sync:()=>sync(true),export:exportCalendar,restore:restoreDraft,discard:discardDrafts,'draft-export':()=>downloadBlob(new Blob([JSON.stringify({workspaceKey:toudiWorkspaceStorage.id,base:editorBase,editing,form},null,2)],{type:'application/json'}),'TouDi日程草稿.json')};
+    const actions={today:()=>calendar?.today(),prev:()=>calendar?.prev(),next:()=>calendar?.next(),new:()=>open(null),cancel,delete:remove,retry:show,connect:connection,authorize,'calendar-settings':calendarSettings,'enable-sync':()=>enableSync(true),disconnect:()=>enableSync(false),sync:()=>sync(true),export:exportCalendar,restore:restoreDraft,discard:discardDrafts,'draft-export':()=>downloadBlob(new Blob([JSON.stringify({workspaceKey:toudiWorkspaceStorage.id,base:editorBase,editing,form},null,2)],{type:'application/json'}),'TouDi日程草稿.json')};
     await actions[button.dataset.schedule]?.();
   });
   function recordDefaults(key){const row=rowByKey(key),date=exactSourceDay(row?.截止时间),url=String(row?.['网申链接/邮箱']||'');return {companyKey:key,type:'application',title:(row?.名称||'')+' · 投递',location:row?.地点||'',url:/^https?:\/\//i.test(url)?url:'',scheduled:!!date,allDay:true,...(date?{date,endDate:date}:{})};}
@@ -259,5 +377,6 @@
     linked:key=>pack.events.filter(event=>event.companyKey===key&&event.status!=='cancelled'),
     native:()=>({status:nativeStatus,results:syncResults}),get:()=>clone(pack)};
   matchMedia('(max-width:800px)').addEventListener('change',event=>{if(event.matches&&mode==='timeGridWeek'){mode='agenda';if(view==='schedule')update();}});
+  window.addEventListener('focus',recheckConnection);
   window.addEventListener('beforeunload',event=>{if(dirty||saving){event.preventDefault();event.returnValue='';}});
 })();

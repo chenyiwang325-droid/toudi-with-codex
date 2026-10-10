@@ -5,6 +5,7 @@ import ast
 import os
 import json
 import platform
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,20 @@ ROOT = DESKTOP.parent
 
 def run(args, **kwargs):
     subprocess.run([str(x) for x in args], check=True, **kwargs)
+
+
+def verify_calendar_bundle(app):
+    """Check the actual signed bundle before publishing, not just source config."""
+    info = plistlib.loads((app/'Contents/Info.plist').read_bytes())
+    for key in ('NSCalendarsUsageDescription', 'NSCalendarsFullAccessUsageDescription'):
+        if not isinstance(info.get(key), str) or not info[key].strip():
+            raise ValueError('macOS calendar usage description missing: '+key)
+    signed = subprocess.check_output(['codesign', '-d', '--entitlements', ':-', str(app)], stderr=subprocess.DEVNULL)
+    entitlements = plistlib.loads(signed)
+    if entitlements.get('com.apple.security.personal-information.calendars') is not True:
+        raise ValueError('Signed macOS App is missing the Calendar entitlement')
+    run(['codesign', '--verify', '--deep', '--strict', app])
+    print('Signed macOS Calendar entitlement and usage descriptions verified')
 
 
 def main():
@@ -110,6 +125,8 @@ def main():
     run(privacy_check+[DESKTOP/'src-tauri/runtime/toudi-runtime'], env=env)
     bundle = DESKTOP/'src-tauri/target'/('debug' if args.debug else 'release')/'bundle'
     run(privacy_check+[bundle], env=env)
+    if sys.platform == 'darwin':
+        verify_calendar_bundle(bundle/'macos/TouDi.app')
     if sys.platform=='darwin' and not args.keep_bundle:
         app=bundle/'macos/TouDi.app'
         if app.is_dir():

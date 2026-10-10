@@ -55,6 +55,19 @@
 .schedule-popover{max-width:min(380px,88vw);max-height:70vh;overflow:auto}
 .schedule-popover .schedule-event-compact strong{white-space:normal;overflow-wrap:anywhere}
 .schedule-record-link{align-self:flex-start;font-weight:400}
+.schedule-company{margin-bottom:16px}.schedule-company>label{margin-bottom:6px}
+.schedule-company-picker{position:relative}.schedule-company-input{position:relative}
+.schedule-company-input input{padding-right:36px!important}
+.schedule-company-input input::-webkit-search-cancel-button{display:none}
+.schedule-company-input button{position:absolute;right:5px;top:4px;width:28px;height:28px;background:transparent;border:0;color:var(--text3);font-size:20px;cursor:pointer;border-radius:var(--radius-sm)}
+.schedule-company-input button[hidden],.schedule-company-list[hidden]{display:none}
+.schedule-company-list{position:absolute;z-index:20;inset:calc(100% + 5px) 0 auto;max-height:216px;overflow:auto;padding:4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card);box-shadow:0 8px 24px rgba(25,45,45,.12)}
+.schedule-picker-up .schedule-company-list{inset:auto 0 calc(100% + 5px)}
+.schedule-company-list button{display:flex;flex-direction:column;gap:3px;min-height:40px;width:100%;padding:8px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;border-radius:calc(var(--radius-sm) - 2px);cursor:pointer}
+.schedule-company-list button:hover,.schedule-company-list button.active{background:var(--primary-faint)}
+.schedule-company-list strong{font-size:13px;font-weight:500}.schedule-company-list small{font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.schedule-picker-empty{margin:8px;font-size:12px;color:var(--text3)}
+.schedule-company .schedule-record-link{margin-top:6px}
 .schedule-source .schedule-event-content,.schedule-completed .schedule-event-content{color:var(--text3)}
 .schedule-source{--fc-monarch-event:var(--bg);--fc-monarch-event-contrast:var(--text3)}
 .schedule-completed{--fc-monarch-event:var(--bg);--fc-monarch-event-contrast:var(--text3);opacity:.7}

@@ -26,7 +26,17 @@ struct Runtime {
 struct AppState(Mutex<Runtime>);
 
 #[tauri::command]
-async fn calendar_action(action: String, request: Option<serde_json::Value>, state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+async fn calendar_action(action: String, request: Option<serde_json::Value>, state: State<'_, AppState>, app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    if action == "settings" {
+        #[cfg(target_os = "macos")]
+        {
+            app.opener().open_url("x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars", None::<&str>)
+                .map_err(|_| "未能打开日历权限设置，请在系统设置的隐私与安全中打开日历".to_string())?;
+            return Ok(serde_json::json!({"ok":true}));
+        }
+        #[cfg(not(target_os = "macos"))]
+        { let _ = app; return Err("此平台暂不支持原生日历".into()); }
+    }
     if action == "sync" {
         use sha2::{Digest, Sha256};
         let expected = {
@@ -111,8 +121,10 @@ async fn native_render_report(
     // A diagnostic run must leave by the normal exit path, otherwise macOS
     // offers to restore the interrupted test window on the user's next launch.
     if std::env::var("TOUDI_RENDER_AUTO_EXIT").as_deref() == Ok("1")
-        && std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("workspace-live-update")
-        && matches!(report["phase"].as_str(), Some("manual" | "failed"))
+        && ((std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("workspace-live-update")
+            && matches!(report["phase"].as_str(), Some("manual" | "failed")))
+            || (std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("search-schedule-check")
+                && matches!(report["phase"].as_str(), Some("complete" | "failed"))))
     {
         let app = window.app_handle().clone();
         std::thread::spawn(move || {
@@ -482,6 +494,10 @@ fn main() {
     if std::env::var_os("TOUDI_RENDER_REPORT").is_some() {
         for window in &mut context.config_mut().app.windows {
             window.incognito = true;
+            if std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("search-schedule-check") {
+                window.visible = false;
+                window.focus = false;
+            }
             if let Ok(width) = std::env::var("TOUDI_RENDER_WIDTH") {
                 if let Ok(width) = width.parse::<f64>() {
                     if (860.0..=1920.0).contains(&width) { window.width = width; }
@@ -518,7 +534,9 @@ fn main() {
                             let _ = webview.eval(format!("window.__TOUDI_DIAG_VIEW__ = '{view}';"));
                         }
                     }
-                    if std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("workspace-live-update") {
+                    if std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("search-schedule-check") {
+                        let _ = webview.eval(include_str!("search_schedule_check.js"));
+                    } else if std::env::var("TOUDI_RENDER_VIEW").as_deref() == Ok("workspace-live-update") {
                         // This flow verifies an open, visible reader. A GUI
                         // process started by the test runner is not activated
                         // by LaunchServices and WKWebView may suspend timers.
