@@ -861,11 +861,12 @@ function workspaceDetailDraftExists() {
 }
 function workspaceHasDraft(module) {
   if(module==='schedule' && window.toudiSchedule?.hasDraft())return true;
-  const domain = module === 'records' ? 'edits' : module;
-  let stored;
-  try { stored = JSON.parse(toudiWorkspaceStorage.getItem('toudiManagementDrafts') || '{}'); } catch (error) { return true; }
   const managerOpen = document.getElementById('managementOverlay')?.style.display === 'flex';
-  if ((managerOpen && management?.module === module) || stored[module] || listUnsavedDrafts().some(item => item.domain === domain)) return true;
+  // Recovery copies can outlive the window that created them. Keep them for
+  // explicit recovery, but only a live editor or an unsaved in-memory change
+  // can defer reading the latest workspace. An archived draft's old save base
+  // still protects it if the user later chooses to resume it.
+  if (managerOpen && management?.module === module) return true;
   if (module === 'profile') return document.querySelector('#fillingDialog iframe')?.contentWindow?.toudiProfileEditor?.hasDraft() || false;
   if (module === 'records' || module === 'edits') {
     return workspaceDetailDraftExists() || editsDirty || editsConflict || editsSaveInFlight || (fieldEditIdx!==null && document.getElementById('detailModal')?.style.display==='flex') || document.getElementById('noteModal')?.style.display === 'flex';

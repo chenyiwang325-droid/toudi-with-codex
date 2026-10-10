@@ -32,6 +32,26 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   const first=await get('/api/workspace-changes');assert.equal(first.workspaceKey.length,64);assert.equal(Object.keys(first.revisions).length,9);assert(!(JSON.stringify(first).includes('sample.md')));
   assert.deepEqual((await get('/api/workspace-changes')).revisions,first.revisions);
   await page.goto(base+'/投递管理.html');await page.waitForFunction(()=>serverMode && data.length===1 && workspaceRefreshSnapshots.size>=7);
+  // Recovery drafts from earlier App sessions are not edits in this window.
+  // They used to block every later records/edits update until the App reopened.
+  const archivedKey=await page.evaluate(()=>{
+    const sessionId='previous-window',key=DRAFT_PREFIX.edits+toudiWorkspaceStorage.id+':'+sessionId;
+    localStorage.setItem(key,JSON.stringify({format:'toudi-unsaved-draft',version:3,workspaceKey:toudiWorkspaceStorage.id,domain:'edits',sessionId,revision:1,base:editsVersion,savedAt:'2026-10-01T00:00:00.000Z',data:{edits:{'合成企业':{note:'历史未提交的完整备注'}},pref:{}}}));
+    return key;
+  });
+  const archivedBefore=await page.evaluate(key=>localStorage.getItem(key),archivedKey);
+  const originalRecords=(await get('/api/manage?module=records')).data;
+  await commit('records',{action:'replace',data:[{...originalRecords[0],岗位:'历史草稿不阻挡最新岗位'}]});
+  write(modules.edits,{edits:{'合成企业':{starred:true}},pref:{}});
+  await page.evaluate(()=>refreshWorkspaceData(true));
+  assert(await page.evaluate(()=>data.some(row=>row.岗位==='历史草稿不阻挡最新岗位')),'Archived edits must not freeze the already-open records view');
+  assert(await page.evaluate(()=>userEdits['合成企业']?.starred),'The latest saved marks are read without restarting');
+  assert.equal(await page.evaluate(key=>localStorage.getItem(key),archivedKey),archivedBefore,'The full recovery draft remains intact');
+  assert.equal(await page.evaluate(()=>workspaceHasDraft('edits')),false,'A different session is not actively editing');
+  assert(!await page.evaluate(()=>workspacePendingUpdates.has('records')||workspacePendingUpdates.has('edits')));
+  await page.screenshot({path:path.join(out,'历史草稿_保留且即时更新.png')});
+  await commit('records',{action:'replace',data:originalRecords});write(modules.edits,{edits:{},pref:{}});
+  await page.evaluate(()=>refreshWorkspaceData(true));
   const overviewBefore=await page.locator('#recordsOverview').boundingBox(),totalBefore=await page.locator('#statsBar').innerText();
   const query=page.locator('#searchInput');await query.fill('没有这家合成企业');
   assert.equal(await page.locator('#tableBody .table-empty').count(),1,'Direct search filters the visible records');
@@ -129,8 +149,18 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   const updatedBank={categories:[{id:'general',name:'通用准备',items:[{id:'answer',title:'合成问题',body:'新版通用回答'}]}]};
   await commit('qbank',{action:'replace',data:updatedBank});
   await page.waitForFunction(()=>workspacePendingUpdates.has('qbank'),null,{timeout:12000});assert.equal(await draft.inputValue(),'{"draft":"保留我的未提交修改"}');
-  await page.evaluate(()=>{closeManagement();toudiWorkspaceStorage.removeItem('toudiManagementDrafts');});
+  const managementRecovery=await page.evaluate(()=>toudiWorkspaceStorage.getItem('toudiManagementDrafts'));
+  await page.evaluate(()=>closeManagement());
   await page.waitForFunction(()=>qbData.categories[0]?.items[0]?.body==='新版通用回答',null,{timeout:12000});
+  assert.equal(await page.evaluate(()=>toudiWorkspaceStorage.getItem('toudiManagementDrafts')),managementRecovery,'Closing an editor keeps its recovery copy without freezing its module');
+  // Resuming that copy keeps its old base: it cannot overwrite external edits.
+  await page.evaluate(()=>openManagement('qbank'));
+  await page.getByRole('button',{name:'继续未保存编辑',exact:true}).click();
+  await page.locator('#managementStatus').filter({hasText:'已恢复草稿及原版本'}).waitFor();
+  assert.equal(await draft.inputValue(),'{"draft":"保留我的未提交修改"}');
+  assert.equal(await page.evaluate(()=>management.version),JSON.parse(managementRecovery).qbank.base);
+  assert(await page.evaluate(()=>workspaceHasDraft('qbank')),'An explicitly resumed editor is still protected');
+  await page.evaluate(()=>closeManagement());
   await page.evaluate(()=>openFilling());const frame=page.frameLocator('#fillingDialog iframe');await frame.locator('.fact-value').first().waitFor();
   const pack1=await get('/api/manage?module=profile'),phone=pack1.data.facts.find(f=>f.label==='手机');phone.value='13911111111';
   await commit('profile',{action:'replace',data:pack1.data});await frame.getByText('13911111111',{exact:true}).waitFor({timeout:12000});
@@ -209,7 +239,7 @@ const report=body=>`# 合成企业岗位探查\n\n## 结论\n${body}\n\n`+Array.
   await page.evaluate(()=>switchView('prospect'));
   assert.equal(await page.locator('#prospectMain .pp-md a').evaluate(el=>getComputedStyle(el).textDecorationLine),'underline');
   assert.deepEqual(errors,[]);
-  const result={runtimeVersion:signal.version,checks:['Direct search preserves focus and fixed stage counts','Both detailed-filter entries share the same conditions','Update status popover does not move content','Manual refresh includes commits after a previous manifest','Background checks leave the toolbar unchanged','Manual refresh keeps fixed geometry and joins a running check','Unchanged modules retain their DOM after manual refresh','Focused open reader receives Agent changes without navigation/reload','Markdown-only report update detected','Search, report identity and reader scroll retained','Unrelated draft does not block refresh','Dirty module deferred until draft ends','Shared profile refreshes while open','Inline edits and old save base preserved on conflict','Cancel editor refreshes automatically','Temporary connection failure preserves data and retries','New records appear','Failed module is never acknowledged and other modules still update','Automatic retry recovers without reopening','Slow personal data read completes without a redundant connection probe','Open read-only detail refreshes in place with stable company binding','Actual unsaved detail input is protected','Read-only CRLF notes do not block refresh and real edits remain protected','Action links use buttons and Markdown links stay underlined'],pageErrors:errors};
+  const result={runtimeVersion:signal.version,checks:['Archived personal-data drafts stay intact without blocking fresh records or marks','Closing management preserves its recovery copy and permits automatic updates','Resuming recovery preserves the original save base and protects the active editor','Direct search preserves focus and fixed stage counts','Both detailed-filter entries share the same conditions','Update status popover does not move content','Manual refresh includes commits after a previous manifest','Background checks leave the toolbar unchanged','Manual refresh keeps fixed geometry and joins a running check','Unchanged modules retain their DOM after manual refresh','Focused open reader receives Agent changes without navigation/reload','Markdown-only report update detected','Search, report identity and reader scroll retained','Unrelated draft does not block refresh','Dirty module deferred until draft ends','Shared profile refreshes while open','Inline edits and old save base preserved on conflict','Cancel editor refreshes automatically','Temporary connection failure preserves data and retries','New records appear','Failed module is never acknowledged and other modules still update','Automatic retry recovers without reopening','Slow personal data read completes without a redundant connection probe','Open read-only detail refreshes in place with stable company binding','Actual unsaved detail input is protected','Read-only CRLF notes do not block refresh and real edits remain protected','Action links use buttons and Markdown links stay underlined'],pageErrors:errors};
   fs.writeFileSync(path.join(out,'App自动更新验收.json'),JSON.stringify(result,null,2)+'\n');console.log('PASS '+JSON.stringify(result));
 })().catch(error=>{console.error(error);process.exitCode=1}).finally(async()=>{
   await browser?.close();if(service && service.exitCode===null){service.stdin.write('shutdown\n');await once(service,'exit');}fs.rmSync(workspace,{recursive:true,force:true});

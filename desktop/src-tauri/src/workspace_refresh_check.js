@@ -14,6 +14,7 @@
     catch(error) {requests.push({route,error:String(error),ms:Math.round(performance.now()-started)});throw error;}
   };
   async function capture(phase) {
+    const archives=listUnsavedDrafts().filter(entry=>entry.domain==='edits'&&entry.draft.sessionId.startsWith('native-refresh-archive-'));
     const state = {phase,visibility:document.visibilityState,hasFocus:document.hasFocus(),secureContext:isSecureContext,view:typeof view==='string'?view:null,serverMode:typeof serverMode==='boolean'?serverMode:null,
       connected:typeof apiBase!=='undefined'&&apiBase!==null,
       revisions:typeof workspaceRefreshSnapshots!=='undefined'?Object.fromEntries(workspaceRefreshSnapshots):{},
@@ -26,6 +27,8 @@
       detailCompanyDigest:await digest(document.getElementById('detailTitle')?.textContent||''),
       detailPositionDigest:await digest([...document.querySelectorAll('.detail-fact')].find(node=>node.querySelector('dt')?.textContent==='岗位与招聘方向')?.querySelector('dd')?.textContent||''),
       readOnlyNoteIsDraft:workspaceHasDraft('edits'),
+      archivedDraftCount:archives.length,
+      archivedDraftDigest:await digest(archives.map(entry=>[entry.key,entry.draft])),
       actionLinks:[...document.querySelectorAll('.detail-entry-actions a.action-link')].map(node=>({label:node.textContent.trim(),height:node.getBoundingClientRect().height,underline:getComputedStyle(node).textDecorationLine,border:getComputedStyle(node).borderTopStyle})),
       reportRows:document.querySelectorAll('#prospectList [data-prospect-id]').length,
       recordRows:document.querySelectorAll('#tableBody tr').length,
@@ -44,6 +47,13 @@
     tableProof={search:geometry('searchInput'),filter:geometry('recordFilterButton'),overview:geometry('recordsOverview'),noticeHidden:document.getElementById('workspaceRefreshNotice').hidden,noticeInToolbar:!!document.getElementById('workspaceRefreshNotice').closest('.topbar-actions'),searchCount:document.querySelectorAll('#searchInput').length};
     await ensureViewData('prospect');switchView('prospect');
     showDetail(data[0]._idx);closeDetailModal();
+    // Reproduce durable recovery copies in the real WKWebView, rather than
+    // testing only a clean browser storage state. No business file is changed.
+    for(let i=0;i<5;i++) {
+      const sessionId='native-refresh-archive-'+i;
+      localStorage.setItem(DRAFT_PREFIX.edits+toudiWorkspaceStorage.id+':'+sessionId,JSON.stringify({format:'toudi-unsaved-draft',version:3,workspaceKey:toudiWorkspaceStorage.id,domain:'edits',sessionId,revision:1,base:String(editsVersion),savedAt:'2026-10-01T00:00:00.000Z',data:{edits:{'合成企业':{note:'合成历史草稿 '+i}},pref:{}}}));
+    }
+    if(workspaceHasDraft('edits'))throw Error('Archived recovery copies incorrectly defer native refresh');
     const initial=await capture('initial');let latest=initial;
     for(let i=0;i<150;i++) {
       await pause(100);
