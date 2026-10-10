@@ -143,7 +143,7 @@
     managementLayout: box('.management-body'), settings: box('#settingsView'),
     theme: document.documentElement.dataset.theme,
     motion: document.documentElement.dataset.motion,
-    themeControl: document.querySelector('#themeMenu [aria-checked="true"]')?.dataset.theme || null,
+    themeControl: document.querySelector('.theme-mode-control [aria-pressed="true"]')?.dataset.theme || null,
     colorPalette: document.documentElement.dataset.palette,
     paletteControl: document.querySelector('.settings-palettes button[aria-pressed="true"]')?.dataset.value || null,
     settingsOpacity: getComputedStyle(document.querySelector('#settingsView')).opacity,

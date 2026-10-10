@@ -65,8 +65,7 @@ a:hover { text-decoration: underline; }
 .sb-footer { padding: 12px 16px; margin-top:auto; border-top: 1px solid var(--border); background: var(--card); }
 .storage-badge { margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 7px 8px; border-radius: 5px; background: var(--bg); line-height: 1.4; color: var(--text2); border: 1px solid var(--border); white-space: normal; }
 .storage-badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.storage-badge.ok { color: var(--success); background: var(--success-light); }
-.storage-badge.ok .dot { background: var(--success); }
+.storage-badge[hidden] { display:none; }
 .storage-badge.warn { color: var(--warning); background: var(--warning-light); }
 .storage-badge.warn .dot { background: var(--warning); }
 .storage-badge.error { color: var(--danger); background: var(--danger-light); }
@@ -817,26 +816,29 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 #detailContent { flex:1; overflow:auto; min-height:0; padding:0 24px 24px; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .detail-section { padding:16px 0; border:0; border-bottom:1px solid var(--border-light); }
 .detail-section:last-child { padding-bottom:0; border-bottom:0; }
-.detail-progress-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-.detail-progress-row label { color:var(--text3); font-size:12px; margin-right:4px; }
-.detail-progress-row select { padding:5px 24px 5px 9px; min-height:32px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); font:inherit; font-size:13px; }
-.detail-progress-row .btn { min-height:32px; }
-.detail-followup-notes { margin-top:12px; }
-.detail-followup-notes>summary { cursor:pointer; font-size:13px; color:var(--text2); line-height:24px; }
-.detail-followup-notes>summary span { color:var(--text3); font-size:12px; margin-left:10px; }
-.detail-followup-notes[open]>summary { color:var(--text); }
+.detail-modal .btn { min-height:34px; padding:6px 10px; font-size:13px; line-height:20px; }
+#detailFollowup { padding-bottom:8px; border-bottom:0; }
+#detailMaterials { padding-top:0; }
+.detail-progress-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.detail-progress-row label { color:var(--text3); font-size:12px; line-height:20px; margin-right:4px; }
+.detail-status-control { position:relative; display:inline-flex; flex-shrink:0; }
+.detail-status-control select { appearance:none; -webkit-appearance:none; width:112px; height:34px; padding:6px 34px 6px 10px; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); font:inherit; font-size:13px; font-weight:500; line-height:20px; cursor:pointer; }
+.detail-status-control>svg { position:absolute; width:14px; height:14px; right:10px; top:50%; transform:translateY(-50%); color:var(--text2); pointer-events:none; }
+.detail-status-control select:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.detail-followup-notes { margin-top:8px; }
+.detail-disclosure { display:inline-flex; align-items:center; gap:8px; min-height:34px; padding:6px 0; list-style:none; cursor:pointer; font-size:13px; font-weight:500; color:var(--text2); line-height:20px; }
+.detail-disclosure::-webkit-details-marker { display:none; }
+.detail-disclosure::marker { content:''; }
+.detail-disclosure svg { width:14px; height:14px; flex-shrink:0; transition:transform var(--ui-motion-fast) var(--ui-ease); }
+details[open]>.detail-disclosure svg { transform:rotate(180deg); }
+.detail-disclosure:hover { color:var(--primary); }
+.detail-disclosure:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:var(--radius-sm); }
 .detail-followup-notes .detail-note-block { margin-top:12px; padding-top:0; border-top:0; }
-.detail-material-entries { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-.detail-material-entry { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; text-align:left; padding:10px 12px; color:var(--text); border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--card); font:inherit; cursor:pointer; transition:background-color var(--ui-motion-fast) var(--ui-ease),border-color var(--ui-motion-fast) var(--ui-ease); }
-.detail-material-entry strong { display:block; font-size:13px; font-weight:500; }
-.detail-material-entry small { display:block; font-size:11px; color:var(--text3); margin-top:2px; }
-.detail-material-entry svg { width:14px; height:14px; flex-shrink:0; color:var(--text3); }
+.detail-material-entries { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.detail-material-entry { gap:8px; white-space:nowrap; }
+.detail-material-entry svg { width:14px; height:14px; flex-shrink:0; }
 .detail-material-entry:hover { background:var(--primary-faint); border-color:var(--primary); }
 .detail-material-entry:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
-.detail-secondary-links { display:flex; flex-wrap:wrap; gap:16px; margin-top:8px; }
-.detail-secondary-links button { border:0; background:transparent; padding:2px 0; color:var(--text2); font:inherit; font-size:12px; cursor:pointer; display:flex; gap:4px; align-items:center; }
-.detail-secondary-links button:hover { color:var(--primary); }
-.detail-secondary-links svg { width:12px; height:12px; }
 .detail-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 .detail-section-heading h3 { font-size:14px; line-height:22px; margin:0; font-weight:600; }
 .detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; margin:0; }
@@ -852,7 +854,6 @@ html[data-motion="on"] .module-enter { animation:ui-content-enter var(--ui-motio
 .detail-source .detail-facts { margin:12px 0; gap:10px 20px; }
 .detail-source .detail-fact dd { font-size:13px; }
 .detail-source-info { margin-top:18px; padding-top:14px; border-top:1px solid var(--border-light); font-size:12px; color:var(--text2); }
-.detail-source-info>summary { cursor:pointer; line-height:24px; }
 .detail-source-info>.detail-facts { margin-top:14px; }
 .detail-related-schedule { margin-top:16px; border-top:1px solid var(--border-light); padding-top:12px; }
 .detail-related-schedule .detail-section-heading { margin-bottom:6px; }
@@ -1451,12 +1452,12 @@ function retryFailedSaves(){
 }
 function updateStorageBadge() {
   const el=document.getElementById('storageBadge'); if(!el)return;
-  const domains=Object.values(SAVE_DOMAINS),conflict=domains.find(d=>d.state==='conflict'),readError=domains.find(d=>d.state==='error'&&d.readFailed),saveError=domains.find(d=>d.state==='error'&&!d.readFailed),error=readError||saveError,saving=domains.find(d=>d.state==='saving');
+  const domains=Object.values(SAVE_DOMAINS),conflict=domains.find(d=>d.state==='conflict'),readError=domains.find(d=>d.state==='error'&&d.readFailed),saveError=domains.find(d=>d.state==='error'&&!d.readFailed),error=readError||saveError;
   el.onclick=null;el.style.cursor='default';
+  el.hidden=serverMode&&!conflict&&!error;
+  if(el.hidden){el.textContent='';el.title='';return;}
   if(conflict){el.className='storage-badge error';el.innerHTML='<span class="dot"></span>'+conflict.message;el.title='存在未解决冲突；点击导出全部未提交草稿';el.onclick=exportUnsavedDrafts;el.style.cursor='pointer';}
   else if(error){el.className='storage-badge error';el.innerHTML='<span class="dot"></span>'+error.message;el.title=error.readFailed?'点击重新读取；不会写入数据':'点击重试保存；草稿仍保留在浏览器';el.onclick=error.readFailed?retryFailedReads:retryFailedSaves;el.style.cursor='pointer';}
-  else if(saving){el.className='storage-badge warn';el.innerHTML='<span class="dot"></span>'+saving.message;el.title='等待最新一轮本地文件确认';}
-  else if (serverMode) { const saved=domains.filter(d=>d.state==='saved');el.className='storage-badge ok';el.innerHTML='<span class="dot"></span>'+(saved.length?'全部改动已保存':(window.__TOUDI_SERVICE__?.mode==='hosted'?'云端工作区已连接':'本地文件已连接'));el.title='所有数据区均无待保存、失败或冲突'; }
   else { el.className='storage-badge warn'; el.innerHTML='<span class="dot"></span>工作区未连接 · 只读'; el.title='请打开 TouDi App 或连接工作区服务，已保存资料以工作区文件为准'; }
 }
 
@@ -1950,7 +1951,6 @@ async function openApplicationMaterial(idx,kind){
   }
 }
 function detailProspects(item){return prospectData.prospects.filter(p=>p.companyKey===item._key||(!p.companyKey&&(p.company===item['名称']||(p.aliases||[]).includes(item['名称']))));}
-function openGeneralPreparation(){contentReturnView=['table','kanban','charts'].includes(view)?view:contentReturnView;closeDetailModal();switchView('qbank');switchPrepMode('general');}
 function detailFact(item,key,label=key,wide=false){
   const edited=item._rawF&&item._rawF[key]!==undefined;
   return `<div class="detail-fact ${wide?'wide':''}"><dt>${esc(label)}${edited?`<span class="detail-edited" title="原始值：${esc(String(item._rawF[key]||'—'))}">已修改</span>`:''}</dt><dd>${esc(item[key]||'未注明')}</dd></div>`;
@@ -1967,20 +1967,25 @@ function mergedSourceHtml(src){
   const marks=[e.excluded?'不适合':'',e.status||'',e.starred?'已收藏':'',e.research?'待探查':''].filter(Boolean);
   return `<article class="detail-source"><h4>${esc(src['名称']||'招聘记录')}</h4>${marks.length?`<p class="detail-context">${esc(marks.join(' · '))}</p>`:''}<p class="detail-prose">${esc(src['岗位']||'岗位未注明')}</p><dl class="detail-facts">${['地点','应届生','学历要求','截止时间','录入时间'].filter(k=>src[k]).map(k=>detailFact(src,k)).join('')}</dl><div class="detail-links">${detailEntryLink(src['公告链接'],'招聘公告')}${detailEntryLink(src['网申链接/邮箱'],'投递入口')}</div>${e.note?`<p class="detail-prose">${esc(e.note)}</p>`:''}</article>`;
 }
+function detailChevronIcon(){return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>';}
+function detailDisclosureHtml(label){return `<summary class="detail-disclosure"><span>${esc(label)}</span>${detailChevronIcon()}</summary>`;}
+function detailFollowupHtml(idx,item){
+  const options=STATUSES.map(st=>`<option ${item._status===st?'selected':''}>${st}</option>`).join('')+(STATUSES.includes(item._status)?'':`<option selected disabled>${esc(item._status||UNKNOWN_STATUS)}</option>`);
+  return `<section class="detail-section" id="detailFollowup" aria-label="投递跟进"><div class="detail-progress-row"><label for="detailStatus">投递进度</label><span class="detail-status-control"><select id="detailStatus" onchange="setStatus(${idx},this.value);showDetail(${idx})">${options}</select>${detailChevronIcon()}</span><button class="btn btn-sm" aria-pressed="${item._starred}" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button><button class="btn btn-sm" aria-pressed="${item._research}" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><button class="btn btn-sm" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button></div><details id="detailNotes" class="detail-followup-notes">${detailDisclosureHtml('跟进记录')}<div class="detail-note-block"><div class="detail-section-heading"><h3>个人备注</h3><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p></div><div class="detail-note-block"><label class="detail-subtitle" for="researchNote">待核实事项</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存记录</button></div></div></details></section>`;
+}
 function detailMaterialsHtml(idx){
-  const item=byId(idx);if(!item)return '';
-  const entries=[['prospect','岗位探查',detailProspects(item).filter(p=>p.filename).length,'份报告'],['prep','面试准备',prepData.preps.filter(p=>p.companyKey===item._key).length,'份准备'],['review','面试复盘',reviewData.sessions.filter(r=>r.companyKey===item._key).length,'场复盘']];
-  return `<div class="detail-material-entries" aria-label="关联材料">${entries.map(([kind,label,count,unit])=>`<button type="button" class="detail-material-entry" data-material="${kind}" onclick="openApplicationMaterial(${idx},'${kind}')"><span><strong>${label}</strong><small>${count?count+' '+unit:'查看或添加'}</small></span>${navigationIcon(true)}</button>`).join('')}</div><div class="detail-secondary-links"><button type="button" onclick="openGeneralPreparation()">通用准备 ${navigationIcon(true)}</button><button type="button" onclick="closeDetailModal();switchView('review');switchReviewTab('weakness')">弱项追踪 ${navigationIcon(true)}</button></div>`;
+  if(!byId(idx))return '';
+  const entries=[['prospect','岗位探查'],['prep','面试准备'],['review','面试复盘']];
+  return `<div class="detail-material-entries" aria-label="本公司材料">${entries.map(([kind,label])=>`<button type="button" class="btn btn-sm detail-material-entry" data-material="${kind}" onclick="openApplicationMaterial(${idx},'${kind}')"><span>${label}</span>${navigationIcon(true)}</button>`).join('')}</div>`;
 }
 async function loadDetailRelations(idx,request){
   const item=byId(idx);if(!item)return;
   const current=()=>request===detailLoadId&&detailIdx===idx&&document.getElementById('detailModal').style.display==='flex';
-  const results=await Promise.allSettled([window.toudiSchedule.refresh({preserveInspector:true}),ensureViewData('qbank'),ensureViewData('review'),ensureViewData('prospect')]);
+  const results=await Promise.allSettled([window.toudiSchedule.refresh({preserveInspector:true})]);
   if(!current())return;
   const target=document.getElementById('detailSchedule');
   if(results[0].status==='rejected'||window.toudiSchedule.hasError())target.innerHTML='<p class="detail-context">日程暂时无法读取，可在日程页重新读取。</p>';
   else {const events=window.toudiSchedule.linked(item._key),format=event=>!event.start?'待安排':event.allDay?event.start:new Intl.DateTimeFormat('zh-CN',{timeZone:event.timeZone||'Asia/Shanghai',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(event.start));target.innerHTML=events.length?events.slice().sort((a,b)=>(a.start||'9999').localeCompare(b.start||'9999')).map(event=>`<button class="detail-schedule-row" data-detail-event="${esc(event.id)}"><span><strong>${esc(event.title)}</strong><small>${esc(format(event))} · ${event.status==='completed'?'已完成':'待完成'}</small></span><span aria-hidden="true">›</span></button>`).join(''):'<p class="detail-context">尚未安排日程</p>';}
-  document.getElementById('detailMaterials').innerHTML=detailMaterialsHtml(idx);
 }
 function showDetail(idx,options={}){
   const opening=document.getElementById('detailModal').style.display!=='flex';if(opening)detailReturnFocus=document.activeElement;
@@ -1988,7 +1993,7 @@ function showDetail(idx,options={}){
   if(options.fresh)detailInputMemory.delete(idx);else rememberDetailInputs();detailIdx=idx;
   const item=byId(idx);if(!item)return;
   const sources=Array.isArray(item['归并来源'])?item['归并来源']:[];
-  let html=`<section class="detail-section" id="detailFollowup" aria-label="投递跟进"><div class="detail-progress-row"><label for="detailStatus">投递进度</label><select id="detailStatus" onchange="setStatus(${idx},this.value);showDetail(${idx})">${STATUSES.map(st=>`<option ${item._status===st?'selected':''}>${st}</option>`).join('')}${STATUSES.includes(item._status)?'':`<option selected disabled>${esc(item._status||UNKNOWN_STATUS)}</option>`}</select><button class="btn btn-sm" aria-pressed="${item._starred}" onclick="toggleStar(${idx});showDetail(${idx})">${item._starred?'取消收藏':'收藏'}</button><button class="btn btn-sm" aria-pressed="${item._research}" onclick="toggleResearch(${idx});showDetail(${idx})">${item._research?'移出待探查':'标为待探查'}</button><button class="btn btn-sm" onclick="toggleExclude(${idx});closeDetailModal()">${item._excluded?'恢复为适合':'标为不适合'}</button></div><details id="detailNotes" class="detail-followup-notes"><summary>跟进记录<span>${item._note||item._researchNote?'查看备注与待核实事项':'添加备注或待核实事项'}</span></summary><div class="detail-note-block"><div class="detail-section-heading"><h3>个人备注</h3><button class="btn btn-sm" onclick="closeDetailModal();openNoteModal(${idx})">编辑备注</button></div><p class="detail-prose">${esc(item._note||'暂无备注')}</p></div><div class="detail-note-block"><label class="detail-subtitle" for="researchNote">待核实事项</label><textarea id="researchNote" class="research-record" placeholder="记录待核实的问题、已确认的信息及来源。">${esc(item._researchNote||'')}</textarea><div class="detail-actions"><button class="btn btn-sm" onclick="saveResearchNote(${idx})">保存记录</button></div></div></details></section><section class="detail-section" id="detailMaterials" aria-label="准备、探查与复盘">${detailMaterialsHtml(idx)}</section><section class="detail-section" id="detailRecruitment" aria-label="招聘信息"><div class="detail-section-heading"><h3>岗位与要求</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div>${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:`<dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'截止时间','招聘截止')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}</dl>`}<details id="detailSourceInfo" class="detail-source-info"><summary>企业信息与招聘来源${sources.length?' · '+sources.length+' 条':''}</summary><dl class="detail-facts">${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl>${sources.length?sources.map(mergedSourceHtml).join(''):''}</details><div class="detail-related-schedule"><div class="detail-section-heading"><h3>关联日程</h3></div><div id="detailSchedule"><p class="detail-context">正在读取日程…</p></div></div></section>`;
+  let html=`${detailFollowupHtml(idx,item)}<section class="detail-section" id="detailMaterials" aria-label="准备、探查与复盘">${detailMaterialsHtml(idx)}</section><section class="detail-section" id="detailRecruitment" aria-label="招聘信息"><div class="detail-section-heading"><h3>岗位与要求</h3><button class="btn btn-sm" onclick="toggleFieldEdit(${idx})" aria-expanded="${fieldEditIdx===idx}">${fieldEditIdx===idx?'收起修改':'修改信息'}</button></div>${fieldEditIdx===idx?`<div class="detail-editor">${fieldEditForm(item)}</div>`:`<dl class="detail-facts">${detailFact(item,'岗位','岗位与招聘方向',true)}${detailFact(item,'地点','工作地点')}${detailFact(item,'截止时间','招聘截止')}${detailFact(item,'应届生','毕业届别')}${detailFact(item,'学历要求')}</dl>`}<details id="detailSourceInfo" class="detail-source-info">${detailDisclosureHtml('企业信息与招聘来源'+(sources.length?' · '+sources.length+' 条':''))}<dl class="detail-facts">${detailFact(item,'性质','企业性质')}${detailFact(item,'录入时间')}${detailFact(item,'行业','行业与业务',true)}</dl>${sources.length?sources.map(mergedSourceHtml).join(''):''}</details><div class="detail-related-schedule"><div class="detail-section-heading"><h3>关联日程</h3></div><div id="detailSchedule"><p class="detail-context">正在读取日程…</p></div></div></section>`;
   document.getElementById('detailTitle').textContent=item['名称'];
   document.getElementById('detailMeta').textContent=[item['校招类型']||'招聘记录',item._status,item._starred?'已收藏':''].filter(Boolean).join(' · ');
   document.getElementById('detailLead').innerHTML=`<div class="detail-entry-actions"><div class="detail-links">${detailEntryLink(item['公告链接'],'招聘公告')}${detailEntryLink(item['网申链接/邮箱'],'投递入口')}</div><button class="btn btn-sm btn-primary" onclick="window.toudiSchedule.openForRecord(byId(${idx})._key)">添加日程</button></div>`;
@@ -3329,7 +3334,7 @@ function initWorkspaceUI(){
  side.querySelector('.sb-footer .btn-group').remove();
  document.querySelector('.content').insertAdjacentHTML('beforeend','<div id="settingsView" style="display:none"></div>');
  document.body.insertAdjacentHTML('beforeend','<div id="filterModal" class="modal-overlay workspace-filter-modal" style="display:none" onclick="if(event.target===this)closeFilters()"><div class="filter-dialog" role="dialog" aria-modal="true" aria-labelledby="filterDialogTitle"><div class="filter-dialog-head"><h2 id="filterDialogTitle">筛选投递记录</h2><button class="btn" onclick="closeFilters()">完成</button></div><p>在当前搜索与快捷视图内筛选，勾选后立即生效。</p><div id="filterDialogBody"></div></div></div>');document.getElementById('filterDialogBody').append(document.getElementById('filterPanel'));document.querySelector('#filterModal .filter-dialog').insertAdjacentHTML('beforeend','<div class="filter-dialog-actions"><button class="btn btn-sm" onclick="clearAdditional()">清除附加条件</button><button class="btn btn-sm" onclick="resetFilters()">重置全部</button><button class="btn btn-sm" onclick="saveCurrentView()">保存视图</button></div>');
- side.querySelector('.sb-footer').insertAdjacentHTML('afterbegin',`<div class="theme-toolbar"><div class="theme-quick-control"><button id="themeQuickToggle" type="button" onclick="toggleThemeQuick()" aria-label="切换主题"></button><button id="themeMenuButton" type="button" aria-label="选择主题模式" aria-haspopup="menu" aria-controls="themeMenu" aria-expanded="false" onclick="toggleThemeMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></button></div><div id="themeMenu" role="menu" aria-label="主题模式" hidden>${[['system','跟随系统'],['light','浅色'],['dark','深色']].map(([key,label])=>`<button type="button" role="menuitemradio" data-theme="${key}" aria-checked="false" onclick="chooseTheme('${key}')"><span>${label}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button>`).join('')}</div></div>`);
+ side.querySelector('.sb-footer').insertAdjacentHTML('afterbegin',`<div class="theme-toolbar"><div class="theme-mode-control" role="group" aria-label="外观模式">${[['light','浅色'],['dark','深色'],['system','跟随电脑']].map(([key,label])=>`<button type="button" data-theme="${key}" aria-label="${label}" title="${label}" aria-pressed="false" onclick="chooseTheme('${key}')">${themeModeIcon(key)}</button>`).join('')}</div></div>`);
  document.querySelector('.topbar-tools button[disabled]').remove();document.querySelector('.topbar-tools').style.display='none';
  QUICK_VIEWS.find(q=>q.id==='recommended').label='符合偏好';
  render();switchView(workspace.defaultView);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeFilters();});
@@ -3358,29 +3363,18 @@ function applyTheme(){
   updateThemeShortcut();
 }
 function updateThemeShortcut(){
-  const toggle=document.getElementById('themeQuickToggle');if(!toggle)return;
-  const dark=document.documentElement.dataset.theme==='dark',label=dark?'深色':'浅色';
-  const path=dark?'<path d="M20.9 13A9 9 0 0 1 11 3.1a9 9 0 1 0 9.9 9.9Z"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>';
-  toggle.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+path+'</svg><span>'+label+'</span>';
-  toggle.setAttribute('aria-label','切换为'+(dark?'浅色':'深色'));
-  toggle.title=(workspace.theme==='system'?'跟随系统 · ':'')+label+'；点击切换为'+(dark?'浅色':'深色');
-  document.querySelectorAll('#themeMenu [role=menuitemradio]').forEach(button=>button.setAttribute('aria-checked',String(button.dataset.theme===workspace.theme)));
+  const chosen=['light','dark','system'].includes(workspace.theme)?workspace.theme:'system';
+  document.querySelectorAll('.theme-mode-control [data-theme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.theme===chosen)));
 }
-function toggleThemeQuick(){setSettingsOption('theme',document.documentElement.dataset.theme==='dark'?'light':'dark');}
-function closeThemeMenu(){const menu=document.getElementById('themeMenu');if(menu)menu.hidden=true;document.getElementById('themeMenuButton')?.setAttribute('aria-expanded','false');}
-function toggleThemeMenu(){
-  const menu=document.getElementById('themeMenu'),open=menu.hidden;menu.hidden=!open;
-  document.getElementById('themeMenuButton').setAttribute('aria-expanded',String(open));
-  if(open)(menu.querySelector('[aria-checked="true"]')||menu.querySelector('button')).focus();
+function themeModeIcon(mode){
+  const path=mode==='dark'?'<path d="M20.9 13A9 9 0 0 1 11 3.1a9 9 0 1 0 9.9 9.9Z"/>':mode==='system'?'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4m-4 0h8"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>';
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+path+'</svg>';
 }
-function chooseTheme(value){setSettingsOption('theme',value);closeThemeMenu();document.getElementById('themeMenuButton').focus();}
-document.addEventListener('click',event=>{if(!event.target.closest('.theme-toolbar'))closeThemeMenu();});
+function chooseTheme(value){if(!['light','dark','system'].includes(value))return;setSettingsOption('theme',value);applyTheme();}
 document.addEventListener('keydown',event=>{
-  const menu=document.getElementById('themeMenu');if(!menu||menu.hidden)return;
-  if(event.key==='Escape'){event.preventDefault();closeThemeMenu();document.getElementById('themeMenuButton').focus();}
-  else if(event.target.closest('#themeMenu')&&['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
-    event.preventDefault();const buttons=[...menu.querySelectorAll('button')],i=buttons.indexOf(document.activeElement),n=event.key==='Home'?0:event.key==='End'?buttons.length-1:(i+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[n].focus();
-  }else if(event.key==='Tab')closeThemeMenu();
+  const control=event.target.closest('.theme-mode-control');if(!control||!['ArrowRight','ArrowLeft','Home','End'].includes(event.key))return;
+  event.preventDefault();const buttons=[...control.querySelectorAll('button')],i=buttons.indexOf(document.activeElement),n=event.key==='Home'?0:event.key==='End'?buttons.length-1:(i+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;
+  buttons[n].focus();chooseTheme(buttons[n].dataset.theme);
 });
 function setAppearance(key,value){workspace[key]=value;saveWorkspace();applyTheme();}
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(workspace.theme==='system')applyTheme();});
@@ -3638,7 +3632,7 @@ function renderSettings(){
         <ol class="agent-setup-flow">
           <li><span class="setup-number">1</span><div><strong>按任务提供材料</strong><p>更新记录时提供招聘信源；准备面试时提供 JD 与简历；复盘时提供真实逐字稿。只提供本次任务需要的内容。</p></div></li>
           <li><span class="setup-number">2</span><div><strong>把启动消息发给 Codex</strong><p>用 ChatGPT 账号登录本机 Codex，提供必要文件与命令权限。复制下方消息并补充材料，让 Codex 确认 TouDi 的当前工作区。</p></div></li>
-          <li><span class="setup-number">3</span><div><strong>完成一次小范围任务</strong><p>在对应模块点击“交给 Agent”，补充材料与范围。只有更新招聘记录且首次读取或新增信源时，才核对分类；已有流程直接沿用。</p></div></li>
+          <li><span class="setup-number">3</span><div><strong>完成一次小范围任务</strong><p>把任务、材料与范围发给 Codex。准备、探查和复盘模块也可复制各自的任务消息。只有更新招聘记录且首次读取或新增信源时，才核对分类；已有流程直接沿用。</p></div></li>
           <li><span class="setup-number">4</span><div><strong>需要填报时，配置 Luna</strong><p>在辅助填报中安装 Chrome 工具包、连接同一工作区，选择“本机 Codex”，检查连接后选择 gpt-6-luna 并保存。核对使用现有 Codex 额度，不需要 API Key。</p></div></li>
           <li><span class="setup-number">5</span><div><strong>查看结果，继续安排任务</strong><p>Codex 保存并读回后，App 自动读取更新；也可点“刷新资料”。检查正文、进度与附件，之后直接安排更新、准备、探查或复盘。</p></div></li>
         </ol>

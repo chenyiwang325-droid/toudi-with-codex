@@ -14,6 +14,19 @@
     report.navigation={themeBottom:themeRect.bottom,toolbarHeight:toolbarRect.height};
     check(themeRect.height>0&&themeRect.bottom<=innerHeight&&toolbarRect.height>0&&toolbarRect.height<=30,'native appearance shortcut and compact result row fit the viewport');
     check(document.getElementById('workspaceUpdatesButton').hidden,'native idle update status stays hidden');
+    check(document.getElementById('storageBadge').hidden,'native healthy connection has no permanent badge');
+    check([...document.querySelectorAll('.theme-mode-control button')].map(el=>el.getAttribute('aria-label')).join('|')==='浅色|深色|跟随电脑'&&!document.getElementById('themeMenu'),'native appearance uses three direct icon choices');
+    for(const mode of ['dark','system','light']){
+      document.querySelector('.theme-mode-control [data-theme="'+mode+'"]').click();
+      check(workspace.theme===mode&&document.querySelector('.theme-mode-control [aria-pressed="true"]').dataset.theme===mode,'native appearance choice '+mode+' updates the selected control');
+    }
+    const openStarted=performance.now();await openManagement('records');
+    report.recordDialog={openMs:performance.now()-openStarted,elements:document.querySelectorAll('#managementOverlay *').length};
+    check(!document.querySelector('.management-list')&&report.recordDialog.elements<120&&document.querySelector('[data-mfield="名称"]').value==='','native record entry stays bounded with thousands of records');
+    check([...document.querySelectorAll('#managementTools [role="tab"]')].map(el=>el.textContent).join('|')==='新增记录|导入 / 导出'&&document.getElementById('managementSubmit').textContent==='保存记录','native new-record flow needs only save');
+    document.getElementById('recordTransferTab').click();
+    check(!!document.querySelector('#managementBody input[type="file"]')&&!/导出完整规范|导出当前草稿|交给 Agent|检查与预览/.test(document.getElementById('managementOverlay').textContent),'native transfer task has clearly named import and export');
+    closeManagement();
     const input=document.getElementById('searchInput'),totals=document.getElementById('statsBar').textContent;
     input.value='合成产品';input.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:true,inputType:'insertCompositionText'}));
     check(searchQuery==='合成产品'&&getFiltered().length===1,'native IME input filters immediately');
@@ -62,6 +75,12 @@
     await wait(()=>!document.getElementById('detailSchedule').textContent.includes('正在读取'));
     check(!document.querySelector('#detailLead [role="tab"]')&&document.querySelectorAll('#detailContent>.detail-section').length===3,'native detail uses continuous sections');
     check(document.querySelectorAll('[data-material]').length===3&&!document.getElementById('detailNotes').open,'native related materials are visible and long notes start collapsed');
+    check([...document.querySelectorAll('[data-material]')].map(el=>el.textContent.trim()).join('|')==='岗位探查|面试准备|面试复盘'&&!document.querySelector('#detailMaterials small,.detail-secondary-links'),'native company material links have no counters or global shortcuts');
+    const status=document.getElementById('detailStatus'),statusRect=status.getBoundingClientRect(),arrowRect=document.querySelector('.detail-status-control>svg').getBoundingClientRect();
+    report.statusControl={height:statusRect.height,arrowOffset:Math.abs(arrowRect.y+arrowRect.height/2-statusRect.y-statusRect.height/2),appearance:getComputedStyle(status).appearance,buttonHeights:[...document.querySelectorAll('.detail-progress-row button')].map(el=>el.getBoundingClientRect().height)};
+    check(report.statusControl.height===34&&report.statusControl.buttonHeights.every(height=>height===34)&&report.statusControl.arrowOffset<.5&&report.statusControl.appearance==='none','native status selector has consistent dimensions and a centered arrow');
+    check(document.querySelector('#detailNotes>summary').textContent.trim()==='跟进记录','native follow-up disclosure shows only its action label');
+    check(document.querySelectorAll('#detailNotes>.detail-disclosure,#detailSourceInfo>.detail-disclosure').length===2,'native detail disclosures share the same visual control');
     check(document.querySelector('.detail-entry-actions>button').textContent==='添加日程','native schedule action describes editing a proposal');
     document.getElementById('detailNotes').open=true;document.getElementById('researchNote').value='完整的合成未保存记录';
     await openApplicationMaterial(detailRow._idx,'prep');check(view==='qbank'&&qbMode==='company','native preparation link navigates to its real module');
