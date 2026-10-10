@@ -110,6 +110,25 @@ class ScheduleTests(unittest.TestCase):
     def test_revision_signal_detects_external_update(self):
         before=self.w.refresh_revisions()['schedule'];self.save(action='upsert',item=event())
         self.assertNotEqual(self.w.refresh_revisions()['schedule'],before)
+    def test_whole_schedule_policy_persists_without_rewriting_legacy_events(self):
+        legacy={**schedule_store.empty(), 'calendar':{'enabled':True,'calendarId':'synthetic-calendar'},
+                'events':[event(),event(id='other',syncToCalendar=True)]}
+        self.save(action='replace',data=legacy)
+        self.assertNotIn('syncAll',self.w.read('schedule')['calendar'])
+        enabled={**legacy,'calendar':{**legacy['calendar'],'syncAll':True}}
+        self.save(action='replace',data=enabled)
+        fresh=workbench.Workbench(self.w.root).read('schedule')
+        self.assertTrue(fresh['calendar']['syncAll'])
+        self.assertEqual(fresh['events'],legacy['events'])
+        backup=self.w.backup()
+        self.save(action='replace',data={**enabled,'calendar':{**enabled['calendar'],'enabled':False}})
+        self.w.restore(backup,self.w.version())
+        self.assertEqual(self.w.read('schedule')['calendar'],enabled['calendar'])
+        before=self.w.inventory()
+        for invalid in ('true',1,None):
+            with self.subTest(invalid=invalid),self.assertRaises(ValueError):
+                self.save(action='replace',data={**enabled,'calendar':{**enabled['calendar'],'syncAll':invalid}})
+        self.assertEqual(self.w.inventory(),before)
 
 
 if __name__=='__main__': unittest.main()

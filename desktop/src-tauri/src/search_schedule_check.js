@@ -28,6 +28,28 @@
     query.value='';query.dispatchEvent(new Event('input',{bubbles:true}));check(document.querySelectorAll('#scheduleCompanyList [role="option"]').length<=20,'native company list stays bounded');
     document.querySelector('[data-schedule="cancel"]').click();check(!canvas.dataset.previewStart&&window.toudiSchedule.get().events.length===0,'cancel clears preview without creating an event');
     report.nativeStatus=await window.toudiDesktop.calendar('status');check(report.nativeStatus.supported,'native EventKit status bridge');
+    // Exercise synchronization policy in WKWebView without writing system events.
+    const realCalendar=window.toudiDesktop.calendar,calls=[];
+    window.toudiDesktop.calendar=async(action,request)=>{
+      if(action==='status')return {supported:true,authorization:'fullAccess'};
+      if(action==='calendars')return {supported:true,authorization:'fullAccess',calendars:[{id:'synthetic-calendar',title:'合成日历'}]};
+      calls.push(request);return {supported:true,authorization:'fullAccess',results:request.items.map(item=>({id:item.id,ok:true,operation:item.status==='cancelled'?'deleted':'updated'}))};
+    };
+    const syncButton=document.getElementById('scheduleSyncButton');check(!!syncButton,'native standalone sync control');syncButton.click();
+    await wait(()=>document.getElementById('scheduleNativeCalendar'));
+    document.getElementById('scheduleNativeCalendar').value='synthetic-calendar';document.querySelector('[data-schedule="enable-sync"]').click();
+    await wait(()=>window.toudiSchedule.get().calendar.syncAll&&!syncButton.disabled);
+    check(window.toudiSchedule.get().calendar.enabled,'native connection enables whole-schedule policy');
+    document.querySelector('[data-schedule="new"]').click();
+    check(!document.querySelector('[name="syncToCalendar"]'),'native editor has no per-event sync checkbox');
+    const syncEditor=document.getElementById('scheduleForm');syncEditor.elements.title.value='合成自动同步事项';syncEditor.elements.title.dispatchEvent(new Event('input',{bubbles:true}));
+    syncEditor.requestSubmit();await wait(()=>calls.some(call=>call.items.some(item=>item.title==='合成自动同步事项'))&&!syncButton.disabled);
+    const saved=window.toudiSchedule.get().events[0];check(!saved.syncToCalendar,'native new event syncs without a legacy flag');
+    switchView('schedule');document.querySelector('[data-schedule-mode="agenda"]').click();
+    document.querySelector('[data-schedule-id]').click();document.querySelector('[data-schedule="delete"]').click();
+    await wait(()=>calls.some(call=>call.items.some(item=>item.id===saved.id&&item.status==='cancelled'))&&!syncButton.disabled);
+    check(window.toudiSchedule.get().events[0].status==='cancelled','native cancellation keeps tombstone and synchronizes');
+    window.toudiDesktop.calendar=realCalendar;
     report.version=window.toudiDesktop.version;report.records=data.length;
     report.errors=(window.__TOUDI_RENDER_ERRORS__||[]).filter(error=>!String(error).includes('ResizeObserver loop completed'));
     check(report.errors.length===0,'native runtime has no JavaScript errors');

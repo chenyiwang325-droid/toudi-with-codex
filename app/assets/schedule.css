@@ -3,6 +3,11 @@
 #scheduleView{display:flex;flex-direction:column;flex:1;min-height:0;background:var(--card);color:var(--text)}
 .schedule-toolbar{display:flex;justify-content:space-between;gap:16px;padding:16px 22px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap}
 .schedule-navigation,.schedule-tools{display:flex;align-items:center;gap:8px}
+.schedule-sync{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:104px;white-space:nowrap}
+.schedule-sync svg{display:block;width:16px;height:16px;flex-shrink:0}
+.schedule-sync[aria-busy=true] svg{animation:schedule-sync-spin 1.2s linear infinite}
+@keyframes schedule-sync-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.schedule-sync[aria-busy=true] svg{animation:none}}
 .schedule-navigation h2{margin:0 0 0 8px;font-size:16px;line-height:24px;font-weight:600;white-space:nowrap}
 .schedule-icon{width:34px;padding:7px}.schedule-icon svg,.schedule-close svg{width:18px;height:18px;display:block}
 .schedule-tabs{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px;margin-right:8px}

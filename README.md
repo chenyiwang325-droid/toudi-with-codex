@@ -22,11 +22,11 @@
 | Chrome 辅助填报 | 识别当前表单，按模块和记录匹配资料；可选 Luna 核对；补齐经历、填写控件并读回；支持仅填空白及手动复制。 |
 | 岗位探查 | 整理公司和岗位的报告、来源与附件，区分事实、判断和待确认内容。 |
 | 面试准备与复盘 | 管理通用问答和公司专项；按场次整理真实问答、追问、复盘要点及必要改进。 |
-| 日程 | 编辑事项和日期、拖动改期、关联公司与材料；导出日历，或在 macOS 中连接系统日历。 |
+| 日程 | 编辑事项和日期、拖动改期、关联公司与材料；独立按钮启用整份日程同步，后续修改自动更新 macOS 日历，也可导出日历文件。 |
 
 ## 开始使用
 
-**默认使用方式是 TouDi App、Codex 和 Chrome 扩展，个人资料保存在电脑上。** 当前源码为 **v0.6.8 macOS Apple Silicon 预览版**；可下载平台与版本以 [Releases 实际附件](https://github.com/chenyiwang325-droid/toudi-with-codex/releases)为准。App 自带运行组件，不需要另外启动 Python 服务。
+**默认使用方式是 TouDi App、Codex 和 Chrome 扩展，个人资料保存在电脑上。** 当前源码为 **v0.6.9 macOS Apple Silicon 预览版**；可下载平台与版本以 [Releases 实际附件](https://github.com/chenyiwang325-droid/toudi-with-codex/releases)为准。App 自带运行组件，不需要另外启动 Python 服务。
 
 1. **安装 TouDi。** 下载对应安装包，按[桌面安装说明](docs/桌面安装与使用.md)打开。首次使用从空工作区开始；已有资料继续使用原工作区。
 2. **让 Codex 初始化。** 在本机 Codex 中提供招聘信源、简历和本次任务，发送[开始指南中的启动消息](docs/开始与初始化.md#3-让-codex-完成初始化)。Codex 确认绑定工作区、整理资料，并根据指定信源核对默认分类。

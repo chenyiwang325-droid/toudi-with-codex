@@ -12,7 +12,7 @@ STATUSES = ('planned', 'completed', 'cancelled')
 
 def empty():
     return {'schemaVersion': 1, 'timeZone': 'Asia/Shanghai', 'events': [],
-            'calendar': {'enabled': False, 'calendarId': ''}}
+            'calendar': {'enabled': False, 'calendarId': '', 'syncAll': False}}
 
 
 def zone(name):
@@ -96,7 +96,7 @@ def validate(pack):
             if value is not None and (type(value) is not int or not minimum <= value <= maximum):
                 raise ValueError('日程优先级、时长或提醒设置无效')
     config = pack.get('calendar', {'enabled': False, 'calendarId': ''})
-    if not isinstance(config, dict) or set(config) - {'enabled', 'calendarId'} or type(config.get('enabled')) is not bool or not isinstance(config.get('calendarId'), str) or len(config['calendarId']) > 512:
+    if not isinstance(config, dict) or set(config) - {'enabled', 'calendarId', 'syncAll'} or type(config.get('enabled')) is not bool or type(config.get('syncAll', False)) is not bool or not isinstance(config.get('calendarId'), str) or len(config['calendarId']) > 512:
         raise ValueError('本机日历连接设置无效')
     if config['enabled'] and not config['calendarId']:
         raise ValueError('请选择本机目标日历')

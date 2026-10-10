@@ -150,6 +150,14 @@ fn times(i: &Item) -> Result<(f64, f64), String> {
     }
     Ok((start, end))
 }
+fn validate_sync_time(i: &Item) -> Result<(), String> {
+    // Removing an owned binding does not require a date in the current source.
+    // The original saved event and ownership check still govern the deletion.
+    if i.status != "cancelled" {
+        times(i)?;
+    }
+    Ok(())
+}
 fn validate(r: &Request) -> Result<(), String> {
     if !valid_key(&r.workspace_key)
         || r.calendar_id.is_empty()
@@ -385,7 +393,7 @@ mod native {
             let mut results = Vec::new();
             for i in r.items {
                 let result = (|| -> Result<Value, String> {
-                    times(&i)?;
+                    validate_sync_time(&i)?;
                     let c = calendar.as_ref().ok_or("所选日历已失效")?;
                     let write: Bool = msg_send![&**c, allowsContentModifications];
                     if !write.as_bool() {
@@ -500,6 +508,15 @@ mod tests {
     use super::*;
     fn item() -> Item {
         serde_json::from_value(json!({"id":"synthetic_1","title":"示例","start":"2026-10-10","end":null,"allDay":true,"timeZone":"Asia/Shanghai","notes":"","location":"","url":"","status":"planned","reminderMinutes":15})).unwrap()
+    }
+    #[test]
+    fn cancelled_items_do_not_require_dates_to_remove_the_owned_binding() {
+        let mut i = item();
+        i.start.clear();
+        i.all_day = false;
+        assert!(validate_sync_time(&i).is_err());
+        i.status = "cancelled".into();
+        assert!(validate_sync_time(&i).is_ok());
     }
     #[test]
     fn meeting_information_is_plain_text_and_preserves_full_notes() {
