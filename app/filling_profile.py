@@ -88,8 +88,10 @@ ALIASES['职责描述']+=['职责和成就']
 ALIASES['角色']+=['项目职务']
 MODULE_ALIASES['language']['证书类型']+=['英语证书名称']
 MODULE_ALIASES['campus-role']['职务']+=['校内职务名称']
-MODULE_ALIASES['awards']={'奖项描述':['详细描述','奖励描述'], '获奖类型':['奖项类别','奖励类别'], '获奖级别':['奖励级别']}
-MODULE_ALIASES['internship']={'工作职责':['项目描述'], '职责':['项目描述']}
+MODULE_ALIASES['awards']={'奖项描述':['详细描述','奖励描述','描述'], '获奖类型':['奖项类别','奖励类别'], '获奖级别':['奖励级别']}
+MODULE_ALIASES['internship']={'工作职责':['项目描述','描述'], '职责':['项目描述','描述']}
+MODULE_ALIASES['project']['项目描述']+=['描述']
+ALIASES['熟练程度']+=['精通程度']
 ALIASES['个人评价']+=['自我描述']
 ALIASES['出生日期']+=['出生日期 (年龄)','出生日期（年龄）']
 ALIASES['家庭地址']+=['家庭所在地']
@@ -589,7 +591,7 @@ def plan_fields(profile,scan,mappings=None,today=None,record_bindings=None):
         if binding:
             row['recordBinding']={k:binding[k] for k in ('groupId','status','recordId','recordLabel')}
             row['allowedFactKeys']=[f['key'] for f in profile['facts'] if not f.get('manual') and f['module']==binding['module'] and f['recordId']==binding['recordId'] and mapping_matches(match_profile,match_field,f)] if binding['status']=='bound' else []
-        kind=field.get('type','text'); label=row['label'];deferred_select=kind=='combobox' and field.get('adapter') in ('moka-select','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region')
+        kind=field.get('type','text'); label=row['label'];deferred_select=kind=='combobox' and field.get('adapter') in ('moka-select','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region','ant-period-date','ant-year-date')
         if field.get('unsupported') or kind not in ('text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'):
             row.update(status='unsupported',reason='控件尚不支持可靠填入。')
         elif kind in ('file','checkbox') or (kind=='combobox' and not field.get('options') and not deferred_select) or manual_field(field):row.update(status='manual',reason='上传、协议或复杂控件需要人工操作。')

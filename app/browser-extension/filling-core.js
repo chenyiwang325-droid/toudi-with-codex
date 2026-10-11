@@ -257,7 +257,7 @@
       for(const k of ['label','groupLabel','recordHint'])if(!text(f[k] || ''))throw Error('网页字段说明过长。');
       if(f.options && (!Array.isArray(f.options) || f.options.length>1000 || f.options.some(o=>!o || !text(o.text) || !text(o.value,2000))))throw Error('网页选项结构无效。');
       if(f.dateFormat && !dateFormats.includes(f.dateFormat))throw Error('网页日期格式无效。');
-      if(f.datePart && (!['year','month'].includes(f.datePart) || !['开始日期','结束日期'].includes(f.semanticLabel) || f.adapter!=='moka-select'))throw Error('拆分日期结构无效。');
+      if(f.datePart && !(f.adapter==='moka-select' && ['year','month'].includes(f.datePart) && ['开始日期','结束日期'].includes(f.semanticLabel) || f.adapter==='ant-year-date' && f.datePart==='year' && f.semanticLabel==='获奖日期'))throw Error('拆分日期结构无效。');
       seen.add(f.id);
     }
     return scan;
@@ -367,6 +367,10 @@
     const mod=moduleHint(field),label=normal(field.label),facts=scoped.facts.filter(f=>!f.manual && String(f.value ?? '').trim());
     const one=name=>{const fs=facts.filter(f=>f.label===name);return fs.length===1?fs[0]:null;};
     const result=(source,value)=>source.length?{fact:source[0],value,sourceKeys:source.map(f=>f.key),derived:true,sensitive:source.some(f=>f.sensitive)}:null;
+    if(languageAbility(field) && ['语言','语种','语言类型','外语语种'].map(normal).includes(label)){
+      const source=englishFacts(scoped).filter(f=>f.label==='语种'),values=new Set(source.map(f=>normal(f.value)));
+      if(source.length && values.size===1)return result(source,String(source[0].value));
+    }
     if(languageAbility(field) && label===normal('取得证书')){
       const certs=englishFacts(scoped).filter(f=>f.label==='证书类型');
       return result(certs,[...new Set(certs.map(f=>String(f.value)))].join('；'));
@@ -424,7 +428,7 @@
       const kind=field.type || 'text';
       const unsupportedReasons={'disabled-or-readonly':'网站锁定了此字段，请先在网站中解除或修改关联记录。','custom-date':'已识别日期字段；此网站的日历控件需手动选择。','split-date':'已识别分开的年月选项；请按对应经历手动选择，避免混填日期。','unlabeled':'未找到可靠的字段标题，请在网页中确认。','custom-selector':'已识别下拉字段，但暂不能可靠读取选项，请手动选择。'};
       if(field.unsupported || !['text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'].includes(kind))return {...row,status:'unsupported',reason:unsupportedReasons[field.unsupported] || '控件尚不支持可靠填入。'};
-      const deferredSelect=kind==='combobox' && ['moka-select','moka-region','moka-date','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region'].includes(field.adapter);
+      const deferredSelect=kind==='combobox' && ['moka-select','moka-region','moka-date','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region','ant-period-date','ant-year-date'].includes(field.adapter);
       if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length && !deferredSelect) || manualField(field))return {...row,status:'manual',reason:'上传、协议或复杂控件需要人工操作。'};
       if(binding && binding.status!=='bound')return {...row,status:'ambiguous',reason:binding.reason};
       const composed=composedValue(p,matchProfile,matchField,binding);

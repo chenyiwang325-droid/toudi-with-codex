@@ -210,14 +210,21 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
   }
   const dateLabel=label=>/^(出生日期(?:（年龄）|\s*\(年龄\))?|毕业时间|入学时间|开始时间|结束时间|开始日期|结束日期|获奖时间|取得日期|获得时间|获证日期|考试日期|发布时间)$/.test(label);
   const dateValue=v=>{const m=String(v).match(/^(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2})日?)?$/);return m?m[1]+'-'+m[2].padStart(2,'0')+(m[3]?'-'+m[3].padStart(2,'0'):''):v;};
-  const antField=node=>node.closest('.ant-form-item');
+  const antField=node=>node.closest('.ant-form-item,.atsx-form-item');
+  const atsxSection=node=>node.closest('[class*="createFormSection__"]');
+  const atsxTitle=node=>{const left=atsxSection(node)?.querySelector(':scope > .createFormSection-left');return compact(left?.querySelector('.createFormSection-title > p')?.textContent || [...(left?.querySelectorAll(':scope > p') || [])].map(n=>compact(n.textContent)).find(Boolean));};
   const antTitle=field=>{
-    const label=[...(field?.querySelectorAll('.ant-form-item-label label,.ant-form-item-label') || [])].find(n=>n.closest('.ant-form-item')===field);
+    const label=[...(field?.querySelectorAll('.ant-form-item-label label,.atsx-form-item-label label,.ant-form-item-label,.atsx-form-item-label') || [])].find(n=>antField(n)===field);
     if(!label)return '';
+    const name=label.querySelector('.customResumeForm-fieldName');if(name)return compact(name.textContent).replace(/[＊*?？]\s*$/,'').trim();
     const copy=label.cloneNode(true);copy.querySelectorAll('.labelRequired,.anticon,[role="img"],button').forEach(n=>n.remove());
     return compact(copy.textContent).replace(/[＊*?？]\s*$/,'').trim();
   };
   function antRead(node) {
+    if(node.matches('.atsx-date-picker-period-month-label')){
+      const year=compact(node.querySelector('[data-cy="year"]')?.textContent),month=compact(node.querySelector('[data-cy="month"]')?.textContent);
+      return /^\d{4}$/.test(year)&&/^\d{1,2}$/.test(month)?year+'-'+month.padStart(2,'0'):'';
+    }
     if(node.matches('.ant-radio-group'))return node.querySelector('input:checked')?.value || '';
     if(node.matches('.cascader-plugins-wrap')){
       const values=[...node.querySelectorAll('[role="combobox"]')].map(antRead);
@@ -225,39 +232,52 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       if(/时间|日期/.test(antTitle(antField(node))))return dateValue(values.map(v=>v.replace(/[年月]/g,'')).join('-'));
       return values.join('/');
     }
-    if(node.matches('[role="combobox"]'))return compact((node.closest('.ant-select') || node).querySelector('.ant-select-selection-selected-value,.ant-select-selection-item')?.textContent);
+    if(node.matches('[role="combobox"]')){
+      const box=node.closest('.ant-select,.atsx-select') || node,selected=box.querySelector('.ant-select-selection-selected-value,.ant-select-selection-item,.atsx-select-selection-selected-value');
+      return compact(selected?.textContent || (atsxAutocomplete(node)?node.querySelector('.atsx-select-search__field')?.value:''));
+    }
     const value=String(node.value || '');
     return node.matches('input.ant-input') && /^请选择/.test(node.getAttribute('placeholder') || '') && /专业$/.test(antTitle(antField(node)))?value.replace(/\s*[（(][^()（）]+类[)）]\s*$/,'').trim():value;
   }
   function antContext(field) {
-    const section=field.closest('.form-cell,fieldset,[role="group"]'),record=field.closest('.form-cell-inner') || section || field.closest('form') || field.parentElement;
+    const atsx=atsxSection(field),section=atsx || field.closest('.form-cell,fieldset,[role="group"]'),record=field.closest('.resumeEditForm-item,.form-cell-inner') || (atsx && field.closest('.createFormSection-formList')) || section || field.closest('form') || field.parentElement;
     if(contexts.has(record))return contexts.get(record);
-    const title=compact(section?.querySelector(':scope > .tit-wrap p,:scope > legend,:scope > h2,:scope > h3')?.textContent);
-    const records=section?[...section.querySelectorAll('.form-cell-inner')]:[record],module=moduleOf(title);
+    const title=atsx?atsxTitle(field):compact(section?.querySelector(':scope > .tit-wrap p,:scope > legend,:scope > h2,:scope > h3')?.textContent);
+    const records=section?[...section.querySelectorAll(atsx?'.resumeEditForm-item':'.form-cell-inner')]:[record],module=moduleOf(title);
     const identity=module==='education'?/^(学历|学校名称|毕业院校)$/:module==='work'?/^(单位|单位名称|公司名称|企业名称|实习单位)$/:module==='family'?/^(关系|与本人关系|姓名)$/:module==='awards'?/^(获奖名称|奖励名称|奖项名称|奖项)$/:module==='campus-role'?/^(职务|担任职务|在校职务名称)$/:module==='projects'?/^(项目名称|名称)$/:null;
-    const hints=identity?[...record.querySelectorAll('.ant-form-item')].filter(f=>identity.test(antTitle(f))).map(f=>antRead(f.querySelector('[role="combobox"],input:not([type="hidden"]),textarea') || f)).filter(Boolean):[];
+    const fields=[...record.querySelectorAll('.ant-form-item,.atsx-form-item')],hints=identity?fields.filter(f=>identity.test(antTitle(f))).map(f=>antRead(f.querySelector('[role="combobox"],input:not([type="hidden"]),textarea') || f)).filter(Boolean):[];
     const result={module:module==='other'&&!title?'':module,groupLabel:title,groupPath:structuralPath(record),recordHint:[...new Set(hints)].join(' ')};
+    const language=fields.find(f=>antTitle(f)==='语言'),languageValue=language?antRead(language.querySelector('[role="combobox"]') || language):'';
+    if(atsx && module==='language' && language && /^(?:英语|english)?$/i.test(languageValue) && fields.some(f=>antTitle(f)==='精通程度') && !fields.some(f=>/成绩|考试日期|取得日期/.test(antTitle(f))))result.recordMode='language-ability';
     if(records.length>1)result.groupLabel+=' · 第'+(records.indexOf(record)+1)+'段';
     contexts.set(record,result);return result;
   }
+  function atsxAutocomplete(node){return node.matches('[role="combobox"]') && !!node.closest('.atsx-select') && /学校(?:名称)?$|院校$/.test(antTitle(antField(node))) && !!node.querySelector('.atsx-select-selection__rendered > ul .atsx-select-search__field') && !node.querySelector('.atsx-select-selection-selected-value');}
   function describeAnt(node) {
     const field=antField(node);if(!field)return null;
     const label=antTitle(field) || (node.matches('[role="combobox"]')&&/中国\+86/.test(antRead(node))?'电话区号':''),context=antContext(field),radio=node.matches('.ant-radio-group'),split=node.matches('.cascader-plugins-wrap'),date=!!node.closest('.ant-calendar-picker');
     // Some Ant forms draw school/major selectors as writable inputs. Typing in
     // those inputs never commits the selected directory item.
     const directory=node.matches('input.ant-input')&&!date&&/^请选择/.test(node.getAttribute('placeholder') || '')&&/学校(?:名称)?$|院校$|专业$/.test(label);
+    const period=node.matches('.atsx-date-picker-period-month-label'),year=node.matches('.atsx-date-picker > input[placeholder="YYYY"]');
+    if(period){
+      const parts=[...node.parentElement.querySelectorAll(':scope > .atsx-date-picker-period-month-label')],index=parts.indexOf(node);
+      return {label:label+' · '+(index===0?'开始时间':'结束时间'),context,adapter:'ant-period-date',type:'combobox',dateFormat:'YYYY-MM',dateMeta:{semanticLabel:index===0?'开始日期':'结束日期'},required:!!field.querySelector('.atsx-form-item-required'),unsupported:parts.length!==2?'split-date':''};
+    }
+    if(year && /获奖时间|获奖日期/.test(label))return {label,context,adapter:'ant-year-date',type:'combobox',dateMeta:{datePart:'year',semanticLabel:'获奖日期'},allowReadonly:true,required:!!field.querySelector('.atsx-form-item-required')};
+    if(atsxAutocomplete(node))return {label,context,adapter:'ant-autocomplete',type:'text',required:!!field.querySelector('.atsx-form-item-required')};
     const select=node.matches('[role="combobox"]') || directory;
     const adapter=radio?'ant-radio':split?(/时间|日期/.test(label)?'ant-split-date':'ant-region'):select?'ant-select':date?'ant-date':'';
-    return {label:select&&/联系电话|手机/.test(label)?'电话区号':label,context,adapter,...(radio?{type:'radio',options:[...node.querySelectorAll('input[type="radio"]')].map(n=>({value:n.value,text:compact(n.closest('label')?.textContent)}))}:split||select||date?{type:'combobox'}:{}),required:!!field.querySelector('.ant-form-item-required,.labelRequired'),allowReadonly:date,...(date?{dateFormat:'YYYY-MM-DD'}:adapter==='ant-split-date'?{dateFormat:'YYYY-MM'}:adapter==='ant-region'?{regionDepth:node.querySelectorAll('[role="combobox"]').length}:{})};
+    return {label:select&&/联系电话|手机/.test(label)?'电话区号':label,context,adapter,...(radio?{type:'radio',options:[...node.querySelectorAll('input[type="radio"]')].map(n=>({value:n.value,text:compact(n.closest('label')?.textContent)}))}:split||select||date?{type:'combobox'}:{}),required:!!field.querySelector('.ant-form-item-required,.atsx-form-item-required,.labelRequired'),allowReadonly:date,...(context.recordMode==='language-ability'&&label==='精通程度'?{dateMeta:{semanticLabel:'英语'}}:{}),...(date?{dateFormat:'YYYY-MM-DD'}:adapter==='ant-split-date'?{dateFormat:'YYYY-MM'}:adapter==='ant-region'?{regionDepth:node.querySelectorAll('[role="combobox"]').length}:{})};
   }
   const antMenuRows=menu=>[...menu.querySelectorAll('[role="option"]')].filter(visible).filter(n=>!disabledOption(n));
   function closeAnt(node) {
     const win=node.ownerDocument.defaultView;
     node.dispatchEvent(new win.KeyboardEvent('keydown',{key:'Escape',code:'Escape',keyCode:27,which:27,bubbles:true}));
-    antField(node)?.querySelector('.ant-form-item-label')?.click();
+    const label=antField(node)?.querySelector('.ant-form-item-label,.atsx-form-item-label');if(label)pointerClick(label);
   }
   async function openAntSelect(node) {
-    node.click();
+    pointerClick(node);
     for(let i=0;i<12;i++){
       const id=node.getAttribute('aria-controls') || node.getAttribute('aria-owns'),menu=id?node.ownerDocument.getElementById(id):null;
       if(menu&&visible(menu)&&antMenuRows(menu).length)return menu;
@@ -273,11 +293,11 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       const normalize=v=>numeric?String(Number(String(v).replace(/[年月]/g,''))):equivalence(v,label);
       let matches=antMenuRows(menu).filter(n=>normalize(n.textContent)===normalize(target));
       if(!matches.length&&search){
-        const input=node.matches('input')?node:node.querySelector('.ant-select-search__field,.ant-select-selection-search-input');
+        const input=node.matches('input')?node:node.querySelector('.ant-select-search__field,.ant-select-selection-search-input,.atsx-select-search__field');
         if(input&&!input.disabled&&!input.readOnly){setNative(input,target);for(let i=0;i<15;i++){await wait(60);matches=antMenuRows(menu).filter(n=>normalize(n.textContent)===normalize(target));if(matches.length)break;}}
       }
       if(matches.length!==1)throw Error(matches.length?'option-not-unique':'option-not-found');
-      matches[0].click();
+      pointerClick(matches[0]);
       // Linked fields may remount this combobox after selection. Read the same
       // structural position and title, never the disconnected old element.
       for(let i=0;i<20;i++){
@@ -377,8 +397,67 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       }
     }
   }
+  async function atsxDatePanel(node,selector) {
+    const owner=node.getAttribute('data-cy');
+    if(!owner)throw Error('menu-not-associated');
+    for(let i=0;i<15;i++){
+      const panels=[...node.ownerDocument.querySelectorAll('.atsx-date-picker-dropdown '+selector)].filter(visible).filter(p=>p.getAttribute('data-cy')===owner+'Dropdown');
+      if(panels.length===1)return panels[0];
+      if(panels.length>1)throw Error('menu-not-unique');
+      await wait(30);
+    }
+    throw Error('menu-not-associated');
+  }
+  async function writeAtsxDate(entry,target) {
+    const node=entry.node;
+    try{
+      if(entry.field.adapter==='ant-period-date'){
+        const parts=target.match(/^(\d{4})-(\d{2})$/);
+        if(!parts)throw Error('date-precision-required');
+        const selector='.atsx-date-picker-period-month-panel';
+        pointerClick(node.querySelector('[data-cy="year"]') || node);
+        let panel=await atsxDatePanel(node,selector);
+        const years=[...panel.querySelectorAll('.atsx-date-picker-period-month-panel-list-item')].filter(n=>visible(n)&&!disabledOption(n)&&compact(n.textContent)===parts[1]);
+        if(years.length!==1)throw Error(years.length?'option-not-unique':'date-year-not-found');
+        pointerClick(years[0]);await wait(40);
+        // Choosing a year can commit and close a populated range. Reopen this
+        // same endpoint for the month; never borrow the other endpoint's portal.
+        if(![...node.ownerDocument.querySelectorAll('.atsx-date-picker-dropdown '+selector)].some(p=>visible(p)&&p.getAttribute('data-cy')===node.getAttribute('data-cy')+'Dropdown'))pointerClick(node.querySelector('[data-cy="month"]') || node);
+        panel=await atsxDatePanel(node,selector);
+        const months=[...panel.querySelectorAll('.atsx-date-picker-period-month-panel-list-item')].filter(n=>visible(n)&&!disabledOption(n)&&compact(n.textContent)===parts[2]);
+        if(months.length!==1)throw Error(months.length?'option-not-unique':'date-month-not-found');
+        pointerClick(months[0]);
+      }else{
+        if(!/^\d{4}$/.test(target))throw Error('date-precision-required');
+        pointerClick(node);
+        const seen=new Set();let selected=false;
+        for(let i=0;i<32;i++){
+          const panel=await atsxDatePanel(node,'.atsx-date-picker-panel'),body=panel.querySelector('.atsx-date-picker-panel-body-year');
+          if(!body)throw Error('date-control-unsupported');
+          const cells=[...body.querySelectorAll('.atsx-date-picker-panel-body-cell-content')].filter(visible).filter(n=>!disabledOption(n)),matches=cells.filter(n=>compact(n.textContent)===target);
+          if(matches.length>1)throw Error('option-not-unique');
+          if(matches.length===1){pointerClick(matches[0]);selected=true;break;}
+          const years=cells.map(n=>Number(compact(n.textContent))).filter(Number.isFinite),signature=years.join('|');
+          if(!years.length || seen.has(signature))throw Error('date-year-not-found');seen.add(signature);
+          const direction=Number(target)<Math.min(...years)?'prev':Number(target)>Math.max(...years)?'next':'';
+          const tool=direction?panel.querySelector('.atsx-date-picker-panel-header [data-cy="'+direction+'"]'):null;
+          if(!tool || disabledOption(tool))throw Error('date-year-not-found');
+          pointerClick(tool);await wait(40);
+        }
+        if(!selected)throw Error('date-year-not-found');
+      }
+      for(let i=0;i<15;i++){await wait(40);if(antRead(node)===target)return target;}
+      throw Error('date-not-retained');
+    }finally{closeAnt(node);}
+  }
   async function antWrite(entry,target) {
     const node=entry.node,label=entry.field.label;
+    if(entry.field.adapter==='ant-autocomplete'){
+      const input=node.querySelector('.atsx-select-search__field');if(!input || input.disabled || input.readOnly)throw Error('selector-layout-unsupported');
+      setNative(input,target);closeAnt(node);await wait(60);
+      if(antRead(node)!==target)throw Error('value-not-retained');return target;
+    }
+    if(['ant-period-date','ant-year-date'].includes(entry.field.adapter))return writeAtsxDate(entry,target);
     if(entry.field.adapter==='ant-radio'){
       const matches=[...node.querySelectorAll('input[type="radio"]')].filter(n=>n.value===target);
       if(matches.length!==1||matches[0].disabled)throw Error('option-unavailable');matches[0].click();return antRead(node);
@@ -704,10 +783,10 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       await closePhoenix(entry);
     }
   }
-  const registry=[{id:'moka',label:'Moka',version:'1',detect:root=>!!root.querySelector('[class^="apply-block-"] [class^="apply-field-"],[class*=" apply-block-"] [class*=" apply-field-"]')},{id:'zhiye-phoenix',label:'Zhiye / Phoenix',version:'1',detect:root=>!!root.querySelector('.form-item--phoenix .phoenix-input,.form-item--phoenix .phoenix-select,.form-item--phoenix .phoenix-radio-group')},{id:'ant-design',label:'Ant Design / Hotjob',version:'1',detect:root=>!!root.querySelector('.ant-form-item input,.ant-form-item textarea,.ant-form-item [role="combobox"]')}];
+  const registry=[{id:'moka',label:'Moka',version:'1',detect:root=>!!root.querySelector('[class^="apply-block-"] [class^="apply-field-"],[class*=" apply-block-"] [class*=" apply-field-"]')},{id:'zhiye-phoenix',label:'Zhiye / Phoenix',version:'1',detect:root=>!!root.querySelector('.form-item--phoenix .phoenix-input,.form-item--phoenix .phoenix-select,.form-item--phoenix .phoenix-radio-group')},{id:'ant-design',label:'Ant Design / Hotjob',version:'1',detect:root=>!!root.querySelector('.ant-form-item input,.ant-form-item textarea,.ant-form-item [role="combobox"]')},{id:'atsx',label:'ATSX / 飞书招聘',version:'1',detect:root=>!!root.querySelector('[class*="createFormSection__"] .atsx-form-item')}];
   function platforms(root){if(!platformCache.has(root))platformCache.set(root,registry.filter(a=>a.detect(root)));return platformCache.get(root);}
   function includes(node,root){
-    if(node.closest('nav,header,aside,[role="search"],[role="listbox"],[role="option"],.common-unmodeled-layer,.phoenix-selectList,.ant-select-dropdown,.ant-calendar-picker-container,#toudi-floating-host,[data-toudi-panel]'))return false;
+    if(node.closest('nav,header,aside,[role="search"],[role="listbox"],[role="option"],.common-unmodeled-layer,.phoenix-selectList,.ant-select-dropdown,.atsx-select-dropdown,.atsx-date-picker-dropdown,.ant-calendar-picker-container,#toudi-floating-host,[data-toudi-panel]'))return false;
     const known=platforms(root);
     if(phoenixField(node) || mokaField(node) || antField(node))return true;
     if(!known.some(p=>['zhiye-phoenix','moka'].includes(p.id)))return node.type!=='search';
@@ -725,20 +804,21 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
   return {
     reset(){descriptions=new WeakMap();platformCache=new WeakMap();contexts=new WeakMap();},
     validationError:entry=>{
-      const ant=antField(entry.node);if(ant)return [...ant.querySelectorAll('.ant-form-explain,.ant-form-item-explain-error')].filter(visible).map(n=>compact(n.textContent)).join('；');
+      const ant=antField(entry.node);if(ant)return [...ant.querySelectorAll('.ant-form-explain,.ant-form-item-explain-error,.atsx-form-explain')].filter(visible).map(n=>compact(n.textContent)).join('；');
       const moka=mokaField(entry.node);if(moka)return [...moka.querySelectorAll('[class*="sd-Input-message-"]')].filter(visible).map(n=>compact(n.textContent)).join('；');
       const field=phoenixField(entry.node);if(!field)return '';
       return [...field.querySelectorAll('.form-item__error')].filter(error=>error.closest('.form-item--phoenix')===field&&visible(error)).map(error=>compact(error.textContent)).filter(Boolean).join('；');
     },
-    sectionRoot:(node,label)=>{const block=node.closest(classPart('apply-block-'));return block && compact(directPart(block,'blockTitle-')?.querySelector(classPart('text-'))?.textContent)===label?block:null;},
-    describe,disabled,inspectOptions,moduleOf,pointerClick,deferred:id=>['moka-select','moka-region','moka-date','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region'].includes(id),
+    sectionTitle:node=>atsxSection(node)===node?atsxTitle(node):'',
+    sectionRoot:(node,label)=>{const atsx=atsxSection(node);if(atsx && atsxTitle(node)===label)return atsx;const block=node.closest(classPart('apply-block-'));return block && compact(directPart(block,'blockTitle-')?.querySelector(classPart('text-'))?.textContent)===label?block:null;},
+    describe,disabled,inspectOptions,moduleOf,pointerClick,deferred:id=>['moka-select','moka-region','moka-date','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region','ant-period-date','ant-year-date'].includes(id),
     matchesValue:(entry,target)=>entry.field.adapter==='ant-select'?equivalence(antRead(entry.node),entry.field.label)===equivalence(target,entry.field.label):entry.field.adapter==='ant-split-date'?dateValue(antRead(entry.node))===target:false,
     platforms:root=>{const found=platforms(root);return (found.length?found:[{id:'generic',label:'通用表单',version:'1'}]).map(({id,label,version})=>({id,label,version}));},
     includes,
-    nodes:root=>[...root.querySelectorAll('input,textarea,select,[role="combobox"],.phoenix-radio-group,.ant-radio-group,.cascader-plugins-wrap')].filter(n=>(!n.closest('.phoenix-radio-group')||n.matches('.phoenix-radio-group'))&&(!n.closest('.ant-radio-group')||n.matches('.ant-radio-group'))&&(!n.closest('.cascader-plugins-wrap')||n.matches('.cascader-plugins-wrap'))&&!n.matches('.ant-select-search__field,.ant-select-selection-search-input,.ant-calendar-input')&&!n.closest('.ant-select-dropdown,.ant-calendar-picker-container,.school-wrap[role="dialog"]')),
+    nodes:root=>[...root.querySelectorAll('input,textarea,select,[role="combobox"],.phoenix-radio-group,.ant-radio-group,.cascader-plugins-wrap,.atsx-date-picker-period-month-label')].filter(n=>(!n.closest('.phoenix-radio-group')||n.matches('.phoenix-radio-group'))&&(!n.closest('.ant-radio-group')||n.matches('.ant-radio-group'))&&(!n.closest('.cascader-plugins-wrap')||n.matches('.cascader-plugins-wrap'))&&!n.matches('.ant-select-search__field,.atsx-select-search__field,.ant-select-selection-search-input,.ant-calendar-input,.atsx-date-picker-period-hidden-input')&&!n.closest('.ant-select-dropdown,.atsx-select-dropdown,.atsx-date-picker-dropdown,.ant-calendar-picker-container,.school-wrap[role="dialog"]')),
     read:entry=>entry.field.adapter.startsWith('ant-')?antRead(entry.node):entry.field.adapter==='moka-select'?mokaValue(entry.node):entry.field.adapter==='moka-date'?mokaDateValue(entry.node):entry.field.adapter==='phoenix-date'?dateValue(phoenixRead(entry.node)):phoenixRead(entry.node),
     write:(entry,target)=>entry.field.adapter.startsWith('ant-')?antWrite(entry,target):entry.field.adapter==='moka-select'?selectMoka(entry,target):entry.field.adapter==='moka-region'?selectMokaRegion(entry,target):entry.field.adapter==='moka-date'?selectMokaDate(entry,target):phoenixWrite(entry,target)
   };
 }
-return {create,revision:'13'};
+return {create,revision:'14'};
 });

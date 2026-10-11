@@ -216,6 +216,7 @@
   const disclosureLabels=new WeakMap();
   function sectionHeading(node){
     if(disclosureLabels.has(node))return disclosureLabels.get(node);
+    const adapted=adapters?.sectionTitle?.(node);if(adapted)return adapted;
     const summary=node.matches('details')?node.querySelector(':scope > summary'):null;
     if(summary)return compact(labelText(summary));
     const moka=node.querySelector(':scope > [class*="blockTitle-"] [class*="text-"]');
@@ -235,10 +236,10 @@
     const sections=new Map();
     const install=(node,label,scope)=>{
       const module=adapters?.moduleOf(label);if(!node || !repeatableModules.has(module))return null;
-      node=adapters?.sectionRoot(node,label) || node;
+      const canonical=adapters?.sectionRoot(node,label);node=canonical || node;
       // An add button can sit inside a title wrapper while fields sit in its
       // parent section. Both entrances must describe the same form scope.
-      for(let p=node.parentElement,depth=0;p&&depth<9;p=p.parentElement,depth++){
+      for(let p=node.parentElement,depth=0;!canonical&&p&&depth<9;p=p.parentElement,depth++){
         if(p.tagName==='FORM')break;
         const heading=sectionHeading(p);
         if(heading && heading!==label)break;
@@ -259,7 +260,7 @@
     // Only explicit disclosure controls may be opened during filling.
     for(const [root,scope] of roots)for(const n of root.querySelectorAll('details:not([open]),[aria-expanded="false"][aria-controls]')){
       const control=n.matches('details')?n.querySelector(':scope > summary'):n;
-      if(!control || !visible(control) || control.closest('[role="combobox"],.ant-select,.ant-calendar-picker,#toudi-floating-host,[data-toudi-panel]'))continue;
+      if(!control || !visible(control) || control.closest('[role="combobox"],.ant-select,.atsx-select,.ant-calendar-picker,.atsx-date-picker,#toudi-floating-host,[data-toudi-panel]'))continue;
       const label=compact(labelText(control)),panel=n.matches('details')?n:root.getElementById?.(n.getAttribute('aria-controls'));
       if(!panel || !repeatableModules.has(adapters?.moduleOf(label)) || control.closest('button')?.type==='submit')continue;
       disclosureLabels.set(panel,label);const s=install(panel,label,scope);if(s)s.opens.push(control);

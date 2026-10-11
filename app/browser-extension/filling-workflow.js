@@ -34,6 +34,7 @@ const explanations={
   'option-confirm-unavailable':['控件','未找到可确认的控件按钮；请在网页完成选择。'],
   'date-precision-required':['资料','网站要求具体日期，但资料只有年月；请补充原始日期后再填写。'],
   'date-month-not-found':['日期控件','日期控件中没有可选的对应月份；请查看网站的日期范围。'],
+  'date-year-not-found':['日期控件','日期控件中没有可选的对应年份；请查看网站的日期范围。'],
   'date-day-not-found':['日期控件','日期控件中没有可选的对应日期；请查看网站的日期范围。'],
   'date-not-retained':['读回','网站未保留选择的日期；请检查该日期字段的校验提示。'],
   'value-not-retained':['读回','网站未保留写入值；请检查网页中的字段或校验提示。'],
