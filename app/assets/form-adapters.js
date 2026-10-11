@@ -13,12 +13,14 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
     return title?labelText(title).replace(/[＊*]\s*$/,'').trim():'';
   };
   const mokaSelect = node => node?.closest('[class*="sd-Select-container-"]');
+  const mokaInputs = field => [...field.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),textarea,select')];
   function mokaValue(node) {
     return compact(mokaSelect(node)?.querySelector('[class*="sd-Input-display-value-"]')?.textContent);
   }
   function mokaLabel(node, field) {
     let title=mokaTitle(field);
-    const inputs=[...field.querySelectorAll('input:not([type="hidden"]),textarea,select')];
+    if(node.type==='checkbox')return compact(node.closest('label')?.textContent) || title;
+    const inputs=mokaInputs(field);
     if(inputs.length>1 && mokaSelect(node)) {
       if(/证件号码/.test(title))return '证件类型';
       if(/手机/.test(title))return '电话区号';
@@ -40,7 +42,9 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
     const level=degree?mokaValue(degree.querySelector('input')):'';
     const recordHint=module==='education' && /^(博士研究生|硕士研究生|博士|硕士|本科|专科|大专|高中)$/.test(level)?level:'';
     const records=[...block.children].filter(n=>n.matches(classPart('apply-fields-')));
-    return {groupLabel:title+(records.length>1?' · 第'+(records.indexOf(record)+1)+'段':''),recordHint,module,groupPath:structuralPath(record)};
+    const labels=[...record.querySelectorAll(classPart('apply-field-'))].map(mokaTitle);
+    const recordMode=module==='language' && labels.includes('英语') && labels.includes('取得证书') && !labels.some(l=>/成绩|考试日期|取得日期/.test(l))?'language-ability':'';
+    return {groupLabel:title+(records.length>1?' · 第'+(records.indexOf(record)+1)+'段':''),recordHint,module,groupPath:structuralPath(record),recordMode};
   }
   async function selectMoka(entry,target) {
     const container=entry.node.closest('[class*="sd-Dropdown-container-"]');
@@ -50,7 +54,7 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       const aliases=/^(最高)?学历$/.test(entry.field.label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:{};
       return aliases[text] || text;
     };
-    entry.node.click();
+    pointerClick(entry.node);
     try {
       let choices=[];
       // Read the clicked control's own menu only; no page-wide first-option heuristic.
@@ -63,17 +67,108 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
       if(matches.length!==1)throw Error(matches.length?'option-not-unique':'option-not-found');
       const option=matches[0];
       if(option.closest('a[href],button[type="submit"],[aria-disabled="true"],[class*="disabled"],[class*="Disabled"]'))throw Error('option-disabled');
-      option.click();
+      pointerClick(option);
       return String(option.textContent).trim();
     } finally {
       // Close without choosing another value or triggering a form submission.
-      const title=directPart(mokaField(entry.node),'title-');
-      title?.click();
+      closeMoka(entry.node);
     }
+  }
+  function closeMoka(node){
+    const title=directPart(mokaField(node),'title-');
+    if(title)pointerClick(title);
+    node.blur();
+  }
+  const mokaDateValue=node=>dateValue(String(node.value || '').replace(/\s*[（(]\d+岁[)）]\s*$/,''));
+  const regionNormal=value=>String(value).normalize('NFKC').replace(/[\s/／>、]+/g,'').replace(/(?:壮族|回族|维吾尔)?自治区|特别行政区|省|市/g,'');
+  async function mokaMenu(node){
+    const container=node.closest('[class*="sd-Dropdown-container-"]');
+    if(!container)throw Error('menu-not-associated');
+    pointerClick(node);
+    for(let i=0;i<20;i++){
+      const menus=[...container.querySelectorAll('[class*="sd-Dropdown-dropdown-"]')].filter(visible);
+      if(menus.length===1)return menus[0];
+      if(menus.length>1)throw Error('menu-not-associated');
+      await wait(40);
+    }
+    throw Error('option-unavailable');
+  }
+  async function selectMokaRegion(entry,target){
+    const node=entry.node,wanted=regionNormal(target);if(!wanted)throw Error('region-source-incomplete');
+    let remainder=wanted;const selected=[];
+    try{
+      const menu=await mokaMenu(node),tabs=()=>[...menu.querySelectorAll('li[class*="sd-Tabs-item-"]')].filter(visible);
+      if(tabs().length!==3)throw Error('selector-layout-unsupported');
+      for(let depth=0;depth<3;depth++){
+        const tab=tabs()[depth];if(disabledOption(tab))throw Error('option-disabled');
+        pointerClick(tab);let matches=[];
+        for(let attempt=0;attempt<20;attempt++){
+          const choices=[...menu.querySelectorAll('[class*="page-container-"] [class*="sd-Tag-container-"]')].filter(visible).filter(n=>!disabledOption(n));
+          matches=choices.filter(n=>{const text=regionNormal(n.querySelector('[class*="sd-Tag-text-"]')?.textContent || n.textContent);return text && remainder.startsWith(text);});
+          // Municipalities can expose a second, identical city level.
+          if(!matches.length && depth===1)matches=choices.filter(n=>regionNormal(n.textContent)===selected[0]?.normalized);
+          if(matches.length)break;await wait(40);
+        }
+        if(matches.length!==1)throw Error(matches.length?'option-not-unique':'option-not-found');
+        const normalized=regionNormal(matches[0].textContent);
+        if(remainder.startsWith(normalized))remainder=remainder.slice(normalized.length);
+        selected.push({normalized,text:compact(matches[0].textContent)});pointerClick(matches[0]);await wait(50);
+      }
+      const buttons=[...menu.querySelectorAll('[class*="confirm-"] button')].filter(n=>visible(n) && compact(n.textContent)==='确认' && n.type!=='submit' && !n.disabled && !disabledOption(n));
+      if(buttons.length!==1)throw Error('option-confirm-unavailable');
+      pointerClick(buttons[0]);
+      for(let i=0;i<20;i++){
+        await wait(40);
+        const actual=String(node.value || ''),parts=actual.split(/[\s/／>]+/).filter(Boolean).map(regionNormal);
+        if(!visible(menu) && parts.length===3 && selected.every((s,j)=>s.normalized===parts[j]))return actual;
+      }
+      throw Error('value-not-retained');
+    }finally{closeMoka(node);}
+  }
+  async function selectMokaDate(entry,target){
+    const node=entry.node,parts=String(target).match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);if(!parts)throw Error('date-precision-required');
+    const year=Number(parts[1]),month=Number(parts[2]),day=Number(parts[3]);
+    try{
+      const menu=await mokaMenu(node),yearHead=()=>menu.querySelector('[class*="sd-basic-selector-year-"]');
+      const displayed=()=>Number(compact(yearHead()?.textContent).match(/^\d{4}(?=年?$)/)?.[0]);
+      if(displayed()!==year){
+        if(!yearHead())throw Error('date-control-unsupported');pointerClick(yearHead());await wait(40);
+        let selected=false;
+        for(let i=0;i<25;i++){
+          const items=[...menu.querySelectorAll('[class*="sd-basic-year-item-"]')].filter(visible),years=items.filter(n=>/^\d{4}$/.test(compact(n.textContent))),matches=years.filter(n=>Number(n.textContent)===year && !disabledOption(n) && !n.closest('[class*="sd-basic-disabled-"]'));
+          if(matches.length>1)throw Error('date-year-not-unique');
+          if(matches.length===1){pointerClick(matches[0]);selected=true;await wait(40);break;}
+          const range=compact(yearHead()?.textContent).match(/(\d{4})\s*[-–]\s*(\d{4})/);if(!range)throw Error('date-year-panel-unavailable');
+          const direction=year<Number(range[1])?'Left':year>Number(range[2])?'Right':'';
+          const tools=direction?[...menu.querySelectorAll('[class*="sd-Icon-icondouble'+direction+'-"]')].filter(visible):[];
+          if(tools.length!==1 || disabledOption(tools[0]))throw Error('date-year-not-found');
+          const before=compact(yearHead().textContent);pointerClick(tools[0]);await wait(40);
+          if(compact(yearHead()?.textContent)===before)throw Error('date-year-navigation-stalled');
+        }
+        if(!selected)throw Error('date-year-navigation-limit');
+      }
+      if(displayed()!==year)throw Error('date-year-not-retained');
+      const monthNames=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+      const monthHead=menu.querySelector('[class*="sd-basic-selector-month-"]');
+      if(monthHead){pointerClick(monthHead);await wait(40);}
+      const months=[...menu.querySelectorAll('[class*="sd-basic-year-item-"]')].filter(visible).filter(n=>compact(n.textContent)===monthNames[month-1]);
+      if(months.length!==1 || disabledOption(months[0]) || months[0].closest('[class*="sd-basic-disabled-"]'))throw Error('date-month-not-found');
+      pointerClick(months[0]);await wait(40);
+      let expected=parts[1]+'-'+parts[2];
+      const days=[...menu.querySelectorAll('[class*="sd-basic-date-item-"]')].filter(visible);
+      if(days.length){
+        if(!parts[3])throw Error('date-precision-required');
+        const matches=days.filter(n=>Number(n.textContent)===day && !n.closest('[class*="sd-basic-fade-"],[class*="sd-basic-disabled-"]') && !disabledOption(n));
+        if(matches.length!==1)throw Error('date-day-not-found');pointerClick(matches[0]);expected+='-'+parts[3];
+      }else if(entry.field.dateFormat?.includes('DD'))throw Error('date-precision-required');
+      closeMoka(node);
+      for(let i=0;i<20;i++){await wait(40);if(mokaDateValue(node)===expected)return expected;}
+      throw Error('date-not-retained');
+    }finally{closeMoka(node);}
   }
   const phoenixField=node=>node.closest('.form-item--phoenix');
   const phoenixTitle=field=>compact(field?.querySelector(':scope > .form-item__title .form-item__text')?.textContent);
-  const moduleOf=title=>/教育|学历|education/i.test(title)?'education':/在校职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部|campus/i.test(title)?'campus-role':/实习|工作经历|任职|employment|work experience/i.test(title)?'work':/获奖|荣誉|奖励|award/i.test(title)?'awards':/论文|专著|发表|publication/i.test(title)?'publications':/家庭|亲属|family/i.test(title)?'family':/项目|科研|实践|project/i.test(title)?'projects':/个人|基本|求职意向|自我评价|附加信息|紧急联系人|personal/i.test(title)?'personal':/语言|外语|证书|language|certificate/i.test(title)?'language':'other';
+  const moduleOf=title=>/教育|学历|education/i.test(title)?'education':/在校职务|校内职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部|campus/i.test(title)?'campus-role':/实习|工作经历|任职|employment|work experience/i.test(title)?'work':/获奖|荣誉|奖励|award/i.test(title)?'awards':/论文|专著|发表|publication/i.test(title)?'publications':/家庭|亲属|family/i.test(title)?'family':/项目|科研|实践|project/i.test(title)?'projects':/个人|基本|求职意向|自我评价|自我描述|附加信息|紧急联系人|personal/i.test(title)?'personal':/语言|英语能力|外语|证书|language|certificate/i.test(title)?'language':'other';
   function phoenixContext(field) {
     const record=field.closest('.ux-standard-form') || field.closest('.form-part') || field.parentElement;
     if(contexts.has(record))return contexts.get(record);
@@ -139,7 +234,7 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
     if(contexts.has(record))return contexts.get(record);
     const title=compact(section?.querySelector(':scope > .tit-wrap p,:scope > legend,:scope > h2,:scope > h3')?.textContent);
     const records=section?[...section.querySelectorAll('.form-cell-inner')]:[record],module=moduleOf(title);
-    const identity=module==='education'?/^(学历|学校名称|毕业院校)$/:module==='work'?/^(单位|单位名称|公司名称|实习单位)$/:module==='family'?/^(关系|与本人关系|姓名)$/:module==='awards'?/^(获奖名称|奖项名称|奖项)$/:module==='campus-role'?/^(职务|在校职务名称)$/:module==='projects'?/^(项目名称|名称)$/:null;
+    const identity=module==='education'?/^(学历|学校名称|毕业院校)$/:module==='work'?/^(单位|单位名称|公司名称|企业名称|实习单位)$/:module==='family'?/^(关系|与本人关系|姓名)$/:module==='awards'?/^(获奖名称|奖励名称|奖项名称|奖项)$/:module==='campus-role'?/^(职务|担任职务|在校职务名称)$/:module==='projects'?/^(项目名称|名称)$/:null;
     const hints=identity?[...record.querySelectorAll('.ant-form-item')].filter(f=>identity.test(antTitle(f))).map(f=>antRead(f.querySelector('[role="combobox"],input:not([type="hidden"]),textarea') || f)).filter(Boolean):[];
     const result={module:module==='other'&&!title?'':module,groupLabel:title,groupPath:structuralPath(record),recordHint:[...new Set(hints)].join(' ')};
     if(records.length>1)result.groupLabel+=' · 第'+(records.indexOf(record)+1)+'段';
@@ -327,8 +422,10 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
     if(antField(node))return describeAnt(node);
     const m=mokaField(node);
     if(m) {
-      const inputs=/date_info-/.test(m.className)?[...m.querySelectorAll('input:not([type="hidden"])')]:[];
+      const inputs=/date_info-/.test(m.className)?mokaInputs(m):[];
       const index=inputs.length===4?inputs.indexOf(node):-1,select=!!mokaSelect(node);
+      if(node.type!=='checkbox' && /(?:location|region)_info-/.test(m.className))return {label:mokaTitle(m),context:mokaContext(node,m),adapter:'moka-region',type:'combobox',allowReadonly:true,regionDepth:3,required:!!m.querySelector('[class*="required-asterisk-"]')};
+      if(node.type!=='checkbox' && /day_info-/.test(m.className) && node.closest('[class*="sd-Dropdown-container-"]'))return {label:mokaTitle(m),context:mokaContext(node,m),adapter:'moka-date',type:'combobox',allowReadonly:true,dateFormat:/出生日期.*年龄/.test(mokaTitle(m))?'YYYY-MM':'YYYY-MM-DD',required:!!m.querySelector('[class*="required-asterisk-"]')};
       return {label:mokaLabel(node,m),context:mokaContext(node,m)||{groupLabel:'',groupPath:'',recordHint:'',module:''},adapter:select?'moka-select':'',...(select?{type:'combobox'}:{}),required:!!m.querySelector('[class*="required-asterisk-"]'),unsupported:/day_info-/.test(m.className)?'custom-date':select&&inputs.length&&index<0?'split-date':'',dateMeta:index>=0?{datePart:index%2?'month':'year',semanticLabel:index<2?'开始日期':'结束日期'}:{}};
     }
     const p=phoenixField(node);if(!p)return null;
@@ -629,17 +726,19 @@ function create({compact,visible,structuralPath,labelText,wait,setNative}) {
     reset(){descriptions=new WeakMap();platformCache=new WeakMap();contexts=new WeakMap();},
     validationError:entry=>{
       const ant=antField(entry.node);if(ant)return [...ant.querySelectorAll('.ant-form-explain,.ant-form-item-explain-error')].filter(visible).map(n=>compact(n.textContent)).join('；');
+      const moka=mokaField(entry.node);if(moka)return [...moka.querySelectorAll('[class*="sd-Input-message-"]')].filter(visible).map(n=>compact(n.textContent)).join('；');
       const field=phoenixField(entry.node);if(!field)return '';
       return [...field.querySelectorAll('.form-item__error')].filter(error=>error.closest('.form-item--phoenix')===field&&visible(error)).map(error=>compact(error.textContent)).filter(Boolean).join('；');
     },
-    describe,disabled,inspectOptions,moduleOf,pointerClick,deferred:id=>['moka-select','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region'].includes(id),
+    sectionRoot:(node,label)=>{const block=node.closest(classPart('apply-block-'));return block && compact(directPart(block,'blockTitle-')?.querySelector(classPart('text-'))?.textContent)===label?block:null;},
+    describe,disabled,inspectOptions,moduleOf,pointerClick,deferred:id=>['moka-select','moka-region','moka-date','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region'].includes(id),
     matchesValue:(entry,target)=>entry.field.adapter==='ant-select'?equivalence(antRead(entry.node),entry.field.label)===equivalence(target,entry.field.label):entry.field.adapter==='ant-split-date'?dateValue(antRead(entry.node))===target:false,
     platforms:root=>{const found=platforms(root);return (found.length?found:[{id:'generic',label:'通用表单',version:'1'}]).map(({id,label,version})=>({id,label,version}));},
     includes,
     nodes:root=>[...root.querySelectorAll('input,textarea,select,[role="combobox"],.phoenix-radio-group,.ant-radio-group,.cascader-plugins-wrap')].filter(n=>(!n.closest('.phoenix-radio-group')||n.matches('.phoenix-radio-group'))&&(!n.closest('.ant-radio-group')||n.matches('.ant-radio-group'))&&(!n.closest('.cascader-plugins-wrap')||n.matches('.cascader-plugins-wrap'))&&!n.matches('.ant-select-search__field,.ant-select-selection-search-input,.ant-calendar-input')&&!n.closest('.ant-select-dropdown,.ant-calendar-picker-container,.school-wrap[role="dialog"]')),
-    read:entry=>entry.field.adapter.startsWith('ant-')?antRead(entry.node):entry.field.adapter==='moka-select'?mokaValue(entry.node):entry.field.adapter==='phoenix-date'?dateValue(phoenixRead(entry.node)):phoenixRead(entry.node),
-    write:(entry,target)=>entry.field.adapter.startsWith('ant-')?antWrite(entry,target):entry.field.adapter==='moka-select'?selectMoka(entry,target):phoenixWrite(entry,target)
+    read:entry=>entry.field.adapter.startsWith('ant-')?antRead(entry.node):entry.field.adapter==='moka-select'?mokaValue(entry.node):entry.field.adapter==='moka-date'?mokaDateValue(entry.node):entry.field.adapter==='phoenix-date'?dateValue(phoenixRead(entry.node)):phoenixRead(entry.node),
+    write:(entry,target)=>entry.field.adapter.startsWith('ant-')?antWrite(entry,target):entry.field.adapter==='moka-select'?selectMoka(entry,target):entry.field.adapter==='moka-region'?selectMokaRegion(entry,target):entry.field.adapter==='moka-date'?selectMokaDate(entry,target):phoenixWrite(entry,target)
   };
 }
-return {create,revision:'11'};
+return {create,revision:'13'};
 });

@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{webcrypto}=require('node:crypto');
 const root=path.resolve(__dirname,'../app/browser-extension'),local={},session={};let listener,url='https://fixture.invalid/application?job=one',shape='shape-one';
-const values={},storage=data=>({async get(key){return {[key]:structuredClone(data[key])}},async set(value){Object.assign(data,structuredClone(value))},async remove(keys){for(const key of Array.isArray(keys)?keys:[keys])delete data[key]},async setAccessLevel(){}});
+const values={},storage=data=>({async get(key){return structuredClone(key==null?data:Object.fromEntries((Array.isArray(key)?key:[key]).map(k=>[k,data[k]])))},async set(value){Object.assign(data,structuredClone(value))},async remove(keys){for(const key of Array.isArray(keys)?keys:[keys])delete data[key]},async setAccessLevel(){}});
 const tab=()=>({id:1,url});
 const context={structuredClone,crypto:webcrypto,TextEncoder,URL,console,setTimeout,clearTimeout,chrome:{storage:{local:storage(local),session:storage(session)},runtime:{id:'fixture',getManifest:()=>({version:'fixture'}),getURL:p=>'chrome-extension://fixture/'+p,onMessage:{addListener(fn){listener=fn}}},tabs:{get:async()=>tab(),query:async()=>[tab()]}}};
 vm.createContext(context);context.importScripts=(...files)=>files.forEach(file=>vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context));vm.runInContext(fs.readFileSync(path.join(root,'worker.js'),'utf8'),context);
@@ -21,7 +21,7 @@ const source={schemaVersion:1,profiles:[{id:'general',label:'合成资料'},{id:
  await send({op:'profile-save',base:null,pack:source});await send({op:'scan'});
  let result=await send({op:'remap',recordBindings:{work:'b'}});assert.equal(result.plan.rows.filter(r=>r.status==='ready').length,4);
  result=await send({op:'fill',selected:['start'],overwrite:[]});assert.equal(result.report.summary.verified,1);assert.equal(result.plan.rows.length,4,'A report retains the record plan');assert.equal(result.pending.length,3);assert.equal(result.engineVersion,'fixture');
- assert.equal(session.toudiFillingSession.recordBindings.work,'b');assert.equal(local.toudiLastReport.submitted,false);assert(!('actualValue' in result.report.results[0]));
+ assert.equal(session['toudiFillingSession:1'].recordBindings.work,'b');assert.equal(local.toudiLastReport.submitted,false);assert(!('actualValue' in result.report.results[0]));
  result=await send({op:'scan',resume:true});assert.equal(result.plan.groups[0].recordId,'b');assert.equal(result.plan.rows.find(r=>r.fieldId==='start').status,'already');assert.equal(result.report,undefined);assert.equal(result.plan.rows.find(r=>r.fieldId==='body').displayValue,originalBody);
  result=await send({op:'fill',selected:['name','end','body'],overwrite:[]});assert.equal(result.report.summary.verified,3);assert.equal(values.body,originalBody);
  result=await send({op:'scan',resume:true});assert.equal(result.plan.rows.filter(r=>r.status==='already').length,4);

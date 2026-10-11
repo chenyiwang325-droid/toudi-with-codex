@@ -17,6 +17,7 @@
   }
   function visible(node) {
     if (!node.isConnected || node.closest('[hidden],[inert],[aria-hidden="true"]')) return false;
+    for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS' && !p.open && !p.querySelector(':scope > summary')?.contains(node))return false;
     const win = node.ownerDocument.defaultView, style = win.getComputedStyle(node);
     return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && [...node.getClientRects()].some(r=>r.width>0 && r.height>0);
   }
@@ -63,8 +64,8 @@
       if (title) { if (!group) { group = title; groupPath=structuralPath(p); } hint = compact(hint + ' ' + title); }
       if (p.tagName === 'FORM') break;
     }
-    const module = /家庭成员|家庭情况|家庭信息|亲属|family|父亲|母亲/i.test(hint) ? 'family' : /紧急联系人|emergency contact/i.test(hint) ? 'personal' : /在校职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部|campus-role|campus posts|school posts/i.test(hint) ? 'campus-role' : /获奖|荣誉|奖励|awards/i.test(hint) ? 'awards' : /论文|专著|发表|publications/i.test(hint) ? 'publications' : /教育|学历|学位|education/i.test(hint) ? 'education' : /实习|工作经历|任职|employment|work experience/i.test(hint) ? 'work' : /项目|科研|实践|project/i.test(hint) ? 'projects' : /语言|外语|证书|language|certificate/i.test(hint)?'language':'';
-    const generic=/^(教育经历|教育背景|学历信息|工作经历|实习经历|项目经历|项目经验|在校职务|在校任职|在校经历|校园经历|学生工作|获奖情况|荣誉奖励|获奖经历|论文\/专著|论文发表|语言能力|外语能力|语言及证书|证书|education|work experience|projects|家庭成员|家庭情况|家庭信息|family)$/i.test(group);
+    const module = /家庭成员|家庭情况|家庭信息|亲属|family|父亲|母亲/i.test(hint) ? 'family' : /紧急联系人|emergency contact/i.test(hint) ? 'personal' : /在校职务|校内职务|在校任职|校园任职|在校经历|校园经历|学生工作|学生干部|campus-role|campus posts|school posts/i.test(hint) ? 'campus-role' : /获奖|荣誉|奖励|awards/i.test(hint) ? 'awards' : /论文|专著|发表|publications/i.test(hint) ? 'publications' : /教育|学历|学位|education/i.test(hint) ? 'education' : /实习|工作经历|任职|employment|work experience/i.test(hint) ? 'work' : /项目|科研|实践|project/i.test(hint) ? 'projects' : /语言|英语能力|外语|证书|language|certificate/i.test(hint)?'language':'';
+    const generic=/^(教育经历|教育背景|学历信息|工作经历|实习经历|项目经历|项目经验|在校职务|校内职务|在校任职|在校经历|校园经历|学生工作|获奖情况|荣誉奖励|获奖经历|论文\/专著|论文发表|语言能力|外语能力|语言及证书|证书|education|work experience|projects|家庭成员|家庭情况|家庭信息|family)$/i.test(group);
     const recordHint = /本科|硕士|博士|大专|学士|master|bachelor|doctor/i.test(hint) ? hint : module && group && !generic ? group : '';
     return { groupLabel: group, recordHint, module, groupPath };
   }
@@ -135,7 +136,7 @@
         }
         if (/password|token|secret|密码|口令|令牌/i.test(label + ' ' + node.name + ' ' + node.id)) continue;
         const adapted=adapters?.describe(node),adapter=adapted?.adapter || '';
-        const dateMeta=adapted?.dateMeta || {};
+        const dateMeta={...(adapted?.dateMeta || {}),...(adapted?.context?.recordMode?{recordMode:adapted.context.recordMode}:{})};
         const type=adapted?.type || (rawType==='radio'?'radio':rawType==='checkbox'?'checkbox':rawType==='file'?'file':node.tagName==='SELECT'?'select':node.tagName==='TEXTAREA'?'textarea':node.getAttribute('role')==='combobox'?'combobox':rawType||'text');
         let ctx=context(node);
         let members = [node], options = [];
@@ -208,11 +209,15 @@
     }
     const fingerprint = hash(JSON.stringify({origin,path,structure:entries.map(x=>({id:x.field.id,...x.descriptor}))}));
     const repeatables=repeatableCatalog(entries,scopeRoots);
-    return {entries,repeatables,report:{protocol:1,engineVersion:ENGINE_VERSION,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),repeatables:repeatables.map(({node,adds,records,...section})=>section),platforms:adapters?.platforms(document)||[{id:"generic",label:"通用表单",version:"1"}],structure:{fingerprint:structureFingerprint,candidates:publicCandidates,applied,rejected},warnings}};
+    return {entries,repeatables,report:{protocol:1,engineVersion:ENGINE_VERSION,origin,path,title:compact(document.title),fingerprint,fields:entries.map(x=>x.field),repeatables:repeatables.map(({node,adds,opens,records,...section})=>section),platforms:adapters?.platforms(document)||[{id:"generic",label:"通用表单",version:"1"}],structure:{fingerprint:structureFingerprint,candidates:publicCandidates,applied,rejected},warnings}};
   }
   const repeatableModules=new Set(['education','work','projects','campus-role','awards','publications','family','language']);
   function recordNode(entry){for(let n=entry.node;n;n=n.parentElement)if(structuralPath(n)===entry.descriptor.groupPath)return n;return null;}
+  const disclosureLabels=new WeakMap();
   function sectionHeading(node){
+    if(disclosureLabels.has(node))return disclosureLabels.get(node);
+    const summary=node.matches('details')?node.querySelector(':scope > summary'):null;
+    if(summary)return compact(labelText(summary));
     const moka=node.querySelector(':scope > [class*="blockTitle-"] [class*="text-"]');
     if(moka)return compact(moka.textContent);
     const ant=node.querySelector(':scope > .tit-wrap p');if(ant)return compact(ant.textContent);
@@ -230,7 +235,16 @@
     const sections=new Map();
     const install=(node,label,scope)=>{
       const module=adapters?.moduleOf(label);if(!node || !repeatableModules.has(module))return null;
-      if(!sections.has(node))sections.set(node,{id:'section-'+hash(scope+structuralPath(node)+label),label,module,node,adds:[],records:[],groupIds:[]});
+      node=adapters?.sectionRoot(node,label) || node;
+      // An add button can sit inside a title wrapper while fields sit in its
+      // parent section. Both entrances must describe the same form scope.
+      for(let p=node.parentElement,depth=0;p&&depth<9;p=p.parentElement,depth++){
+        if(p.tagName==='FORM')break;
+        const heading=sectionHeading(p);
+        if(heading && heading!==label)break;
+        if(heading===label)node=p;
+      }
+      if(!sections.has(node))sections.set(node,{id:'',scope,label,module,node,adds:[],opens:[],records:[],groupIds:[]});
       return sections.get(node);
     };
     for(const entry of entries){
@@ -240,6 +254,15 @@
       for(let p=record.parentElement,i=0;p&&i<9;p=p.parentElement,i++){const title=sectionHeading(p);if(adapters?.moduleOf(title)===entry.field.module){section=install(p,title,entry.descriptor.scope);break;}if(p.tagName==='FORM')break;}
       if(!section)section=install(record,entry.field.groupLabel.replace(/\s*·\s*第\d+段$/,''),entry.descriptor.scope);
       if(section && !section.groupIds.includes(entry.field.groupId)){section.groupIds.push(entry.field.groupId);section.records.push(record);}
+    }
+    // A collapsed module is an unknown scope, not proof of zero records.
+    // Only explicit disclosure controls may be opened during filling.
+    for(const [root,scope] of roots)for(const n of root.querySelectorAll('details:not([open]),[aria-expanded="false"][aria-controls]')){
+      const control=n.matches('details')?n.querySelector(':scope > summary'):n;
+      if(!control || !visible(control) || control.closest('[role="combobox"],.ant-select,.ant-calendar-picker,#toudi-floating-host,[data-toudi-panel]'))continue;
+      const label=compact(labelText(control)),panel=n.matches('details')?n:root.getElementById?.(n.getAttribute('aria-controls'));
+      if(!panel || !repeatableModules.has(adapters?.moduleOf(label)) || control.closest('button')?.type==='submit')continue;
+      disclosureLabels.set(panel,label);const s=install(panel,label,scope);if(s)s.opens.push(control);
     }
     // Semantic add controls are discovered locally, including custom Phoenix
     // div+SVG controls. No CSS generated class names or site account values.
@@ -255,6 +278,10 @@
       if(section && !section.adds.includes(control))section.adds.push(control);
     }
     return [...sections.values()].map(s=>{
+      // Section wrappers and record positions can remount after an addition.
+      // A unique semantic section keeps its ID across that rerender.
+      const peers=[...sections.values()].filter(n=>n.scope===s.scope && n.module===s.module && n.label===s.label);
+      s.id='section-'+hash(s.scope+'|'+s.module+'|'+s.label+(peers.length>1?'|'+structuralPath(s.node):''));
       // Saved cards are not empty destinations. Without a verified readable
       // identity, adding the same profile again would duplicate old records.
       const editControls=[...s.node.querySelectorAll('button,[role="button"],a')].filter(n=>visible(n) && /^(编辑|修改|edit)$/i.test(compact(n.getAttribute('aria-label') || labelText(n))));
@@ -264,21 +291,21 @@
         return fields.length && fields.every(e=>e.field.unsupported==='disabled-or-readonly');
       }).length;
       const blockedReason=closedCards || lockedRecords?'saved-records-closed':'';
-      return {...s,closedRecords:closedCards+lockedRecords,blockedReason,addStatus:blockedReason?'requires-edit':safeAddStatus(s.adds)};
+      return {...s,closedRecords:closedCards+lockedRecords,blockedReason,addStatus:s.opens.length===1?'requires-expand':blockedReason?'requires-edit':safeAddStatus(s.adds)};
     });
   }
   function groupSnapshots(state){
     const groups=new Map();
     for(const e of state.entries){if(!e.field.groupId || !repeatableModules.has(e.field.module))continue;
-      if(!groups.has(e.field.groupId))groups.set(e.field.groupId,{id:e.field.groupId,module:e.field.module,node:recordNode(e),entries:[]});groups.get(e.field.groupId).entries.push(e);
+      if(!groups.has(e.field.groupId))groups.set(e.field.groupId,{id:e.field.groupId,module:e.field.module,sectionId:state.repeatables.find(s=>s.groupIds.includes(e.field.groupId))?.id || '',node:recordNode(e),entries:[]});groups.get(e.field.groupId).entries.push(e);
     }
-    const identities={education:/学校|院校|学历/,work:/公司|单位名称|实习单位|^单位$/,projects:/项目名称|实践名称|^名称$|在校科研及实践项目/,'campus-role':/职务|岗位|组织名称/,awards:/奖项|获奖名称/,publications:/名称|论文题目/,language:/证书名称|证书类型|语言.?证书名称/,family:/姓名|关系/};
+    const identities={education:/学校|院校|学历/,work:/公司|企业名称|单位名称|实习单位|^单位$/,projects:/项目名称|实践名称|^名称$|在校科研及实践项目/,'campus-role':/职务|岗位|组织.*名称/,awards:/奖项|获奖名称|奖励名称/,publications:/名称|论文题目/,language:/证书名称|证书类型|语言.?证书名称/,family:/姓名|关系/};
     return [...groups.values()].map(g=>({...g,empty:!g.entries.some(e=>e.field.value!==false && String(e.field.value ?? '').trim() && !/^(?:请选择.*|请输入.*)$/.test(String(e.field.value)) && (!['select','radio','combobox','checkbox'].includes(e.type) || identities[g.module]?.test(e.field.label))),signature:JSON.stringify(g.entries.map(e=>[e.field.label,e.type,e.field.value])),shape:JSON.stringify(g.entries.map(e=>[e.field.label,e.type]))}));
   }
   function relateGroups(before,after){
     const mapped=new Map(),used=new Set();
     for(const g of [...before].sort((a,b)=>Number(a.empty)-Number(b.empty))){
-      const eligible=after.filter(n=>n.module===g.module && n.signature===g.signature && !used.has(n.id));
+      const eligible=after.filter(n=>n.module===g.module && n.sectionId===g.sectionId && n.signature===g.signature && !used.has(n.id));
       let match=eligible.find(n=>n.node===g.node);
       if(!match && eligible.length===1)match=eligible[0];
       // Indistinguishable blank slots contain no experience identity. Their
@@ -299,11 +326,19 @@
     if(request.targets.reduce((n,t)=>n+(t.recordIds?.length || 0),0)>100)throw Error('record-limit-exceeded');
     for(const t of request.targets){
       const s=state.repeatables.find(s=>s.id===t.sectionId);
-      if(!s || !Array.isArray(t.recordIds) || t.recordIds.some(r=>typeof r!=='string' || !r || r.length>240 || requested.has(s.module+'|'+r)) || request.targets.filter(x=>x.sectionId===t.sectionId).length!==1)throw Error('record-target-invalid');
-      t.recordIds.forEach(r=>requested.add(s.module+'|'+r));
+      if(!s || !Array.isArray(t.recordIds) || t.recordIds.some(r=>typeof r!=='string' || !r || r.length>240 || requested.has(s.id+'|'+r)) || request.targets.filter(x=>x.sectionId===t.sectionId).length!==1 || t.action && t.action!=='open')throw Error('record-target-invalid');
+      t.recordIds.forEach(r=>requested.add(s.id+'|'+r));
     }
     for(const target of request.targets){
-      const initialSection=state.repeatables.find(s=>s.id===target.sectionId),item={module:initialSection.module,label:initialSection.label,requested:target.recordIds.length,added:0,remaining:[],reason:''};additions.push(item);
+      const initialSection=state.repeatables.find(s=>s.id===target.sectionId),item={module:initialSection.module,sectionId:target.sectionId,label:initialSection.label,requested:target.recordIds.length,added:0,remaining:[],reason:''};additions.push(item);
+      if(target.action==='open'){
+        if(initialSection.addStatus!=='requires-expand' || initialSection.opens.length!==1)throw Error('disclosure-unavailable');
+        adapters.pointerClick(initialSection.opens[0]);
+        const control=initialSection.opens[0];
+        for(let i=0;i<20;i++){await wait(80);state=collect();if(control.closest('details')?.open || control.getAttribute('aria-expanded')==='true'){item.opened=true;break;}}
+        if(!item.opened)item.reason='disclosure-no-effect';
+        continue;
+      }
       for(const recordId of target.recordIds){
         state=collect();const section=state.repeatables.find(s=>s.id===target.sectionId),before=groupSnapshots(state);
         if(!section || section.addStatus!=='ready'){item.reason=section?.blockedReason || (section?.addStatus==='disabled'?'add-disabled':section?.addStatus==='ambiguous'?'add-ambiguous':'add-unavailable');break;}
@@ -374,7 +409,7 @@
     // Websites can render numeric results with trailing zeros. Never normalize identifiers.
     return /^(语言成绩|考试成绩|成绩（GPA）|GPA|平均绩点|身高|体重)$/.test(entry.field.label) && /^-?\d+(?:\.\d+)?$/.test(String(actual)) && /^-?\d+(?:\.\d+)?$/.test(String(expected)) && Number(actual)===Number(expected);
   }
-  const recordIdentityLabels={education:/^(学校名称|学校|院校|学历)$/,work:/^(公司名称|单位名称|实习单位|单位|公司)$/,projects:/^(项目名称|实践名称|名称|在校科研及实践项目)$/,'campus-role':/^(在校职务名称|职务|岗位|组织名称)$/,awards:/^(奖项|奖项名称|获奖名称)$/,publications:/^(名称|论文名称|论文题目)$/,language:/^(证书名称|语言.?证书名称)$/,family:/^(姓名|与本人关系|关系)$/};
+  const recordIdentityLabels={education:/^(学校名称|学校|院校|学历)$/,work:/^(公司名称|单位名称|实习单位|单位|公司)$/,projects:/^(项目名称|实践名称|名称|在校科研及实践项目)$/,'campus-role':/^(在校职务名称|职务|岗位|组织.*名称)$/,awards:/^(奖项|奖项名称|获奖名称)$/,publications:/^(名称|论文名称|论文题目)$/,language:/^(证书名称|语言.?证书名称)$/,family:/^(姓名|与本人关系|关系)$/};
   function sameControl(a,b){
     const strip=d=>Object.fromEntries(Object.entries(d).filter(([key])=>!['scope','groupPath','groupLabel'].includes(key)));
     return JSON.stringify(strip(a.descriptor))===JSON.stringify(strip(b.descriptor));

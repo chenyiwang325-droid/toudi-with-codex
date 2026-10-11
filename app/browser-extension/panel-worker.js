@@ -6,8 +6,9 @@ async function panelTarget(message={}){
   if(!message.panelToken){const [tab]=await chrome.tabs.query({active:true,currentWindow:true});return tab;}
   const session=(await chrome.storage.session.get(PANEL_SESSION_PREFIX+message.panelTabId))[PANEL_SESSION_PREFIX+message.panelTabId];
   if(!session || session.token!==message.panelToken)throw Error('此填报窗口已失效，请从招聘页重新打开 TouDi。');
-  const tab=await chrome.tabs.get(message.panelTabId),[active]=await chrome.tabs.query({active:true,windowId:session.sourceWindowId});
-  if(active?.id!==tab.id || tab.windowId!==session.sourceWindowId || tab.url?.split('#')[0]!==session.targetUrl)throw Error('请返回此填报窗口对应的招聘页面再操作。');
+  const tab=await chrome.tabs.get(message.panelTabId);
+  // Authorization belongs to the original document, not the focused tab or window.
+  if(!tab || tab.url!==session.targetUrl)throw Error('此填报窗口对应的招聘页面已变化，请重新识别。');
   return tab;
 }
 async function assertPanelTarget(message){if(message.panelToken)await panelTarget(message);}
@@ -25,7 +26,7 @@ chrome.action?.onClicked.addListener(async tab=>{
   if(!/^https?:\/\//.test(tab.url || '')){await chrome.action.setBadgeText({tabId:tab.id,text:'!'});await chrome.action.setTitle({tabId:tab.id,title:'请在招聘网页打开 TouDi。'});return;}
   try{
     const token=crypto.randomUUID(),url=chrome.runtime.getURL('popup.html')+'?panel='+encodeURIComponent(token)+'&tab='+tab.id;
-    await chrome.storage.session.set({[PANEL_SESSION_PREFIX+tab.id]:{token,url,sourceWindowId:tab.windowId,targetUrl:tab.url.split('#')[0]}});
+    await chrome.storage.session.set({[PANEL_SESSION_PREFIX+tab.id]:{token,url,targetUrl:tab.url}});
     await chrome.scripting.executeScript({target:{tabId:tab.id},files:['panel-host.js']});
     await chrome.scripting.executeScript({target:{tabId:tab.id},func:config=>globalThis.TouDiPanelHost(config),args:[{url,token}]});
     await chrome.action.setBadgeText({tabId:tab.id,text:''});

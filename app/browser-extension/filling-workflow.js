@@ -2,7 +2,7 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.TouDiFillingWorkflow=api;})(globalThis,function(){
 'use strict';
 const canonicalModule=value=>({work:'internship',projects:'project'}[value] || value || 'other');
-function signature(f){return JSON.stringify([canonicalModule(f.module),String(f.label || '').normalize('NFKC').trim(),f.type,f.adapter || '',f.datePart || '',f.dateFormat || '',f.regionDepth || '']);}
+function signature(f){return JSON.stringify([canonicalModule(f.module),String(f.label || '').normalize('NFKC').trim(),f.type,f.adapter || '',f.datePart || '',f.dateFormat || '',f.regionDepth || '',f.recordMode || '']);}
 function key(field,bindings={}){return JSON.stringify([signature(field),bindings[field.groupId] || '',field.groupId && !bindings[field.groupId]?field.groupId:'']);}
 function attemptKey(row,field,bindings={}){return JSON.stringify([key(field,bindings),bindings[field.groupId]?'':field.id,row.factKey,row.optionValue ?? row.value,field.options || [],field.constraints || {},field.required || false,field.unsupported || '']);}
 function restore(p,scan,bindings,cached,optionKeys={}){
@@ -32,6 +32,10 @@ const explanations={
   'options-unavailable':['控件','未能读取此控件的选项；在网页选择或从我的资料复制。'],
   'option-not-selected':['控件','网站没有接受选择；请在网页确认该选项。'],
   'option-confirm-unavailable':['控件','未找到可确认的控件按钮；请在网页完成选择。'],
+  'date-precision-required':['资料','网站要求具体日期，但资料只有年月；请补充原始日期后再填写。'],
+  'date-month-not-found':['日期控件','日期控件中没有可选的对应月份；请查看网站的日期范围。'],
+  'date-day-not-found':['日期控件','日期控件中没有可选的对应日期；请查看网站的日期范围。'],
+  'date-not-retained':['读回','网站未保留选择的日期；请检查该日期字段的校验提示。'],
   'value-not-retained':['读回','网站未保留写入值；请检查网页中的字段或校验提示。'],
   'validation-failed':['读回','网站校验未通过；请查看该字段的提示后修正。'],
   'field-changed':['页面变化','页面改变了字段位置或归属；重新识别后再填写。'],
@@ -50,6 +54,8 @@ const explanations={
   'continuation-limit':['页面变化','页面持续变化，本轮已停止；检查当前内容后重新识别。'],
   'record-not-bound':['记录归属','无法确认整段经历对应的资料，已保留原值；请先确认记录名称。'],
   'saved-records-closed':['记录归属','此模块有已保存或锁定的记录；请先在网页打开编辑，避免重复添加。'],
+  'disclosure-no-effect':['展开模块','点击展开后网站未显示内容，未继续新增或填写该模块。'],
+  'disclosure-unavailable':['展开模块','展开入口已变化，请重新识别页面。'],
   'save-required':['保存','请先在网页保存当前记录，再运行填写；TouDi 不代点网站保存。'],
   'file-upload':['附件','附件需要在网页选择并上传。'],
   'verification-code':['验证','验证码需要在网页完成。'],

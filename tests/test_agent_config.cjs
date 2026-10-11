@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../app/browser-extension'),local={},session={},sent=[],timers=[];
-const storage=store=>({setAccessLevel:async()=>{},get:async key=>({[key]:store[key]}),set:async value=>Object.assign(store,value),remove:async keys=>{for(const key of [keys].flat())delete store[key];}});
+const storage=store=>({setAccessLevel:async()=>{},get:async key=>structuredClone(key==null?store:Object.fromEntries((Array.isArray(key)?key:[key]).map(k=>[k,store[k]]))),set:async value=>Object.assign(store,value),remove:async keys=>{for(const key of [keys].flat())delete store[key];}});
 let handler;
 const context=vm.createContext({console,TextEncoder,crypto:require('crypto').webcrypto,URL,structuredClone,Option:undefined,
   setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();timers.push(timer);return timer;},clearTimeout,
@@ -20,7 +20,7 @@ vm.runInContext(fs.readFileSync(path.join(root,'worker.js'),'utf8'),context);
   const Core=context.TouDiFillingCore;
   const pack=Core.validatePack({schemaVersion:1,name:'Synthetic',profiles:[{id:'general',label:'默认资料'},{id:'ai-product',label:'Synthetic variant'}],facts:[{key:'personal.city',label:'现居地',value:'Synthetic City',module:'personal'},{key:'edu.mode',label:'学历类型',value:'全日制',module:'education',recordId:'edu'}],rules:[]});
   pack.sourceVersion='fixture';local.toudiPrivateProfile=pack;
-  function plan(){const scan={protocol:1,origin:'https://example.invalid',path:'/apply',fingerprint:'fixture',fields:[{id:'f',label:'学习方式',module:'education',type:'text',options:[],value:''}]};session.toudiFillingSession={startedAt:Date.now(),tabId:1,origin:scan.origin,path:scan.path,sourceVersion:pack.sourceVersion,scan,mappings:{},plan:Core.plan(Core.profile(pack,'general'),scan)};}
+  function plan(){const scan={protocol:1,origin:'https://example.invalid',path:'/apply',fingerprint:'fixture',fields:[{id:'f',label:'学习方式',module:'education',type:'text',options:[],value:''}]};session['toudiFillingSession:1']={startedAt:Date.now(),tabId:1,origin:scan.origin,path:scan.path,sourceVersion:pack.sourceVersion,scan,mappings:{},plan:Core.plan(Core.profile(pack,'general'),scan)};}
   plan();await assert.rejects(op({op:'remap',agent:true}),/先.*选择/);assert.equal(sent.length,0);
   let pref=await op({op:'preferences',preferences:{agentMode:'codex',agentModel:'fixture-user-model',autoAgent:false}});
   assert.equal(pref.agentModel,'fixture-user-model');assert.equal(pref.autoAgent,false);

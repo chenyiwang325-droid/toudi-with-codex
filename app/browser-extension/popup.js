@@ -13,7 +13,7 @@ function render(){
  el('fill').disabled=running || checking || scanning || !hasProfile || !state?.plan;el('reviewAgent').disabled=running || checking || scanning || !hasProfile || !state?.plan;el('scan').disabled=running || checking || scanning || !hasProfile;el('fillMode').disabled=running || checking || scanning;el('profile').disabled=running || checking || scanning;
  el('reviewAgent').textContent=checking?'核对中…':'Agent 核对';
  el('fill').textContent=running?'正在填写…':'自动填写';
- const progress={reading:'正在读取网页…',preparing:'正在准备填写…',matching:'正在核对对应信息…',writing:'正在填写并检查结果…'}[state?.automation?.phase] || '正在读取网页…';
+ const progress={reading:'正在读取网页…',preparing:'正在检查并展开表单模块…',matching:'正在核对对应信息…',writing:'正在填写并检查结果…'}[state?.automation?.phase] || '正在读取网页…';
  el('progress').hidden=!running && !scanning && !checking;el('progress').textContent=scanning?'正在识别网页…':checking?(state?.agentReview?.status==='running'?(state.agentReview.message || '正在核对资料…'):state?.structureReview?.status==='running'?'正在核对网页的板块结构…':'正在准备核对…'):progress;
  const review=state?.agentReview;
  el('reviewResult').hidden=checking || !review || !['completed','failed','skipped'].includes(review.status);
@@ -56,7 +56,8 @@ function renderScan(){
  if(!state?.plan){el('scanSummary').innerHTML='<p>先识别网页，再填写对应资料。</p>';el('scanGroups').replaceChildren();return;}
  const canFill=r=>r.status==='ready' || el('fillMode').value!=='empty' && r.status==='conflict';
  const available=rows.filter(canFill).length,already=rows.filter(r=>r.status==='already').length;
- el('scanSummary').innerHTML=`<strong>识别到 ${rows.length} 项</strong><p>可填写 ${available} 项${already?' · 已一致 '+already+' 项':''}</p>`;
+ const preparing=(state.plan.expansion || []).filter(m=>m.canOpen || m.canAdd && m.missing.length);
+ el('scanSummary').innerHTML=`<strong>识别到 ${rows.length} 项</strong><p>可填写 ${available} 项${already?' · 已一致 '+already+' 项':''}</p>${preparing.length?`<p>填写时检查并补齐：${escapeHtml([...new Set(preparing.map(m=>m.label))].join('、'))}</p>`:''}`;
  const modules=new Map();
  for(const row of rows){const module=row.recordBinding?.module || row.module || 'other',name=scanModuleNames[module] || row.groupLabel || '其他内容';if(!modules.has(name))modules.set(name,[]);modules.get(name).push(row);}
  el('scanGroups').innerHTML=[...modules].map(([name,items])=>{
@@ -91,6 +92,7 @@ el('fill').addEventListener('click',async()=>{
  finally{filling=false;render();}
 });
 const automationPoll=setInterval(async()=>{if(!filling && !reviewing && state?.automation?.status!=='running' && state?.agentReview?.status!=='running' && state?.structureReview?.status!=='running')return;try{const next=(await send('state')).state;if(next){state=next;render();}}catch(_){}},800);
+document.addEventListener('visibilitychange',async()=>{if(document.hidden)return;try{const next=(await send('state')).state;if(next){state=next;render();}}catch(e){notice(e.message,true);}});
 window.addEventListener('unload',()=>clearInterval(automationPoll));
 const copyModuleLabels={personal:'个人信息',education:'教育经历',internship:'工作实习',project:'项目经历','campus-role':'在校经历',awards:'荣誉获奖',publications:'论文发表',language:'语言能力',family:'家庭成员',contact:'联系人'};
 const profileView=TouDiProfileView;
@@ -180,6 +182,6 @@ task(async()=>{
  const value=await send('state');el('runtimeVersion').textContent='扩展 '+(value.extensionVersion || '未知版本');
  showSync(value.sync);profileSummary=value.profile;pref=value.preferences;hasProfile=!!profileSummary?.count;
  el('empty').hidden=hasProfile;el('controls').hidden=!hasProfile;el('fillPane').hidden=!hasProfile;el('tabLibrary').disabled=!hasProfile;
- el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=pref.profile;
- state=value.state;render();notice('');if(location.hash==='#library' && hasProfile){setPane('library');await loadCopyLibrary();}if(activePane==='fill' && hasProfile && state?.automation?.status!=='running')await scanPage();
+ el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=value.state?.plan?.profileId || pref.profile;
+ state=value.state;render();notice('');if(location.hash==='#library' && hasProfile){setPane('library');await loadCopyLibrary();}if(activePane==='fill' && hasProfile && ![state?.automation,state?.agentReview,state?.structureReview].some(job=>job?.status==='running'))await scanPage();
 });

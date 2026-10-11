@@ -68,6 +68,8 @@ ALIASES.update({
  '工作所在地':['工作所在地','单位所在地','工作地点','工作城市','work location'],
 })
 ALIASES['手机']+=['联系电话','联系手机','电话','联系方式','contact phone']
+ALIASES['手机']+=['移动电话']
+ALIASES['家庭地址']+=['住宅详细地址']
 MODULE_ALIASES['family']={'姓名':['成员姓名','亲属姓名'], '手机':['联系电话','联系电话号码','手机号码','电话'], '工作单位':['所在单位','单位名称','单位'], '职务':['职位','岗位','职务或职业','职业']}
 RECORD_IDENTITY_FIELDS['family']=['姓名','与本人关系']
 
@@ -77,11 +79,26 @@ MODULE_ALIASES['language']={'语种':['语言','外语语种','语言类型'], '
 RECORD_IDENTITY_FIELDS['language']=['语言／证书名称','证书类型']
 ALIASES['取得日期']+=['获得时间']
 ALIASES['发表刊物']+=['期刊名称/专利号申请号']
+ALIASES['单位']+=['企业名称']
+ALIASES['职务']+=['职位名称']
+ALIASES['职责']+=['工作描述']
+ALIASES['工作职责']=['工作职责','职责','工作内容','实习内容','工作描述','responsibilities','description']
+ALIASES['组织名称']+=['组织/团体名称','组织团体名称']
+ALIASES['职责描述']+=['职责和成就']
+ALIASES['角色']+=['项目职务']
+MODULE_ALIASES['language']['证书类型']+=['英语证书名称']
+MODULE_ALIASES['campus-role']['职务']+=['校内职务名称']
+MODULE_ALIASES['awards']={'奖项描述':['详细描述','奖励描述'], '获奖类型':['奖项类别','奖励类别'], '获奖级别':['奖励级别']}
+MODULE_ALIASES['internship']={'工作职责':['项目描述'], '职责':['项目描述']}
+ALIASES['个人评价']+=['自我描述']
+ALIASES['出生日期']+=['出生日期 (年龄)','出生日期（年龄）']
+ALIASES['家庭地址']+=['家庭所在地']
 
 MANUAL_TERMS=('验证码','verification code','captcha','协议','同意','承诺','agreement','consent','签名','signature','上传','upload','照片','photo',)
 SENSITIVE_TERMS=('姓名','name','手机','电话','phone','邮箱','email','证件','身份证','id number','家庭地址','home address','紧急联系人','emergency contact','证明人','referee','reference contact')
 MODULES={'campus-role': 'campus-role', '在校任职': 'campus-role', '校园任职': 'campus-role', '在校经历': 'campus-role', '校园经历': 'campus-role', '在校职务': 'campus-role', '学生工作': 'campus-role', '学生干部': 'campus-role', 'school posts': 'campus-role', 'school_posts': 'campus-role', 'campus posts': 'campus-role', 'campus_posts': 'campus-role', 'awards': 'awards', '获奖': 'awards', '奖励': 'awards', '荣誉': 'awards', 'publications': 'publications', '论文': 'publications', '发表': 'publications', '专著': 'publications'}
 MODULES.update({'family':'family','家庭':'family','亲属':'family','教育':'education','education':'education','学历':'education','实习':'internship','工作':'internship','internship':'internship','employment':'internship','项目':'project','project':'project','个人':'personal','personal':'personal','基本':'personal','语言':'language','language':'language','work':'internship','projects':'project'})
+MODULES.update({'校内职务':'campus-role','英语能力':'language','外语能力':'language','证书':'language','活动实践':'project'})
 
 
 def normalized(value):
@@ -314,7 +331,7 @@ def module_hint(field):
     if manual_field(field):return 'manual'
     if re.search(r'紧急联系人|emergency contact',context+' '+str(field.get('label','')),re.I):return 'personal'
     if re.search(r'家庭成员|家庭情况|家庭信息|家庭关系|亲属|family|父亲|母亲',context,re.I) or re.match(r'^(父亲|母亲)',str(field.get('label',''))):return 'family'
-    if re.search(r'campus-role|在校任职|校园任职|在校经历|校园经历|在校职务|学生工作|学生干部|school[ _-]*posts|campus[ _-]*posts',context,re.I):return 'campus-role'
+    if re.search(r'campus-role|在校任职|校园任职|在校经历|校园经历|在校职务|校内职务|学生工作|学生干部|school[ _-]*posts|campus[ _-]*posts',context,re.I):return 'campus-role'
     if re.search(r'获奖|奖励|荣誉|awards',context,re.I):return 'awards'
     if re.search(r'论文|发表|出版|专著|publications',context,re.I):return 'publications'
     if re.fullmatch(r'毕业院校|毕业学校|最近毕业专业',str(field.get('label',''))):return 'education'

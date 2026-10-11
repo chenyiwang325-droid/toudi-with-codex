@@ -80,7 +80,7 @@
     const context=[field.module,field.groupLabel].join(' ');
     if(/紧急联系人|emergency contact/i.test(context+' '+field.label))return 'personal';
     if(/家庭成员|家庭情况|家庭信息|家庭关系|亲属|family|父亲|母亲/i.test(context) || /^(父亲|母亲)/.test(field.label || ''))return 'family';
-    if(/campus-role|在校任职|校园任职|在校经历|校园经历|在校职务|学生工作|学生干部|school[ _-]*posts|campus[ _-]*posts/i.test(context))return 'campus-role';
+    if(/campus-role|在校任职|校园任职|在校经历|校园经历|在校职务|校内职务|学生工作|学生干部|school[ _-]*posts|campus[ _-]*posts/i.test(context))return 'campus-role';
     if(/获奖|奖励|荣誉|awards/i.test(context))return 'awards';
     if(/论文|发表|出版|专著|publications/i.test(context))return 'publications';
     if(/^(毕业院校|毕业学校|最近毕业专业)$/.test(field.label || ''))return 'education';
@@ -99,7 +99,7 @@
   function recordMatches(fact,field) {
     if(fact.module==='family'){const relation=[field.label,field.groupLabel].join(' ').match(/父亲|母亲/);if(relation && ![fact.recordLabel,fact.recordHint].join(' ').includes(relation[0]))return false;}
     const qs=qualifiers([field.label,field.groupLabel,field.recordHint].join(' '));
-    const hint=normal(fact.recordLabel+' '+fact.recordHint);
+    const hint=normal(fact.recordLabel+' '+fact.recordHint+(fact.module==='education' && fact.label==='学历'?' '+fact.value:''));
     return fact.module!=='education' || qs.every(q=>hint.includes(normal(q.replace('研究生',''))));
   }
   const sharedAliasIndex=new Map();
@@ -108,8 +108,16 @@
     for(const key of keys){if(!sharedAliasIndex.has(key))sharedAliasIndex.set(key,new Set());keys.forEach(value=>sharedAliasIndex.get(key).add(value));}
   }
   const scopedAliasIndex=Object.fromEntries(Object.entries(V.moduleAliases || {}).map(([mod,entries])=>[mod,new Map(Object.entries(entries).map(([canonical,synonyms])=>[normal(canonical),new Set(synonyms.map(normal))]))]));
+  const languageAbility=field=>moduleHint(field)==='language' && field.recordMode==='language-ability';
+  function englishFacts(p){
+    const ids=new Set(p.facts.filter(f=>f.module==='language' && !f.manual && (f.label==='语种' && /^(英语|english)$/i.test(String(f.value)) || ['证书类型','语言／证书名称'].includes(f.label) && /四级|六级|CET[- ]?[46]/i.test(String(f.value)))).map(f=>f.recordId));
+    return p.facts.filter(f=>f.module==='language' && !f.manual && ids.has(f.recordId));
+  }
+  const boundProfile=(p,g)=>({...p,facts:p.facts.filter(f=>f.module===g.module && (g.sourceRecordIds || [g.recordId]).includes(f.recordId))});
   function labelMatches(fact,field) {
     const label=semantic(field),factLabel=normal(fact.label);
+    if(languageAbility(field) && label===normal('英语'))return factLabel===normal('熟练程度');
+    if(languageAbility(field) && label===normal('取得证书'))return factLabel===normal('证书类型');
     if(moduleHint(field)==='language'){for(const canonical of ['语种','证书类型','考试成绩']){const names=[canonical,...(V.moduleAliases.language[canonical] || [])].map(normal);if(names.includes(label))return factLabel===normal(canonical);}}
     if(moduleHint(field)==='awards'){const scope=new Set(['获奖级别','获奖等级','award level','award scope'].map(normal)),rank=new Set(['奖项等级','奖励等级','award rank','prize rank'].map(normal));if((scope.has(factLabel)&&rank.has(label)) || (rank.has(factLabel)&&scope.has(label)))return false;}
     if(scopedAliasIndex[moduleHint(field)]?.get(factLabel)?.has(label))return true;
@@ -189,6 +197,7 @@
   }
   function mappingMatches(p,field,fact) {
     if(manualField(field) || fact.module==='family' && moduleHint(field)!=='family')return false;
+    if(languageAbility(field) && semantic(field)===normal('英语'))return englishFacts(p).some(f=>f.key===fact.key && ['熟练程度','证书类型','语种','考试成绩'].includes(f.label));
     if(personalReference(field))return personalReferenceFacts(p,field).some(f=>f.key===fact.key);
     const campusCategory=moduleHint(field)==='campus-role' && /^(在校职务类别|校园职务类别|任职类别|职务类别)$/.test(field.label || '');
     if(campusCategory) {if(fact.module!=='campus-role' || !['职务','职务类别'].includes(fact.label))return false;const evidence=recordEvidence(p,field,'campus-role');return evidence===null || evidence.has(fact.recordId);}
@@ -206,9 +215,12 @@
     let n=normal(value);
     if(label==='获奖级别')n=({'校级':'院校级','学校级':'院校级','高校级':'院校级','校院级':'院校级','省级':'省区级','省部级':'省区级','市级':'地市级','全国级':'国家级','国际性':'国际级'})[n] || n;
     if(label==='专业'){
-      n=normal(String(value).replace(/\s*[（(][^()（）]+类[)）]\s*$/,''));
+      // Resume parsers may append a research direction, even with an omitted
+      // closing bracket. It is annotation, not a different base qualification.
+      n=normal(String(value).replace(/\s*[（(](?:[^()（）]*(?:方向|研究方向|专业方向|类))[)）]?\s*$/,''));
       if(n.length>=5)n=n.replace(/(规划|工程|管理|技术|设计|经济|教育|园林)学$/,'$1');
     }
+    if(label==='单位')n=normal(String(value).replace(/\s*[（(][^()（）]*(?:部|部门|中心|组)[)）]\s*$/,''));
     if(['证书类型','语言／证书名称'].includes(label)){if(/^(大学英语)?(四级|4级|四级考试|4级考试)$/.test(n) || ['cet4','collegeenglishtest4'].includes(n))return 'cet4';if(/^(大学英语)?(六级|6级|六级考试|6级考试)$/.test(n) || ['cet6','collegeenglishtest6'].includes(n))return 'cet6';}
     const map=['学历','最高学历'].includes(label)?{'硕士研究生':'硕士','博士研究生':'博士','大学本科':'本科','大学专科':'专科','大专':'专科'}:['学位','最高学位'].includes(label)?{'硕士学位':'硕士','学士学位':'学士','博士学位':'博士','工学学士':'学士','理学学士':'学士','文学学士':'学士','工学硕士':'硕士','理学硕士':'硕士','文学硕士':'硕士'}:label==='学历类型'?{'普通全日制':'全日制','全日制普通':'全日制','全国普通高等院校全日制':'全日制','全国普通高等院校非全日制':'非全日制'}:{};
     return map[n] || n;
@@ -219,7 +231,12 @@
     return numeric(a) && numeric(b) && Number.isFinite(Number(a)) && Number(a)===Number(b);
   }
   function regionEquivalent(field,existing,proposed){
-    if(field.adapter!=='ant-region' || !Number.isInteger(field.regionDepth) || field.regionDepth<2 || field.regionDepth>4)return false;
+    if(!['ant-region','moka-region'].includes(field.adapter) || !Number.isInteger(field.regionDepth) || field.regionDepth<2 || field.regionDepth>4)return false;
+    if(field.adapter==='moka-region'){
+      const normalize=v=>String(v).replace(/(?:壮族|回族|维吾尔)?自治区|特别行政区|省|市/g,'');
+      const parts=String(existing).split(/[\s/／>]+/).filter(Boolean).map(normalize),source=String(proposed).replace(/[\s/／>、]+/g,'');
+      return parts.length===field.regionDepth && normalize(source).startsWith(parts.join(''));
+    }
     const parts=v=>String(v).replace(/[\s/／>]+/g,'').split(/(?<=省|市|自治区|特别行政区)/).filter(Boolean).map(v=>v.replace(/省|市|自治区|特别行政区/g,''));
     const actual=parts(existing),source=parts(proposed),depth=field.regionDepth;
     return actual.length===depth && source.length>=depth && actual.every((v,i)=>v===source[i]);
@@ -247,31 +264,63 @@
   }
   const repeatedModules=new Set(['education','internship','project','campus-role','awards','publications','family','language']);
   const meaningfulValue=f=>f.value!==false && String(f.value ?? '').trim()!=='' && !/^(?:请选择.*|请输入.*|please select.*|select\.\.\.)$/i.test(String(f.value).trim());
-  const recordIdentities={education:/学校|院校|学历/,internship:/公司|单位名称|实习单位|^单位$/,project:/项目名称|实践名称|^名称$|在校科研及实践项目/,'campus-role':/职务|岗位|组织名称/,awards:/奖项|获奖名称/,publications:/名称|论文题目/,language:/证书名称|证书类型|语言.?证书名称/,family:/姓名|关系/};
+  const recordIdentities={education:/学校|院校|学历/,internship:/公司|企业名称|单位名称|实习单位|^单位$/,project:/项目名称|实践名称|^名称$|在校科研及实践项目/,'campus-role':/职务|岗位|组织.*名称/,awards:/奖项|获奖名称|奖励名称/,publications:/名称|论文题目/,language:/证书名称|证书类型|语言.?证书名称/,family:/姓名|关系/};
   const hasRecordContent=f=>meaningfulValue(f) && (!['select','radio','combobox','checkbox'].includes(f.type) || recordIdentities[moduleHint(f)]?.test(f.label));
+  // Several sections can share a fact module while serving different tasks.
+  // Route by section purpose before allocating blank records, never by DOM order.
+  function sectionPurpose(module,label){
+    if(module==='internship')return /实习|intern/i.test(label)?'internship':/工作|employment|work experience/i.test(label)?'employment':'';
+    if(module==='project')return /项目|科研|project|research/i.test(label)?'project':/活动|实践|activity/i.test(label)?'activity':'';
+    if(module==='language')return /英语|外语|语言能力|english|language ability/i.test(label)?'exam':/证书|certificate/i.test(label)?'certificate':'';
+    if(module==='education')return qualifiers(label).join('|');
+    return '';
+  }
+  function sectionAccepts(p,module,section,record,split){
+    if(module==='education')return p.facts.some(f=>f.module===module && f.recordId===record.id && !f.manual && recordMatches(f,{groupLabel:section.label}));
+    const purpose=sectionPurpose(module,section.label),facts=p.facts.filter(f=>f.module===module && f.recordId===record.id && !f.manual);
+    if(module==='language' && purpose==='exam')return facts.some(f=>['语种','证书类型','语言／证书名称'].includes(f.label) && /英语|外语|四级|六级|CET|IELTS|TOEFL|雅思|托福|English/i.test(f.value));
+    if(!split)return true;
+    if(module==='internship'){
+      const type=facts.filter(f=>['工作类别','工作类型','经历类别'].includes(f.label)).map(f=>f.value).join(' ');
+      const kind=/正式|全职|employment|full.time/i.test(type) && !/实习|intern/i.test(type)?'employment':'internship';
+      return purpose===kind;
+    }
+    if(module==='project'){
+      const type=facts.filter(f=>['项目类别','经历类别','类型'].includes(f.label)).map(f=>f.value).join(' ');
+      return purpose===(/活动|社会实践|activity/i.test(type)?'activity':'project');
+    }
+    return true;
+  }
   // Empty slots are destinations for explicit whole-record placement, not
   // evidence about the identity of an existing nonempty experience.
   function allocateRecords(p,scan,bindings={}) {
     const groups=bindRecordGroups(p,scan,bindings),next={...bindings},modules=[],unusedGroups=[];
     for(const module of repeatedModules){
-      const relevant=groups.filter(g=>g.module===module),sections=(scan.repeatables || []).filter(s=>({work:'internship',projects:'project'})[s.module]===module || s.module===module),section=sections.length===1?sections[0]:null;
-      let records=[...new Map(p.facts.filter(f=>f.module===module && !f.manual && String(f.value ?? '').trim()).map(f=>[f.recordId,{id:f.recordId,label:f.recordLabel || f.recordHint || f.recordId}])).values()];
-      if(module==='education' && section && qualifiers(section.label || '').length)records=records.filter(r=>p.facts.some(f=>f.module===module && f.recordId===r.id && !f.manual && recordMatches(f,{groupLabel:section.label})));
-      if(!records.length)continue;
-      if(!relevant.length && !sections.length)continue;
+      const moduleGroups=groups.filter(g=>g.module===module),sections=(scan.repeatables || []).filter(s=>({work:'internship',projects:'project'})[s.module]===module || s.module===module);
+      const allRecords=[...new Map(p.facts.filter(f=>f.module===module && !f.manual && String(f.value ?? '').trim()).map(f=>[f.recordId,{id:f.recordId,label:f.recordLabel || f.recordHint || f.recordId}])).values()];
+      if(!moduleGroups.length && !sections.length)continue;
+      for(const section of sections.length?sections:[null]){
+      const samePurpose=section?sections.filter(s=>sectionPurpose(module,s.label)===sectionPurpose(module,section.label)):[];
+      const ambiguous=samePurpose.length>1;
+      const relevant=section?moduleGroups.filter(g=>section.groupIds?.includes(g.groupId) || !section.groupIds && (sections.length===1 || normal(g.label.replace(/\s*·\s*第\d+段$/,''))===normal(section.label))):moduleGroups;
+      let records=section?allRecords.filter(r=>sectionAccepts(p,module,section,r,sections.length>1)):allRecords;
+      // A language ability card is one capability, not one card per certificate.
+      if(relevant.some(g=>g.recordMode==='language-ability'))records=records.filter(r=>relevant.some(g=>g.recordId===r.id));
       const used=new Set(relevant.filter(g=>g.status==='bound').map(g=>g.recordId));
       let blank=0;
       for(const g of relevant){
         const fields=scan.fields.filter(f=>g.fieldIds.includes(f.id));
         if(g.status==='bound'){next[g.groupId]=g.recordId;if(!fields.some(hasRecordContent))blank++;continue;}
-        if(fields.some(hasRecordContent) || new Set(fields.map(moduleHint)).size!==1)continue;
+        if(ambiguous || fields.some(hasRecordContent) || new Set(fields.map(moduleHint)).size!==1)continue;
         const constrained=module==='education'?fields.filter(f=>qualifiers([f.label,f.groupLabel,f.recordHint].join(' ')).length):[];
         const record=records.find(r=>!used.has(r.id) && constrained.every(field=>p.facts.some(f=>f.module===module && f.recordId===r.id && recordMatches(f,field))));if(!record){unusedGroups.push(g.groupId);continue;}
         next[g.groupId]=record.id;used.add(record.id);blank++;
       }
       const remaining=records.filter(r=>!used.has(r.id)),unresolved=relevant.filter(g=>g.status!=='bound' && !next[g.groupId] && scan.fields.some(f=>g.fieldIds.includes(f.id) && hasRecordContent(f))).length;
-      const canAdd=!!section && section.addStatus==='ready' && !unresolved;
-      modules.push({module,label:section?.label || relevant[0]?.label || module,total:records.length,matched:used.size,blank,missing:remaining,sectionId:section?.id || '',canAdd,unresolved,reason:section?.blockedReason || (unresolved?'已有经历无法确认归属，先纠正对应关系，避免重复添加。':sections.length>1?'页面存在多个同类模块，需确认新增位置。':section?.addStatus==='disabled'?'网站新增入口已停用或达到数量上限。':section?.addStatus==='ambiguous'?'该模块存在多个新增入口，需手动确认。':!canAdd && remaining.length?'未找到可直接操作的新增经历入口。':'')});
+      const canAdd=!!section && section.addStatus==='ready' && !unresolved && !ambiguous && records.length>0;
+      const canOpen=!!section && section.addStatus==='requires-expand' && !ambiguous;
+      modules.push({module,label:section?.label || relevant[0]?.label || module,total:records.length,matched:used.size,blank,missing:remaining,sectionId:section?.id || '',canAdd,canOpen,unresolved,reason:canOpen?'该模块尚未展开，填写前先展开检查已有记录。':section?.blockedReason || (unresolved?'已有经历无法确认归属，先纠正对应关系，避免重复添加。':ambiguous?'页面存在多个用途相同的模块，需确认新增位置。':section?.addStatus==='disabled'?'网站新增入口已停用或达到数量上限。':section?.addStatus==='ambiguous'?'该模块存在多个新增入口，需手动确认。':!canAdd && remaining.length?'未找到可直接操作的新增经历入口。':'')});
+      }
     }
     return {bindings:next,modules,unusedGroups};
   }
@@ -283,6 +332,12 @@
     if(Object.entries(bindings).some(([id,rid])=>!grouped.has(id) || typeof rid!=='string'))throw Error('经历绑定必须对应当前页面板块。');
     return [...grouped].map(([groupId,fields])=>{
       const mod=moduleHint(fields[0]),facts=p.facts.filter(f=>f.module===mod),records=new Map(facts.map(f=>[f.recordId,{id:f.recordId,label:f.recordLabel || f.recordHint || f.recordId}]));
+      if(mod==='language' && moduleGroups.get(mod)===1 && fields.every(languageAbility)){
+        const sourceRecordIds=[...new Set(englishFacts(p).map(f=>f.recordId))],explicit=bindings[groupId];
+        if(explicit && !sourceRecordIds.includes(explicit))throw Error('该经历不属于当前板块的资料模块。');
+        const recordId=explicit || sourceRecordIds[0] || '';
+        return {groupId,module:mod,label:fields[0].groupLabel,status:recordId?'bound':'unbound',recordId,sourceRecordIds,recordMode:'language-ability',recordLabel:'英语能力',reason:recordId?'按英语能力汇总已确认的证书。':'没有已确认的英语资料。',candidates:sourceRecordIds.map(id=>records.get(id)),fieldIds:fields.map(f=>f.id)};
+      }
       let eligible=new Set(records.keys()),hasEvidence=false;
       const constrain=ids=>{hasEvidence=true;eligible=new Set([...eligible].filter(id=>ids.has(id)));};
       if(new Set(fields.map(moduleHint)).size!==1)constrain(new Set());
@@ -306,6 +361,57 @@
       return {groupId,module:mod,label:fields[0].groupLabel || mod,status:bound?'bound':conflict?'conflict':'unbound',recordId,recordLabel:records.get(recordId)?.label || '',reason:bound?'整段字段使用同一份经历。':conflict?'页面经历信息与所选资料不一致，请核对整段名称或重新选择经历。':'请先为这一整段选择对应经历，开始、结束时间与正文将统一匹配。',candidates:[...records.values()],fieldIds:fields.map(f=>f.id)};
     });
   }
+  // Compose only explicit facts for fields that ask for several values. These
+  // are view values; source facts and full experience text remain unchanged.
+  function composedValue(p,scoped,field,binding){
+    const mod=moduleHint(field),label=normal(field.label),facts=scoped.facts.filter(f=>!f.manual && String(f.value ?? '').trim());
+    const one=name=>{const fs=facts.filter(f=>f.label===name);return fs.length===1?fs[0]:null;};
+    const result=(source,value)=>source.length?{fact:source[0],value,sourceKeys:source.map(f=>f.key),derived:true,sensitive:source.some(f=>f.sensitive)}:null;
+    if(languageAbility(field) && label===normal('取得证书')){
+      const certs=englishFacts(scoped).filter(f=>f.label==='证书类型');
+      return result(certs,[...new Set(certs.map(f=>String(f.value)))].join('；'));
+    }
+    if(!binding || binding.status!=='bound')return null;
+    if(mod==='internship' && /^(证明人及联系方式|证明人联系方式姓名及电话|证明人姓名及联系方式)$/.test(label)){
+      const name=one('证明人'),phone=one('证明人电话');
+      return name && phone?result([name,phone],String(name.value)+'，'+String(phone.value)):null;
+    }
+    if(mod!=='education')return null;
+    if(/^(在校成绩gpa及排名|gpa及排名|gpa和排名|成绩gpa及排名)$/.test(label)){
+      const gpa=one('GPA'),rank=one('年级排名');
+      return gpa && rank?result([gpa,rank],'GPA：'+gpa.value+(gpa.gpaScale?'（满分 '+gpa.gpaScale+'）':'')+'；排名：'+rank.value):null;
+    }
+    if(label===normal('是否全日制')){
+      const type=one('学历类型');if(!type)return null;
+      const value=normal(type.value);
+      return /非全日制/.test(value)?result([type],'否'):/全日制/.test(value)?result([type],'是'):null;
+    }
+    if(label===normal('是否最高学历')){
+      const degree=one('学历'),highest=p.facts.filter(f=>f.module==='personal' && f.label==='最高学历' && !f.manual);
+      if(!degree || highest.length!==1)return null;
+      return result([degree,highest[0]],optionEquivalent(degree.value,'学历')===optionEquivalent(highest[0].value,'学历')?'是':'否');
+    }
+    if(label===normal('是否第一学历')){
+      const eligible=new Set(p.facts.filter(f=>f.module==='education' && f.label==='学历' && !f.manual && ['专科','本科','硕士','博士'].includes(optionEquivalent(f.value,'学历'))).map(f=>f.recordId));
+      const dates=p.facts.filter(f=>f.module==='education' && eligible.has(f.recordId) && f.label==='开始日期' && !f.manual && /^\d{4}-\d{2}(?:-\d{2})?$/.test(String(f.value)));
+      if(!eligible.has(binding.recordId) || [...eligible].some(id=>dates.filter(f=>f.recordId===id).length!==1))return null;
+      const first=[...dates].sort((a,b)=>String(a.value).localeCompare(String(b.value)))[0];
+      if(dates.filter(f=>f.value===first.value).length!==1)return null;
+      const start=dates.find(f=>f.recordId===binding.recordId);
+      return result([start,...dates.filter(f=>f.key!==start.key)],binding.recordId===first.recordId?'是':'否');
+    }
+    if(label===normal('在校担任职务')){
+      const start=one('开始日期'),end=one('结束日期');
+      if(!start || !end || ![start,end].every(f=>/^\d{4}-\d{2}-\d{2}$/.test(String(f.value))))return null;
+      const roles=[];
+      for(const role of p.facts.filter(f=>f.module==='campus-role' && f.label==='职务' && !f.manual)){
+        const dates=['开始日期','结束日期'].map(name=>p.facts.filter(f=>f.module==='campus-role' && f.recordId===role.recordId && f.label===name && !f.manual));
+        if(dates.every(fs=>fs.length===1 && /^\d{4}-\d{2}-\d{2}$/.test(String(fs[0].value))) && dates[0][0].value>=start.value && dates[1][0].value<=end.value)roles.push({role,dates:dates.flat()});
+      }
+      return roles.length?result([roles[0].role,start,end,...roles.flatMap(r=>[r.role,...r.dates]).filter(f=>f.key!==roles[0].role.key)],[...new Set(roles.map(r=>String(r.role.value)))].join('；')):null;
+    }
+    return null;
+  }
   function plan(p,scan,mappings={},now=new Date(),optionDecisions={},recordBindings={}) {
     scanValid(scan);
     const facts=new Map(p.facts.map(f=>[f.key,f]));
@@ -313,16 +419,17 @@
     const groups=bindRecordGroups(p,scan,recordBindings), byField=new Map(groups.flatMap(g=>g.fieldIds.map(id=>[id,g])));
     const rows=scan.fields.map(field=>{
       const row={fieldId:field.id,label:field.label || '',module:field.module || '',groupLabel:field.groupLabel || '',status:'missing',reason:'资料中没有可确认的对应字段。',expectedValue:field.value ?? ''};
-      const binding=byField.get(field.id),matchField=binding?.status==='bound'?{...field,module:binding.module,groupLabel:'',recordHint:''}:field,matchProfile=binding?.status==='bound'?{...p,facts:p.facts.filter(f=>f.module===binding.module && f.recordId===binding.recordId)}:p;
-      if(binding){row.recordBinding={groupId:binding.groupId,status:binding.status,recordId:binding.recordId,recordLabel:binding.recordLabel};row.allowedFactKeys=binding.status==='bound'?p.facts.filter(f=>!f.manual && f.module===binding.module && f.recordId===binding.recordId && mappingMatches(matchProfile,matchField,f)).map(f=>f.key):[];}
+      const binding=byField.get(field.id),matchField=binding?.status==='bound'?{...field,module:binding.module,groupLabel:'',recordHint:''}:field,matchProfile=binding?.status==='bound'?boundProfile(p,binding):p;
+      if(binding){row.recordBinding={groupId:binding.groupId,status:binding.status,recordId:binding.recordId,recordLabel:binding.recordLabel,...(binding.sourceRecordIds?{sourceRecordIds:binding.sourceRecordIds}:{})};row.allowedFactKeys=binding.status==='bound'?matchProfile.facts.filter(f=>!f.manual && mappingMatches(matchProfile,matchField,f)).map(f=>f.key):[];}
       const kind=field.type || 'text';
       const unsupportedReasons={'disabled-or-readonly':'网站锁定了此字段，请先在网站中解除或修改关联记录。','custom-date':'已识别日期字段；此网站的日历控件需手动选择。','split-date':'已识别分开的年月选项；请按对应经历手动选择，避免混填日期。','unlabeled':'未找到可靠的字段标题，请在网页中确认。','custom-selector':'已识别下拉字段，但暂不能可靠读取选项，请手动选择。'};
       if(field.unsupported || !['text','textarea','email','tel','date','month','number','select','radio','checkbox','combobox','file'].includes(kind))return {...row,status:'unsupported',reason:unsupportedReasons[field.unsupported] || '控件尚不支持可靠填入。'};
-      const deferredSelect=kind==='combobox' && ['moka-select','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region'].includes(field.adapter);
+      const deferredSelect=kind==='combobox' && ['moka-select','moka-region','moka-date','phoenix-select','phoenix-date','ant-select','ant-date','ant-split-date','ant-region'].includes(field.adapter);
       if(['file','checkbox'].includes(kind) || (kind==='combobox' && !field.options?.length && !deferredSelect) || manualField(field))return {...row,status:'manual',reason:'上传、协议或复杂控件需要人工操作。'};
       if(binding && binding.status!=='bound')return {...row,status:'ambiguous',reason:binding.reason};
-      let list=Object.hasOwn(mappings,field.id)?[facts.get(mappings[field.id])]:candidates(matchProfile,matchField);
-      if(binding)list=list.filter(f=>f.module===binding.module && f.recordId===binding.recordId);
+      const composed=composedValue(p,matchProfile,matchField,binding);
+      let list=composed?[composed.fact]:Object.hasOwn(mappings,field.id)?[facts.get(mappings[field.id])]:candidates(matchProfile,matchField);
+      if(binding && !composed)list=list.filter(f=>f.module===binding.module && (binding.sourceRecordIds || [binding.recordId]).includes(f.recordId));
       if(list.length>1)return {...row,status:'ambiguous',reason:'有多个资料记录，分组或记录提示无法唯一确认，请选择事实。'};
       if(!list.length){
         const outside=(p.facts || []).length===0 || !p.facts.some(f=>f.module===moduleHint(field));
@@ -330,13 +437,13 @@
         if(moduleHint(field)==='campus-role' && semantic(field)===normal('在校职务类别'))row.reason='资料未保存对应职务类别，需要依据网站候选选项人工确认；不能将职务名称当作类别。';
         return row;
       }
-      const fact=list[0];let value=String(fact.value), reason='', valuePrecision=fact.precision;
+      const fact=list[0];let value=composed?composed.value:String(fact.value), reason='', valuePrecision=composed?null:fact.precision;
       const format=field.dateFormat, deferredDate=field.adapter==='phoenix-date' && !format, dateKind=deferredDate?(valuePrecision==='month'?'month':valuePrecision==='day'?'date':''):field.datePart?'month':['date','month'].includes(kind)?kind:format?(format.includes('DD')?'date':'month'):'';
-      Object.assign(row,{factKey:fact.key,value,displayValue:fact.sensitive?mask(value,row.label):value,sensitive:fact.sensitive});
-      if(Object.hasOwn(mappings,field.id) && !mappingMatches(matchProfile,matchField,fact))reason='映射与字段的明确含义、模块或记录不符，不能跨记录填入。';
+      Object.assign(row,{factKey:fact.key,value,displayValue:(composed?.sensitive || fact.sensitive)?mask(value,row.label):value,sensitive:!!(composed?.sensitive || fact.sensitive),...(composed?{derived:true,sourceKeys:composed.sourceKeys}:{})});
+      if(!composed && Object.hasOwn(mappings,field.id) && !mappingMatches(matchProfile,matchField,fact))reason='映射与字段的明确含义、模块或记录不符，不能跨记录填入。';
       if(!reason && fact.manual)reason='此项资料必须人工确认，不使用自动填入。';
       const constraints=field.constraints || {};
-      if(!reason && fact.label==='GPA') {
+      if(!reason && !composed && fact.label==='GPA') {
         const demanded=/4[.．]0|四分/.test(row.label)?4:/5[.．]0|五分/.test(row.label)?5:kind==='number' && ['4','4.0','5','5.0'].includes(constraints.max)?Number(constraints.max):0;
         if(demanded && Number(fact.gpaScale)!==demanded)reason='GPA 未注明相同满分口径，需人工确认。';
       }
@@ -369,10 +476,11 @@
         }
       }
       const decision=optionDecisions[field.id];
-      if(!reason && decision && decision.factKey===fact.key && validOptionDecision(matchProfile,matchField,decision)) {
+      if(!reason && !composed && decision && decision.factKey===fact.key && validOptionDecision(matchProfile,matchField,decision)) {
         row.optionValue=decision.optionValue;row.optionText=field.options.find(o=>o.value===decision.optionValue).text;
         row.displayValue=row.optionText;row.agentReason=decision.reason;row.sourceKeys=decision.sourceKeys;
       }
+      if(!reason && languageAbility(matchField) && semantic(matchField)===normal('英语') && fact.label!=='熟练程度' && row.optionValue===undefined)reason='没有唯一等价选项；证书成绩不能直接当作语言熟练程度，需要核对网站选项。';
       if(!reason && ['select','radio','combobox'].includes(kind) && (!deferredSelect || field.options?.length) && row.optionValue===undefined) {
         const present=v=>['至今','present','ongoing','current'].includes(normal(v));
         const binaryMarriage=fact.label==='婚姻状况' && normal(field.label)==='婚否'?{'已婚':'是','未婚':'否'}[normal(value)]:undefined;
@@ -383,7 +491,7 @@
       if(reason)return {...row,status:'manual',reason};
       const existing=String(field.value ?? ''), proposed=String(row.optionValue ?? value);
       const note=row.agentReason?' Agent：'+row.agentReason:row.dateFallbackUsed?' 经历仍在进行；此日期为填写当天的表单占位，不是实际结束日期。':'';
-      if(existing && (existing===proposed || existing===value || (row.optionText && existing===row.optionText) || numericEquivalent(existing,value,fact.label) || (deferredDate && /^\d{4}-\d{2}$/.test(existing) && value.startsWith(existing+'-')) || regionEquivalent(field,existing,value) || (['select','radio','combobox'].includes(kind) && optionEquivalent(existing,fact.label)===optionEquivalent(value,fact.label))))return {...row,status:'already',reason:existing===value?'已有值与资料相同。'+note:'已有选项与资料语义一致，无需覆盖。'+note};
+      if(existing && (existing===proposed || existing===value || (row.optionText && existing===row.optionText) || numericEquivalent(existing,value,fact.label) || (deferredDate && /^\d{4}-\d{2}$/.test(existing) && value.startsWith(existing+'-')) || regionEquivalent(field,existing,value) || ((['select','radio','combobox'].includes(kind) || fact.label==='单位') && optionEquivalent(existing,fact.label)===optionEquivalent(value,fact.label))))return {...row,status:'already',reason:existing===value?'已有值与资料相同。'+note:'已有选项与资料语义一致，无需覆盖。'+note};
       if(existing)return {...row,status:'conflict',reason:'已有值与资料不同，保留现值，需明确选择覆盖。'+note};
       return {...row,status:'ready',reason:(deferredSelect?'资料已匹配；填写时展开此字段菜单，仅选择唯一对应选项，未找到则保留原值。':'事实、记录及控件约束已确认。')+note};
     });
@@ -414,10 +522,10 @@
     const facts=new Map(),fields=[];
     for(const f of scan.fields) {
       const row=plan.rows.find(r=>r.fieldId===f.id);
-      if(moduleHint(f)==='family' || !row || !(agentPending(row,f) || reviewAll && ['ready','conflict','already'].includes(row.status)) || manualField(f) || sensitive(f.label) || moduleHint(f)==='unsupported-module' || f.unsupported)continue;
+      if(moduleHint(f)==='family' || !row || row.derived || !(agentPending(row,f) || reviewAll && ['ready','conflict','already'].includes(row.status)) || manualField(f) || sensitive(f.label) || moduleHint(f)==='unsupported-module' || f.unsupported)continue;
       if(row.recordBinding && row.recordBinding.status!=='bound')continue;
       const bound=row.recordBinding;
-      const related=relevantAgentFacts(bound?{...p,facts:p.facts.filter(x=>x.recordId===bound.recordId && x.module===moduleHint(f))}:p,bound?{...f,recordHint:'',groupLabel:''}:f);
+      const related=relevantAgentFacts(bound?boundProfile(p,{...bound,module:moduleHint(f)}):p,bound?{...f,recordHint:'',groupLabel:''}:f);
       // A vague field must not turn into a request for the whole profile.
       if(!related.length || related.length>40 || !moduleHint(f))continue;
       related.forEach(fact=>facts.set(fact.key,pick(fact,['key','label','module','recordId','recordLabel','recordHint','aliases','value','manual','sensitive'])));
@@ -448,7 +556,7 @@
     const groups=bindRecordGroups(p,scan,recordBindings),byField=new Map(groups.flatMap(g=>g.fieldIds.map(id=>[id,g])));
     const accepted={},rejected=[];
     for(const [id,d] of Object.entries(decisions || {})){
-      const original=scan.fields.find(f=>f.id===id),group=byField.get(id),field=original && group?.status==='bound'?{...original,module:group.module,recordHint:'',groupLabel:''}:original,scoped=group?{...p,facts:p.facts.filter(f=>f.module===group.module && f.recordId===group.recordId)}:p;
+      const original=scan.fields.find(f=>f.id===id),group=byField.get(id),field=original && group?.status==='bound'?{...original,module:group.module,recordHint:'',groupLabel:''}:original,scoped=group?boundProfile(p,group):p;
       if(!field || (group && group.status!=='bound') || mappings[id]!==d?.factKey || !validOptionDecision(scoped,field,d)){rejected.push(id);continue;}
       accepted[id]=d;
     }
@@ -458,9 +566,9 @@
     const groups=bindRecordGroups(p,scan,recordBindings),byField=new Map(groups.flatMap(g=>g.fieldIds.map(id=>[id,g])));
     const accepted={}, rejected=[];
     for(const [id,key] of Object.entries(mappings)) {
-      const original=scan.fields.find(f=>f.id===id),group=byField.get(id),field=original && group?.status==='bound'?{...original,module:group.module,recordHint:'',groupLabel:''}:original, fact=p.facts.find(f=>f.key===key), scoped=group?{...p,facts:p.facts.filter(f=>f.module===group.module && f.recordId===group.recordId)}:p;
+      const original=scan.fields.find(f=>f.id===id),group=byField.get(id),field=original && group?.status==='bound'?{...original,module:group.module,recordHint:'',groupLabel:''}:original, fact=p.facts.find(f=>f.key===key), scoped=group?boundProfile(p,group):p;
       if(!field || !fact || fact.manual || fact.sensitive || !mappingMatches(scoped,field,fact)) {rejected.push(id);continue;}
-      if(group){if(group.status!=='bound' || fact.recordId!==group.recordId){rejected.push(id);continue;}accepted[id]=key;continue;}
+      if(group){if(group.status!=='bound' || !(group.sourceRecordIds || [group.recordId]).includes(fact.recordId)){rejected.push(id);continue;}accepted[id]=key;continue;}
       const evidence=recordEvidence(p,field,moduleHint(field));
       if(evidence!==null){if(evidence.size!==1 || !evidence.has(fact.recordId)){rejected.push(id);continue;}accepted[id]=key;continue;}
       // A model may not choose the first repeated education/work card by guesswork.

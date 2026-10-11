@@ -5,6 +5,13 @@ const Workflow=globalThis.TouDiFillingWorkflow;
 const KEY='toudiFillingSession', PACK='toudiPrivateProfile', PREF='toudiFillingPreferences', MAPS='toudiFieldMappings', STRUCTURES='toudiStructureHints';
 const HOST='com.toudi.filling.codex';
 const EXTENSION_VERSION=chrome.runtime.getManifest?.().version || 'development';
+const STATE_PREFIX=KEY+':',LAST_TAB=KEY+'LastTab',WORKER_ID=crypto.randomUUID();
+const stateKey=tabId=>STATE_PREFIX+tabId;
+async function clearStates(tabId){
+  if(Number.isInteger(tabId)){await chrome.storage.session.remove(stateKey(tabId));return;}
+  const saved=await chrome.storage.session.get(null);
+  await chrome.storage.session.remove(Object.keys(saved).filter(k=>k===KEY || k===LAST_TAB || k.startsWith(STATE_PREFIX)));
+}
 const init=(async()=>{
   await chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
   await chrome.storage.session.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
@@ -20,18 +27,26 @@ async function preferences() {
 }
 function summary(value) {return value?{name:value.name,revision:value.sourceVersion,savedAt:value.savedAt,importedAt:value.importedAt,editedAt:value.editedAt,count:value.facts.length,profiles:value.profiles.map(p=>({...p,count:value.facts.filter(f=>f.profiles.includes(p.id)).length})),rules:value.rules,warnings:value.warnings}:null;}
 async function loadState(targetTabId) {
-  const state=(await chrome.storage.session.get(KEY))[KEY];
-  if(state && (EXTENSION_VERSION==='development' || state.extensionVersion===EXTENSION_VERSION) && Date.now()-state.startedAt<600000) {
-    const tab=Number.isInteger(targetTabId)?await chrome.tabs.get(targetTabId):(await chrome.tabs.query({active:true,currentWindow:true}))[0];
+  let tab;try{tab=Number.isInteger(targetTabId)?await chrome.tabs.get(targetTabId):(await chrome.tabs.query({active:true,currentWindow:true}))[0];}catch(_){if(Number.isInteger(targetTabId))await clearStates(targetTabId);return null;}
+  if(!tab?.id)return null;
+  const key=stateKey(tab.id);let state=(await chrome.storage.session.get(key))[key];
+  if(!state){const legacy=(await chrome.storage.session.get(KEY))[KEY];if(legacy?.tabId===tab.id){state=legacy;await chrome.storage.session.set({[key]:state,[LAST_TAB]:tab.id});await chrome.storage.session.remove(KEY);}}
+  const running=state && ['automation','agentReview','structureReview'].some(k=>state[k]?.status==='running' && state[k].ownerId===WORKER_ID);
+  if(state && (EXTENSION_VERSION==='development' || state.extensionVersion===EXTENSION_VERSION) && (running || Date.now()-(state.updatedAt || state.startedAt)<600000)) {
     const source=(await chrome.storage.local.get(PACK))[PACK];
     let url;try{url=new URL(tab?.url);}catch(_){}
-    if(tab?.id===state.tabId && url?.origin===state.origin && url?.pathname===state.path && source?.sourceVersion===state.sourceVersion && (!state.pageKey || state.pageKey===await digest(tab.url)))return state;
+    if(tab.id===state.tabId && url?.origin===state.origin && url?.pathname===state.path && source?.sourceVersion===state.sourceVersion && (!state.pageKey || state.pageKey===await digest(tab.url))){
+      let interrupted=false;
+      for(const kind of ['automation','agentReview','structureReview'])if(state[kind]?.status==='running' && state[kind].ownerId!==WORKER_ID){state[kind]={...state[kind],status:'failed',phase:'done',message:'浏览器或扩展中断了上次任务；已填写内容保留，请重新识别后继续。'};interrupted=true;}
+      if(interrupted)await putState(state);
+      return state;
+    }
   }
-  await chrome.storage.session.remove(KEY);return null;
+  await clearStates(tab.id);return null;
 }
 const publicState=state=>state?{startedAt:state.startedAt,extensionVersion:state.extensionVersion,engineVersion:state.scan?.engineVersion,agentReview:state.agentReview,structureReview:state.structureReview,structurePending:state.structurePending,answerDraft:state.answerDraft,subjectiveFields:state.scan?.fields.filter(subjectiveField).map(f=>f.id),platform:state.scan?.platforms || state.scan?.platform,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,timings:state.timings,automation:state.automation,autoAgentPending:state.autoAgentPending,agentError:state.agentError || state.lunaError}:null;
-async function putState(state) {state.extensionVersion=EXTENSION_VERSION;await chrome.storage.session.set({[KEY]:state});return publicState(state);}
-chrome.tabs.onRemoved?.addListener(async tabId=>{const state=(await chrome.storage.session.get(KEY))[KEY];if(state?.tabId===tabId)await chrome.storage.session.remove(KEY);});
+async function putState(state) {state.extensionVersion=EXTENSION_VERSION;state.updatedAt=Date.now();await chrome.storage.session.set({[stateKey(state.tabId)]:state,[LAST_TAB]:state.tabId});return publicState(state);}
+chrome.tabs.onRemoved?.addListener(async tabId=>{await clearStates(tabId);if((await chrome.storage.session.get(LAST_TAB))[LAST_TAB]===tabId)await chrome.storage.session.remove(LAST_TAB);});
 let nativePort, nativeTimer, nextId=0;
 const nativeRequests=new Map();
 function nativeFailure() {return Error('本机 Codex 连接工具尚未安装或不可用；请在「资料与设置」查看安装步骤。本地识别和填写仍可使用。');}
@@ -159,7 +174,7 @@ async function installPack(value){
   const old=(await chrome.storage.local.get(PACK))[PACK] || null,changed=!Sync.same(old,value);
   if(value===null)await chrome.storage.local.remove(PACK);
   else{const next={...value,...Core.validatePack(value)};next.sourceVersion=!changed && old?.sourceVersion?old.sourceVersion:await digest({...next,sourceVersion:''});await chrome.storage.local.set({[PACK]:next});}
-  if(changed)await chrome.storage.session.remove(KEY);
+  if(changed)await clearStates();
 }
 async function writeAndRead(workspaceKey,base,pack){
   const written=validateRemote(await native({op:'profile-write',protocol:1,workspaceKey,base,pack}));
@@ -172,7 +187,7 @@ async function synchronize(connect=false,readTimeout=30000){
   const local=(await chrome.storage.local.get(PACK))[PACK] || null;
   try{
     const remote=validateRemote(await native({op:'profile-read',protocol:1},readTimeout));
-    if(state.workspaceKey && state.workspaceKey!==remote.workspaceKey && !connect){await chrome.storage.session.remove(KEY);return storeSync({...state,status:'workspace-changed',error:'中控台已切换工作区。原资料保留；请重新连接并核对，避免写入其他工作区。'});}
+    if(state.workspaceKey && state.workspaceKey!==remote.workspaceKey && !connect){await clearStates();return storeSync({...state,status:'workspace-changed',error:'中控台已切换工作区。原资料保留；请重新连接并核对，避免写入其他工作区。'});}
     const base=connect?null:state.basePack;
     const type=local===null && remote.pack!==null?'remote':Sync.compare(base,local,remote.pack);
     state={...state,enabled:true,workspaceKey:remote.workspaceKey,version:remote.version,error:null};
@@ -205,7 +220,8 @@ async function resolveSync(message){
 async function prepareFill(state,{onePerModule=false,blocked=new Set()}={}){
   state.expansion=[];
         const p=Core.profile(await pack(),state.plan.profileId),placement=Core.allocateRecords(p,state.scan,state.recordBindings || {});
-        const targets=placement.modules.filter(m=>m.canAdd && m.missing.length && !blocked.has(m.module)).map(m=>({sectionId:m.sectionId,recordIds:(onePerModule?m.missing.slice(0,1):m.missing).map(r=>r.id)}));
+        const opening=placement.modules.filter(m=>m.canOpen && !blocked.has(m.sectionId));
+        const targets=opening.length?opening.map(m=>({sectionId:m.sectionId,action:'open',recordIds:[]})):placement.modules.filter(m=>m.canAdd && m.missing.length && !blocked.has(m.sectionId)).map(m=>({sectionId:m.sectionId,recordIds:(onePerModule?m.missing.slice(0,1):m.missing).map(r=>r.id)}));
         if(targets.length){
           const previous=state.scan,expanded=await engine(state.tabId,'expand-records',{fingerprint:state.scan.fingerprint,bindings:placement.bindings,targets},state.structureHints);
           if((await pack()).sourceVersion!==state.sourceVersion || !(await loadState(state.tabId)))throw Error('新增期间网页或资料已变化，请重新识别；已新增的空白经历保留。');
@@ -232,8 +248,8 @@ async function operation(message) {
       await chrome.tabs.sendMessage(message.panelTabId,{type:'toudi-panel-ready',panelToken:message.panelToken},{frameId:0});
       return {ready:true};
     }
-    case 'agent-context': {const saved=(await chrome.storage.session.get(KEY))[KEY];const state=saved?await loadState(saved.tabId):null;if(!state)throw Error('请先在招聘网页打开 TouDi 完成识别，再处理该网页的补充任务。');return publicState(state);}
-    case 'state':return {extensionVersion:EXTENSION_VERSION,sync:await syncState(),profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState(message.panelToken?message.panelTabId:undefined)),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
+    case 'agent-context': {const tabId=message.targetTabId || (await chrome.storage.session.get(LAST_TAB))[LAST_TAB];const state=Number.isInteger(tabId)?await loadState(tabId):null;if(!state)throw Error('请先在招聘网页打开 TouDi 完成识别，再处理该网页的补充任务。');return publicState(state);}
+    case 'state':return {extensionVersion:EXTENSION_VERSION,sync:await syncState(),profile:summary((await chrome.storage.local.get(PACK))[PACK]),preferences:await preferences(),state:publicState(await loadState(message.panelToken?message.panelTabId:message.targetTabId)),lastReport:(await chrome.storage.local.get('toudiLastReport')).toudiLastReport};
     case 'profile-sync':return synchronize(false,message.background?5000:30000);
     case 'profile-connect':return synchronize(true);
     case 'profile-resolve':return resolveSync(message);
@@ -248,10 +264,10 @@ async function operation(message) {
       next.editedAt=message.imported?null:new Date().toISOString();
       if(!message.imported)next.savedAt=next.editedAt;
       next.sourceVersion=await digest({...next,sourceVersion:''});
-      await chrome.storage.local.set({[PACK]:next});await chrome.storage.session.remove(KEY);
+      await chrome.storage.local.set({[PACK]:next});await clearStates();
       await synchronize();return summary(next);
     }
-    case 'profile-delete':if((await syncState()).enabled)throw Error('请先断开工作区同步，再清除浏览器副本。');await chrome.storage.local.remove([PACK,MAPS,'toudiLastReport']);await chrome.storage.session.remove(KEY);return {deleted:true};
+    case 'profile-delete':if((await syncState()).enabled)throw Error('请先断开工作区同步，再清除浏览器副本。');await chrome.storage.local.remove([PACK,MAPS,'toudiLastReport']);await clearStates();return {deleted:true};
     case 'preferences': {
       const value={...await preferences(),...message.preferences};
       const current=(await chrome.storage.local.get(PACK))[PACK];
@@ -259,13 +275,16 @@ async function operation(message) {
         || typeof value.autoAgent!=='boolean' || (value.agentModel && !TouDiAgentConfig.validModel(value.agentModel)))throw Error('协作设置无效。');
       if(value.autoAgent && (value.agentMode!=='codex' || !value.agentModel))throw Error('自动核对需要先选择 Codex 模型。');
       const next=TouDiAgentConfig.normalize(value);
-      await chrome.storage.local.set({[PREF]:next});await chrome.storage.session.remove(KEY);return next;
+      await chrome.storage.local.set({[PREF]:next});
+      const onlyProfile=Object.keys(message.preferences || {}).length===1 && Object.hasOwn(message.preferences,'profile');
+      if(onlyProfile && (message.panelToken || Number.isInteger(message.targetTabId)))await clearStates((await panelTarget(message)).id);
+      else await clearStates();return next;
     }
     case 'settings':
       if(message.section==='agent')await chrome.tabs.create({url:chrome.runtime.getURL('options.html')+'#agent'});
       else await chrome.runtime.openOptionsPage();return {opened:true};
     case 'open-workbench':return native({op:'open-workbench',protocol:1});
-    case 'clear-plan':await chrome.storage.session.remove(KEY);return {cleared:true};
+    case 'clear-plan':await clearStates((await panelTarget(message))?.id);return {cleared:true};
     case 'codex-status':return native({op:'status',protocol:1});
     case 'scan': {
       const started=Date.now();
@@ -282,8 +301,8 @@ async function operation(message) {
       if(cached){
         try{const hints=safeHints(scan,cached.hints);if(Object.keys(hints).length){const updated=Core.scanValid(await engine(tab.id,'scan',hints));if(updated.structure?.fingerprint===scan.structure?.fingerprint){structureHints=appliedHints(updated,hints);scan=updated;structureReview={status:'cached',accepted:Object.keys(structureHints).length,rejected:(updated.structure?.rejected || []).length,message:'已复用本页验证过的结构规则。'};}}}catch(_){}
       }
-      const value=await pack(), pref=await preferences(), p=Core.profile(value,message.profile || pref.profile);
-      if(!scan.fields.length && !scan.repeatables?.some(s=>s.addStatus==='ready'))throw Error('当前页面没有可见填写字段；请先打开网申表单。');
+      const value=await pack(), pref=await preferences(), p=Core.profile(value,message.profile || previous?.plan?.profileId || pref.profile);
+      if(!scan.fields.length && !scan.repeatables?.some(s=>['ready','requires-expand'].includes(s.addStatus)))throw Error('当前页面没有可见填写字段；请先打开网申表单。');
       const pageKey=await digest(tab.url);
       const state={startedAt:Date.now(),tabId:tab.id,pageKey,origin:scan.origin,path:scan.path,sourceVersion:value.sourceVersion,scan,structureHints,structureReview,mappings:{},recordBindings:{},plan:{profileId:p.profileId},timings:{syncMs:Date.now()-started,scanMs}};
       // A continuation reads the current values again. Only explicit record choices
@@ -371,6 +390,7 @@ function appliedHints(scan,hints){
 }
 async function structureOperation(message){
   const state=await enqueue(()=>current(message));
+  message={...message,panelToken:undefined,targetTabId:state.tabId};
   if(message.startedAt && message.startedAt!==state.startedAt)throw Error('计划已变化，请重新识别。');
   if(state.structureReview?.status==='running')return publicState(state);
   if(state.agentReview?.status==='running')throw Error('资料语义核对正在进行，请等待后补充结构。');
@@ -378,7 +398,7 @@ async function structureOperation(message){
   if(!candidates.length)return publicState(state);
   if(message.agent && (pref.agentMode!=='codex' || !pref.agentModel))throw Error('请先配置自己的 Agent 或选择 Codex 模型。');
   const started=Date.now(),baseline=JSON.stringify(state.mappings),fingerprint=state.scan.structure?.fingerprint;
-  state.structureReview={status:'running',model:message.agent?pref.agentModel:'自己的 Agent',requested:candidates.length,message:'正在补充未知字段的标题与分组；本地计划可继续使用。'};
+  state.structureReview={status:'running',ownerId:WORKER_ID,model:message.agent?pref.agentModel:'自己的 Agent',requested:candidates.length,message:'正在补充未知字段的标题与分组；本地计划可继续使用。'};
   await enqueue(async()=>{const active=await current(message);if(active.startedAt!==state.startedAt || active.sourceVersion!==state.sourceVersion || JSON.stringify(active.mappings)!==baseline)throw Error('计划或手动匹配已变化，请重新核对结构。');return putState(state);});
   let result,error;
   try{result=message.agent?await native({op:'adapt',protocol:1,model:pref.agentModel,candidates}):{hints:message.hints,provider:{called:false,model:'自己的 Agent'}};}catch(e){error=e;}
@@ -435,6 +455,7 @@ async function inspectChoices(state,purpose='review',onProgress){
 }
 async function agentOperation(message){
   const state=await enqueue(()=>current(message));
+  message={...message,panelToken:undefined,targetTabId:state.tabId};
   if(message.startedAt && message.startedAt!==state.startedAt)throw Error('计划已变化，请重新核对。');
   if(state.agentReview?.status==='running')return publicState(state);
   if(state.structureReview?.status==='running')throw Error('页面结构辅助正在进行，请等待后核对资料。');
@@ -449,7 +470,7 @@ async function agentOperation(message){
   if(!request.fields.length && !fieldIds.length){state.agentReview={status:'skipped',model:pref.agentModel,requested:0,message:'没有需要语义匹配的字段，本次未调用 Agent。'};return putState(state);}
   const reviewStarted=Date.now();
   const mappingsAtStart=JSON.stringify(state.mappings),bindingsAtStart=JSON.stringify(state.recordBindings);
-  state.agentReview={status:'running',model:pref.agentModel,requested:request.fields.length,startedAt:reviewStarted,message:'正在核对字段含义与已有资料，不影响本地计划使用。'};
+  state.agentReview={status:'running',ownerId:WORKER_ID,model:pref.agentModel,requested:request.fields.length,startedAt:reviewStarted,message:'正在核对字段含义与已有资料，不影响本地计划使用。'};
   await enqueue(()=>putState(state));
   // Do not hold the mutation queue while waiting for a model response.
   let result={mappings:{},provider:{called:false,model:pref.agentModel,optionDecisions:{},mappingReview:{returned:0,ignored:0,duplicates:0,rejected:[]}}},error;
@@ -549,6 +570,7 @@ function finishFill(state,outcomes,additions,passes,limited=false){
 }
 async function reviewPage(message){
   await init;await assertPanelTarget(message);const tab=await panelTarget(message);
+  message={...message,panelToken:undefined,targetTabId:tab.id};
   if(autoRuns.has(tab.id))throw Error('正在填写，请完成后再核对。');
   if(reviewRuns.has(tab.id))return reviewRuns.get(tab.id);
   const run=(async()=>{
@@ -558,11 +580,16 @@ async function reviewPage(message){
     if(state.structurePending)await structureOperation({...message,op:'adapt',agent:true});
     return agentOperation({...message,op:'remap',agent:true});
   })();
-  reviewRuns.set(tab.id,run);try{return await run;}finally{if(reviewRuns.get(tab.id)===run)reviewRuns.delete(tab.id);}
+  reviewRuns.set(tab.id,run);
+  try{return await run;}catch(error){
+    await enqueue(async()=>{const state=await loadState(tab.id);if(!state)return;let changed=false;for(const key of ['agentReview','structureReview'])if(state[key]?.status==='running' && state[key].ownerId===WORKER_ID){state[key]={...state[key],status:'failed',phase:'done',message:error.message};changed=true;}if(changed)await putState(state);});
+    throw error;
+  }finally{if(reviewRuns.get(tab.id)===run)reviewRuns.delete(tab.id);}
 }
 async function autoFill(message){
   await init;await assertPanelTarget(message);
   const tab=await panelTarget(message);
+  message={...message,panelToken:undefined,targetTabId:tab.id};
   if(reviewRuns.has(tab.id))throw Error('Agent 正在核对，请核对完成后再点击自动填写。');
   if(autoRuns.has(tab.id))return autoRuns.get(tab.id);
   const runId=crypto.randomUUID();
@@ -572,14 +599,22 @@ async function autoFill(message){
       const state=await current(message);
       if(state.automation?.id && state.automation.id!==runId && state.automation.status==='running')throw Error('已有填写任务正在运行。');
       state.autoAgentPending=false;
-      state.automation={...(state.automation?.id===runId?state.automation:{}),id:runId,status:'running',phase:value};
+      state.automation={...(state.automation?.id===runId?state.automation:{}),id:runId,ownerId:WORKER_ID,status:'running',phase:value};
       await putState(state);return state;
     });
     try{
       const attempts=new Set(),outcomes=new Map(),blockedAdds=new Set(),additions=[];let passes=0,limited=true;
       for(;passes<64;passes++){
+        // Prepare the whole page scope first. Opening a hidden section returns
+        // a fresh plan before any additions, so existing records are inspected.
+        let active=await phase('preparing');
+        if(active.plan.expansion?.some(m=>(m.canOpen || m.canAdd && m.missing.length) && !blockedAdds.has(m.sectionId))){
+          active=await enqueue(async()=>{const s=await current(message);await prepareFill(s,{onePerModule:true,blocked:blockedAdds});return s;});
+          for(const a of active.expansion || []){additions.push(a);if(a.reason)blockedAdds.add(a.sectionId);}
+          if((active.expansion || []).some(a=>a.opened))continue;
+        }
         await phase('writing');
-        let active=await enqueue(async()=>{const s=await current(message);await inspectChoices(s,'fill');await putState(s);return s;});
+        active=await enqueue(async()=>{const s=await current(message);await inspectChoices(s,'fill');await putState(s);return s;});
         const rows=active.plan.rows.filter(r=>r.factKey && (r.status==='ready' || message.mode!=='empty' && r.status==='conflict')).filter(r=>!attempts.has(Workflow.attemptKey(r,active.scan.fields.find(f=>f.id===r.fieldId),active.recordBindings)));
         if(rows.length){
           const scan=active.scan,bindings=active.recordBindings;
@@ -591,12 +626,8 @@ async function autoFill(message){
           const changedReady=active.plan.rows.some(r=>r.factKey && (r.status==='ready' || message.mode!=='empty' && r.status==='conflict') && !attempts.has(Workflow.attemptKey(r,active.scan.fields.find(f=>f.id===r.fieldId),active.recordBindings)));
           if(changedReady)continue;
         }
-        const missing=active.plan.expansion?.some(m=>m.canAdd && m.missing.length && !blockedAdds.has(m.module));
+        const missing=active.plan.expansion?.some(m=>(m.canOpen || m.canAdd && m.missing.length) && !blockedAdds.has(m.sectionId));
         if(!missing){limited=false;break;}
-        await phase('preparing');
-        active=await enqueue(async()=>{const s=await current(message);await prepareFill(s,{onePerModule:true,blocked:blockedAdds});return s;});
-        for(const a of active.expansion || []){additions.push(a);if(a.reason)blockedAdds.add({work:'internship',projects:'project'}[a.module] || a.module);}
-        if(!(active.expansion || []).some(a=>a.added)){limited=false;break;}
       }
       return await enqueue(async()=>{
         await synchronize(false,5000);
@@ -645,7 +676,8 @@ function validateAnswer(request,result,internal=false){
  return {answer:result.answer,sourceKeys:[...new Set(result.sourceKeys)],sourceLabels:[...new Set(result.sourceKeys)].map(key=>{const source=request.sources.find(s=>s.key===key);return [source.recordLabel,source.label].filter(Boolean).join(' · ');}),uncertainties:result.uncertainties};
 }
 async function answerOperation(message){
- const state=await enqueue(()=>current(message)),request=await enqueue(()=>answerRequest(state,message.fieldId)),binding=await answerBinding(state),pref=await preferences();
+ const state=await enqueue(()=>current(message));message={...message,panelToken:undefined,targetTabId:state.tabId};
+ const request=await enqueue(()=>answerRequest(state,message.fieldId)),binding=await answerBinding(state),pref=await preferences();
  if(pref.agentMode!=='codex' || !pref.agentModel)throw Error('请在协作设置选择 Codex 模型，或复制问答任务给自己的 Agent。');
  const result=await native({protocol:1,op:'answer',model:pref.agentModel,...request});
  return enqueue(async()=>{const active=await current(message);if(await answerBinding(active)!==binding)throw Error('页面、资料或计划已变化；答案未采用。');await answerRequest(active,message.fieldId);active.answerDraft={fieldId:message.fieldId,...validateAnswer(request,result.answer),binding,approved:false,originalValue:active.scan.fields.find(f=>f.id===message.fieldId)?.value || '',provider:result.provider};return putState(active);});

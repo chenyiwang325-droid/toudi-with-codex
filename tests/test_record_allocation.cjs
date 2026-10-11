@@ -10,3 +10,15 @@ s=scan([...group('blank'),...group('blank2'),...group('unused')]);a=C.allocateRe
 s=scan([...group('blank'),{id:'default',groupId:'blank',groupLabel:'实习经历',module:'work',label:'工作类型',type:'select',value:'实习'}]);a=C.allocateRecords(p,s);assert.equal(a.bindings.blank,'a','A nonidentity selector default does not make a blank experience an unknown existing record');
 s=scan([{id:'school',groupId:'master',module:'education',groupLabel:'硕士教育经历',recordHint:'硕士',label:'学校名称',type:'text',value:''}]);s.repeatables=[];a=C.allocateRecords(p,s);assert.equal(a.bindings.master,'master','Explicit degree still constrains placement');
 console.log('PASS allocation: current-version whole records, identity before blank placement, unknown nonempty module preserved, unused blanks skipped, preset selector defaults handled, explicit degree constraint retained');
+
+// Empty parallel sections must route whole records by purpose, not by order.
+const sections=[['employment','工作经历','work'],['intern','实习经历','work'],['activity','活动实践','projects'],['project','项目经验','projects']].map(([id,label,module])=>({id,label,module,groupIds:[],addStatus:'ready'}));
+let parallel={...scan([]),repeatables:sections};a=C.allocateRecords(p,parallel);
+assert.equal(a.modules.find(m=>m.sectionId==='employment').total,0);
+assert.equal(a.modules.find(m=>m.sectionId==='intern').missing.length,2);
+assert.equal(a.modules.find(m=>m.sectionId==='intern').canAdd,true);
+parallel.repeatables.push({...sections[1],id:'duplicate'});a=C.allocateRecords(p,parallel);
+assert.equal(a.modules.find(m=>m.sectionId==='intern').canAdd,false,'Same-purpose ambiguity remains guarded');
+parallel.repeatables=[{...sections[1],addStatus:'requires-expand'}];a=C.allocateRecords(p,parallel);
+assert.equal(a.modules[0].canOpen,true);assert.equal(a.modules[0].canAdd,false,'Collapsed scope must be opened and rescanned before adding');
+console.log('PASS parallel purposes / same-purpose ambiguity / collapsed scope preflight');

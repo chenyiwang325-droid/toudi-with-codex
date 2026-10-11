@@ -17,7 +17,7 @@ GENERATED_PARTS = {'runtime', '.venv', 'venv', '__pycache__', 'node_modules', '.
 GENERATED_ROOTS = ('desktop/build/', 'desktop/dist/', 'desktop/src-tauri/target/',
                    'desktop/src-tauri/icons/', 'desktop/src-tauri/gen/', 'desktop/ui/assets/', 'desktop/ui/browser-extension/',
                    'diagnostics/', 'backups/')
-TEXT_SUFFIXES = {'.py', '.html', '.md', '.svg', '.yml', '.yaml', '.txt', '.js', '.css', '.rs', '.toml', '.json'}
+TEXT_SUFFIXES = {'.py', '.html', '.md', '.svg', '.yml', '.yaml', '.txt', '.js', '.cjs', '.css', '.rs', '.toml', '.json'}
 errors = []
 # Union includes new source files awaiting staging and deduplicates staged files.
 result = subprocess.run(['git', '-C', str(ROOT), 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
