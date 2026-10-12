@@ -9,15 +9,15 @@ async function task(fn,text=''){if(busy)return;busy=true;notice(text);try{await 
 function showSync(sync){const message={pending:'资料更新待同步',conflict:'资料同步有冲突，请在设置中核对','workspace-changed':'工作区已变化，请在设置中重新连接'}[sync?.status] || '';el('workspaceSync').hidden=!message;el('workspaceSync').textContent=message;}
 function render(){
  const running=filling || state?.automation?.status==='running';
- const checking=reviewing || state?.agentReview?.status==='running' || state?.structureReview?.status==='running';
+ const checking=reviewing || state?.preflight?.status==='running' || state?.agentReview?.status==='running' || state?.structureReview?.status==='running';
  el('fill').disabled=running || checking || scanning || !hasProfile || !state?.plan;el('reviewAgent').disabled=running || checking || scanning || !hasProfile || !state?.plan;el('scan').disabled=running || checking || scanning || !hasProfile;el('fillMode').disabled=running || checking || scanning;el('profile').disabled=running || checking || scanning;
- el('reviewAgent').textContent=checking?'核对中…':'Agent 核对';
+ el('reviewAgent').innerHTML=checking?'核对中…':'Agent 核对 <small>可选</small>';
  el('fill').textContent=running?'正在填写…':'自动填写';
  const progress={reading:'正在读取网页…',preparing:'正在检查并展开表单模块…',matching:'正在核对对应信息…',writing:'正在填写并检查结果…'}[state?.automation?.phase] || '正在读取网页…';
- el('progress').hidden=!running && !scanning && !checking;el('progress').textContent=scanning?'正在识别网页…':checking?(state?.agentReview?.status==='running'?(state.agentReview.message || '正在核对资料…'):state?.structureReview?.status==='running'?'正在核对网页的板块结构…':'正在准备核对…'):progress;
+ el('progress').hidden=!running && !scanning && !checking;el('progress').textContent=scanning?'正在展开并识别填写板块…':checking?(state?.preflight?.status==='running'?state.preflight.message:state?.agentReview?.status==='running'?(state.agentReview.message || '正在核对资料…'):state?.structureReview?.status==='running'?'正在核对网页的板块结构…':'正在准备核对…'):progress;
  const review=state?.agentReview;
  el('reviewResult').hidden=checking || !review || !['completed','failed','skipped'].includes(review.status);
- el('reviewResult').textContent=review?.status==='completed'?'核对完成 · 已匹配 '+(review.accepted || 0)+' 项'+(review.unresolved || review.rejected?' · '+((review.unresolved || 0)+(review.rejected || 0))+' 项未确定':''):review?.status==='failed'?'本次核对未全部完成，已匹配结果保留，可继续填写。':'当前内容已由本地规则匹配，无需模型判断。';
+ el('reviewResult').textContent=review?.status==='completed'?'核对完成，可按更新后的板块预览填写。':review?.status==='failed'?'本次核对未全部完成，已匹配结果保留，可继续填写。':'当前内容已由本地规则匹配，无需模型判断。';
  renderReview(review,checking);
  renderScan();
  const report=state?.report;el('result').hidden=!report || running;
@@ -41,7 +41,7 @@ function renderReview(review,checking){
  const items=review?.items || [];
  el('reviewDetails').hidden=checking || !items.length;
  if(checking || !items.length)return;
- el('reviewDetailsSummary').textContent='查看核对结果 · '+items.length+' 项';
+ el('reviewDetailsSummary').textContent='查看核对结果';
  const key=JSON.stringify(items);if(key===reviewRenderKey)return;reviewRenderKey=key;
  const groups=new Map();for(const item of items){const name=scanModuleNames[item.module] || item.groupLabel || '其他内容';if(!groups.has(name))groups.set(name,[]);groups.get(name).push(item);}
  el('reviewItems').innerHTML=[...groups].map(([name,list])=>`<section class="review-module"><h3>${escapeHtml(name)}</h3>${list.map(item=>{
@@ -51,20 +51,15 @@ function renderReview(review,checking){
  }).join('')}</section>`).join('');
 }
 function renderScan(){
- const rows=state?.plan?.rows || [];
- if(scanning){el('scanSummary').innerHTML='<p>正在识别网页中的填写内容…</p>';return;}
+ el('scanGroups').hidden=scanning;
+ if(scanning){el('scanSummary').innerHTML='<p>正在展开并识别填写板块…</p>';return;}
  if(!state?.plan){el('scanSummary').innerHTML='<p>先识别网页，再填写对应资料。</p>';el('scanGroups').replaceChildren();return;}
- const canFill=r=>r.status==='ready' || el('fillMode').value!=='empty' && r.status==='conflict';
- const available=rows.filter(canFill).length,already=rows.filter(r=>r.status==='already').length;
- const preparing=(state.plan.expansion || []).filter(m=>m.canOpen || m.canAdd && m.missing.length);
- el('scanSummary').innerHTML=`<strong>识别到 ${rows.length} 项</strong><p>可填写 ${available} 项${already?' · 已一致 '+already+' 项':''}</p>${preparing.length?`<p>填写时检查并补齐：${escapeHtml([...new Set(preparing.map(m=>m.label))].join('、'))}</p>`:''}`;
- const modules=new Map();
- for(const row of rows){const module=row.recordBinding?.module || row.module || 'other',name=scanModuleNames[module] || row.groupLabel || '其他内容';if(!modules.has(name))modules.set(name,[]);modules.get(name).push(row);}
- el('scanGroups').innerHTML=[...modules].map(([name,items])=>{
-  const n=items.filter(canFill).length,matched=items.filter(r=>r.status==='already').length;
-  const groups=new Map();for(const row of items){const key=row.recordBinding?.groupId || row.groupLabel || name;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
-  return `<details class="scan-module"><summary><strong>${escapeHtml(name)}</strong><span>${n?'可填 '+n+' 项':matched?'已一致 '+matched+' 项':'暂未匹配'}</span></summary>${[...groups.values()].map(list=>{const title=list[0].recordBinding?.recordLabel || list[0].groupLabel || '';const labels=status=>[...new Set(list.filter(status).map(r=>r.label))].filter(Boolean).join('、');const ready=labels(canFill),equal=labels(r=>r.status==='already'),other=labels(r=>!canFill(r) && r.status!=='already' && r.status!=='skipped');return `<div class="scan-record">${groups.size>1 && title?`<h3>${escapeHtml(title)}</h3>`:''}${ready?`<p class="scan-ready">可填写：${escapeHtml(ready)}</p>`:''}${equal?`<p>已一致：${escapeHtml(equal)}</p>`:''}${other?`<p>未匹配：${escapeHtml(other)}</p>`:''}</div>`;}).join('')}</details>`;
- }).join('');
+ const preview=TouDiFillingWorkflow.preview(state.plan,el('fillMode').value,state.preflight);
+ const parts=[`可处理 ${preview.available} 个板块`,...(preview.complete?[`已填写 ${preview.complete} 个`]:[]),...(preview.pending?[`待处理 ${preview.pending} 个`]:[])];
+ el('scanSummary').innerHTML=`<strong>识别到 ${preview.total} 个板块</strong><p>${parts.join(' · ')}</p>`;
+ const opened=new Set([...el('scanGroups').querySelectorAll('details[open]')].map(node=>node.dataset.scanModule));
+ const reason=text=>TouDiFillingWorkflow.explain(text).message;
+ el('scanGroups').innerHTML=preview.modules.map(module=>`<details class="scan-module" data-scan-module="${escapeHtml(module.id)}" ${opened.has(module.id)?'open':''}><summary><strong>${escapeHtml(module.label)}</strong><span class="scan-status" data-status="${module.status}">${escapeHtml(module.statusLabel)}</span></summary>${module.records.map(record=>`<div class="scan-record">${record.label && record.label!==module.label?`<h3>${escapeHtml(record.label)}</h3>`:''}${record.ready.length?`<p class="scan-ready">可填写：${escapeHtml(record.ready.join('、'))}</p>`:''}${record.kept.length?`<p>保留已有：${escapeHtml(record.kept.join('、'))}</p>`:''}${record.pending.length?`<p>待补充：${escapeHtml(record.pending.join('、'))}</p>`:''}</div>`).join('')}${module.planned.length?`<div class="scan-record scan-planned"><h3>填写时补齐 ${module.planned.length} 段</h3><p>${escapeHtml(module.planned.map(record=>record.label).join('、'))}</p></div>`:''}${module.unplaced.length?`<div class="scan-record"><p>待确认：${escapeHtml(module.unplaced.map(record=>record.label).join('、'))}</p></div>`:''}${module.reason?`<p class="scan-reason">${escapeHtml(reason(module.reason))}</p>`:''}${module.status==='empty'?'<p class="scan-reason">当前资料版本没有对应内容。</p>':''}</details>`).join('');
 }
 async function scanPage(){
  if(scanning || filling || reviewing || state?.automation?.status==='running')return;
@@ -91,7 +86,7 @@ el('fill').addEventListener('click',async()=>{
  catch(e){notice(e.message,true);try{state=(await send('state')).state;}catch(_){} }
  finally{filling=false;render();}
 });
-const automationPoll=setInterval(async()=>{if(!filling && !reviewing && state?.automation?.status!=='running' && state?.agentReview?.status!=='running' && state?.structureReview?.status!=='running')return;try{const next=(await send('state')).state;if(next){state=next;render();}}catch(_){}},800);
+const automationPoll=setInterval(async()=>{if(!filling && !reviewing && state?.preflight?.status!=='running' && state?.automation?.status!=='running' && state?.agentReview?.status!=='running' && state?.structureReview?.status!=='running')return;try{const next=(await send('state')).state;if(next){state=next;render();}}catch(_){}},800);
 document.addEventListener('visibilitychange',async()=>{if(document.hidden)return;try{const next=(await send('state')).state;if(next){state=next;render();}}catch(e){notice(e.message,true);}});
 window.addEventListener('unload',()=>clearInterval(automationPoll));
 const copyModuleLabels={personal:'个人信息',education:'教育经历',internship:'工作实习',project:'项目经历','campus-role':'在校经历',awards:'荣誉获奖',publications:'论文发表',language:'语言能力',family:'家庭成员',contact:'联系人'};
@@ -183,5 +178,5 @@ task(async()=>{
  showSync(value.sync);profileSummary=value.profile;pref=value.preferences;hasProfile=!!profileSummary?.count;
  el('empty').hidden=hasProfile;el('controls').hidden=!hasProfile;el('fillPane').hidden=!hasProfile;el('tabLibrary').disabled=!hasProfile;
  el('profile').replaceChildren(...(profileSummary?.profiles || [{id:'general',label:'默认资料'}]).map(p=>new Option(p.label,p.id)));el('profile').value=value.state?.plan?.profileId || pref.profile;
- state=value.state;render();notice('');if(location.hash==='#library' && hasProfile){setPane('library');await loadCopyLibrary();}if(activePane==='fill' && hasProfile && ![state?.automation,state?.agentReview,state?.structureReview].some(job=>job?.status==='running'))await scanPage();
+ state=value.state;render();notice('');if(location.hash==='#library' && hasProfile){setPane('library');await loadCopyLibrary();}if(activePane==='fill' && hasProfile && ![state?.preflight,state?.automation,state?.agentReview,state?.structureReview].some(job=>job?.status==='running'))await scanPage();
 });

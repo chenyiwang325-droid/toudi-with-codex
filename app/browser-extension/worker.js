@@ -31,20 +31,20 @@ async function loadState(targetTabId) {
   if(!tab?.id)return null;
   const key=stateKey(tab.id);let state=(await chrome.storage.session.get(key))[key];
   if(!state){const legacy=(await chrome.storage.session.get(KEY))[KEY];if(legacy?.tabId===tab.id){state=legacy;await chrome.storage.session.set({[key]:state,[LAST_TAB]:tab.id});await chrome.storage.session.remove(KEY);}}
-  const running=state && ['automation','agentReview','structureReview'].some(k=>state[k]?.status==='running' && state[k].ownerId===WORKER_ID);
+  const running=state && ['preflight','automation','agentReview','structureReview'].some(k=>state[k]?.status==='running' && state[k].ownerId===WORKER_ID);
   if(state && (EXTENSION_VERSION==='development' || state.extensionVersion===EXTENSION_VERSION) && (running || Date.now()-(state.updatedAt || state.startedAt)<600000)) {
     const source=(await chrome.storage.local.get(PACK))[PACK];
     let url;try{url=new URL(tab?.url);}catch(_){}
     if(tab.id===state.tabId && url?.origin===state.origin && url?.pathname===state.path && source?.sourceVersion===state.sourceVersion && (!state.pageKey || state.pageKey===await digest(tab.url))){
       let interrupted=false;
-      for(const kind of ['automation','agentReview','structureReview'])if(state[kind]?.status==='running' && state[kind].ownerId!==WORKER_ID){state[kind]={...state[kind],status:'failed',phase:'done',message:'浏览器或扩展中断了上次任务；已填写内容保留，请重新识别后继续。'};interrupted=true;}
+      for(const kind of ['preflight','automation','agentReview','structureReview'])if(state[kind]?.status==='running' && state[kind].ownerId!==WORKER_ID){state[kind]={...state[kind],status:'failed',phase:'done',message:'浏览器或扩展中断了上次任务；已填写内容保留，请重新识别后继续。'};interrupted=true;}
       if(interrupted)await putState(state);
       return state;
     }
   }
   await clearStates(tab.id);return null;
 }
-const publicState=state=>state?{startedAt:state.startedAt,extensionVersion:state.extensionVersion,engineVersion:state.scan?.engineVersion,agentReview:state.agentReview,structureReview:state.structureReview,structurePending:state.structurePending,answerDraft:state.answerDraft,subjectiveFields:state.scan?.fields.filter(subjectiveField).map(f=>f.id),platform:state.scan?.platforms || state.scan?.platform,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,timings:state.timings,automation:state.automation,autoAgentPending:state.autoAgentPending,agentError:state.agentError || state.lunaError}:null;
+const publicState=state=>state?{startedAt:state.startedAt,extensionVersion:state.extensionVersion,engineVersion:state.scan?.engineVersion,agentReview:state.agentReview,structureReview:state.structureReview,structurePending:state.structurePending,preflight:state.preflight,answerDraft:state.answerDraft,subjectiveFields:state.scan?.fields.filter(subjectiveField).map(f=>f.id),platform:state.scan?.platforms || state.scan?.platform,tabId:state.tabId,plan:state.plan?Core.review(state.plan,true):undefined,report:state.report,saved:state.saved,labels:state.labels,pending:state.pending,timings:state.timings,automation:state.automation,autoAgentPending:state.autoAgentPending,agentError:state.agentError || state.lunaError}:null;
 async function putState(state) {state.extensionVersion=EXTENSION_VERSION;state.updatedAt=Date.now();await chrome.storage.session.set({[stateKey(state.tabId)]:state,[LAST_TAB]:state.tabId});return publicState(state);}
 chrome.tabs.onRemoved?.addListener(async tabId=>{await clearStates(tabId);if((await chrome.storage.session.get(LAST_TAB))[LAST_TAB]===tabId)await chrome.storage.session.remove(LAST_TAB);});
 let nativePort, nativeTimer, nextId=0;
@@ -215,13 +215,13 @@ async function resolveSync(message){
   if(result.workspaceKey!==review.workspaceKey || !Sync.same(result.pack,selected))throw Error('保存读回不一致，双方候选仍保留。');
   await installPack(result.pack);return storeSync({...state,status:'synced',version:result.version,basePack:result.pack,review:null,error:null,lastSync:new Date().toISOString()});
 }
-// Add missing records only on filling. Reviewed existing fields keep their
-// guarded mapping; new records use the same local facts and option inspection.
-async function prepareFill(state,{onePerModule=false,blocked=new Set()}={}){
+// Initial discovery opens disclosures only. An explicit review or fill may
+// also prepare blank records, using the same guarded allocation and engine.
+async function prepareFill(state,{onePerModule=false,openOnly=false,blocked=new Set()}={}){
   state.expansion=[];
         const p=Core.profile(await pack(),state.plan.profileId),placement=Core.allocateRecords(p,state.scan,state.recordBindings || {});
         const opening=placement.modules.filter(m=>m.canOpen && !blocked.has(m.sectionId));
-        const targets=opening.length?opening.map(m=>({sectionId:m.sectionId,action:'open',recordIds:[]})):placement.modules.filter(m=>m.canAdd && m.missing.length && !blocked.has(m.sectionId)).map(m=>({sectionId:m.sectionId,recordIds:(onePerModule?m.missing.slice(0,1):m.missing).map(r=>r.id)}));
+        const targets=(opening.length?opening.map(m=>({sectionId:m.sectionId,action:'open',recordIds:[]})):openOnly?[]:placement.modules.filter(m=>m.canAdd && m.missing.length && !blocked.has(m.sectionId)).map(m=>({sectionId:m.sectionId,recordIds:(onePerModule?m.missing.slice(0,1):m.missing).map(r=>r.id)}))).slice(0,16);
         if(targets.length){
           const previous=state.scan,expanded=await engine(state.tabId,'expand-records',{fingerprint:state.scan.fingerprint,bindings:placement.bindings,targets},state.structureHints);
           if((await pack()).sourceVersion!==state.sourceVersion || !(await loadState(state.tabId)))throw Error('新增期间网页或资料已变化，请重新识别；已新增的空白经历保留。');
@@ -238,6 +238,18 @@ async function prepareFill(state,{onePerModule=false,blocked=new Set()}={}){
         }else state.recordBindings=placement.bindings;
         state.plan=placedPlan(p,state);
   return putState(state);
+}
+async function openPreview(state){
+  const blocked=new Set(),opened=[],pending=[];
+  for(let pass=0;pass<16 && state.plan.expansion?.some(m=>m.canOpen && !blocked.has(m.sectionId));pass++){
+    await prepareFill(state,{openOnly:true,blocked});
+    for(const item of state.expansion || []){
+      if(item.opened)opened.push(item.sectionId);
+      if(item.reason){blocked.add(item.sectionId);pending.push({sectionId:item.sectionId,reason:item.reason});}
+    }
+    if(!(state.expansion || []).some(item=>item.opened || item.reason))break;
+  }
+  state.preflight={status:'completed',opened:[...new Set(opened)],pending};
 }
 async function operation(message) {
   await init;
@@ -305,6 +317,7 @@ async function operation(message) {
       if(!scan.fields.length && !scan.repeatables?.some(s=>['ready','requires-expand'].includes(s.addStatus)))throw Error('当前页面没有可见填写字段；请先打开网申表单。');
       const pageKey=await digest(tab.url);
       const state={startedAt:Date.now(),tabId:tab.id,pageKey,origin:scan.origin,path:scan.path,sourceVersion:value.sourceVersion,scan,structureHints,structureReview,mappings:{},recordBindings:{},plan:{profileId:p.profileId},timings:{syncMs:Date.now()-started,scanMs}};
+      state.plan=placedPlan(p,state);await putState(state);await openPreview(state);scan=state.scan;
       // A continuation reads the current values again. Only explicit record choices
       // from this exact page, profile and unchanged field structure may carry over.
       if(previous?.plan && previous.pageKey===pageKey && previous.sourceVersion===value.sourceVersion && previous.plan.profileId===p.profileId && previous.scan.fingerprint===scan.fingerprint){
@@ -318,7 +331,7 @@ async function operation(message) {
         state.optionChecks=previous.optionChecks;
       }
       state.plan=placedPlan(p,state);await restoreRepairs(state,p);state.plan=placedPlan(p,state);await putState(state);
-      state.structurePending=!!scan.structure?.candidates?.some(c=>!structureHints[c.fieldId]);
+      state.structurePending=!!scan.structure?.candidates?.some(c=>!state.structureHints[c.fieldId]);
       state.autoAgentPending=false;
       state.timings.totalMs=Date.now()-started;
       return {...await putState(state),sync:await syncState()};
@@ -576,13 +589,29 @@ async function reviewPage(message){
   const run=(async()=>{
     const pref=await preferences();if(pref.agentMode!=='codex' || !pref.agentModel)throw Error('请先在资料与设置中选择 Agent 与核对模型。');
     await enqueue(()=>operation({...message,op:'scan',resume:true}));
+    // Materialize safely addable records before optional semantic review, so
+    // the model sees their actual fields/options rather than only old records.
+    const blocked=new Set();
+    for(let pass=0;pass<64;pass++){
+      const more=await enqueue(async()=>{
+        const active=await current(message);
+        const targets=active.plan.expansion?.filter(m=>(m.canOpen || m.canAdd && m.missing.length) && !blocked.has(m.sectionId)) || [];
+        if(!targets.length){active.preflight={...active.preflight,status:'completed'};active.structurePending=!!active.scan.structure?.candidates?.some(c=>!active.structureHints[c.fieldId]);await putState(active);return false;}
+        active.preflight={...active.preflight,status:'running',ownerId:WORKER_ID,message:'正在展开'+targets.map(m=>m.label).join('、')+'，准备核对…'};await putState(active);
+        await prepareFill(active,{onePerModule:true,blocked});
+        for(const item of active.expansion || [])if(item.reason){blocked.add(item.sectionId);(active.preflight.pending ||= []).push({sectionId:item.sectionId,reason:item.reason});}
+        return (active.expansion || []).some(item=>item.opened || item.added || item.reason);
+      });
+      if(!more)break;
+    }
+    await enqueue(async()=>{const active=await current(message);active.preflight={...active.preflight,status:'completed'};active.structurePending=!!active.scan.structure?.candidates?.some(c=>!active.structureHints[c.fieldId]);await putState(active);});
     const state=await enqueue(()=>current(message));
     if(state.structurePending)await structureOperation({...message,op:'adapt',agent:true});
     return agentOperation({...message,op:'remap',agent:true});
   })();
   reviewRuns.set(tab.id,run);
   try{return await run;}catch(error){
-    await enqueue(async()=>{const state=await loadState(tab.id);if(!state)return;let changed=false;for(const key of ['agentReview','structureReview'])if(state[key]?.status==='running' && state[key].ownerId===WORKER_ID){state[key]={...state[key],status:'failed',phase:'done',message:error.message};changed=true;}if(changed)await putState(state);});
+    await enqueue(async()=>{const state=await loadState(tab.id);if(!state)return;let changed=false;if(state.preflight?.status==='running'){state.preflight={...state.preflight,status:'failed',message:error.message};changed=true;}for(const key of ['agentReview','structureReview'])if(state[key]?.status==='running' && state[key].ownerId===WORKER_ID){state[key]={...state[key],status:'failed',phase:'done',message:error.message};changed=true;}if(changed)await putState(state);});
     throw error;
   }finally{if(reviewRuns.get(tab.id)===run)reviewRuns.delete(tab.id);}
 }

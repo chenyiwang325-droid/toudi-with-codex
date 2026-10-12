@@ -10,13 +10,13 @@
 <p id="notice" role="status" hidden></p>
 <section id="fillPane" role="tabpanel" aria-labelledby="tabFill">
   <div class="fill-intro"><h1>填写当前网页</h1><button id="scan" class="quiet">重新识别</button></div>
-  <section id="scanSummary" aria-live="polite"><p>正在识别网页中的填写内容…</p></section>
-  <div class="fill-actions"><label class="sr-only" for="fillMode">填写范围</label><select id="fillMode"><option value="all">填写全部内容</option><option value="empty">仅填空白</option></select><button id="reviewAgent" disabled>Agent 核对</button><button id="fill" class="primary" disabled>自动填写</button></div>
+  <div class="scan-overview"><section id="scanSummary" aria-live="polite"><p>正在识别网页中的填写内容…</p></section><div class="review-choice"><button id="reviewAgent" disabled>Agent 核对 <small>可选</small></button></div></div>
+  <div class="fill-actions"><label class="sr-only" for="fillMode">填写范围</label><select id="fillMode"><option value="all">填写全部内容</option><option value="empty">仅填空白</option></select><button id="fill" class="primary" disabled>自动填写</button></div>
   <p id="progress" role="status" hidden></p>
   <p id="reviewResult" class="caption" role="status" hidden></p>
   <details id="reviewDetails" class="review-details" hidden><summary id="reviewDetailsSummary">查看核对结果</summary><div id="reviewItems"></div></details>
   <section id="result" aria-live="polite" hidden></section>
-  <section id="scanGroups" aria-label="已识别的填写内容"></section>
+  <section id="scanGroups" aria-label="填写板块与经历"></section>
   <button id="browseFallback" class="text-button">查找资料并复制填写</button>
 </section>
 <section id="copyLibrary" role="tabpanel" aria-labelledby="tabLibrary" hidden><div class="library-search"><label class="sr-only" for="copySearch">搜索资料</label><input id="copySearch" type="search" placeholder="搜索字段、经历或内容"><span id="copyCount" class="caption" role="status"></span></div><div class="library-layout"><nav id="copyDirectory" aria-label="资料分类目录"></nav><div class="library-content"><div id="copyRecords" tabindex="0" aria-label="资料内容"></div></div></div></section>

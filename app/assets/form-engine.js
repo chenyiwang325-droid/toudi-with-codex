@@ -257,7 +257,7 @@
       if(section && !section.groupIds.includes(entry.field.groupId)){section.groupIds.push(entry.field.groupId);section.records.push(record);}
     }
     // A collapsed module is an unknown scope, not proof of zero records.
-    // Only explicit disclosure controls may be opened during filling.
+    // The workflow may open only explicit disclosures before matching/filling.
     for(const [root,scope] of roots)for(const n of root.querySelectorAll('details:not([open]),[aria-expanded="false"][aria-controls]')){
       const control=n.matches('details')?n.querySelector(':scope > summary'):n;
       if(!control || !visible(control) || control.closest('[role="combobox"],.ant-select,.atsx-select,.ant-calendar-picker,.atsx-date-picker,#toudi-floating-host,[data-toudi-panel]'))continue;

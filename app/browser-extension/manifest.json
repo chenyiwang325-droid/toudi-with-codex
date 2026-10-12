@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TouDi 辅助填报",
-  "version": "0.5.26",
+  "version": "0.5.27",
   "description": "当前招聘网页的资料识别、核对与填写；推荐通过 Codex 调用 Luna。",
   "permissions": [
     "activeTab",

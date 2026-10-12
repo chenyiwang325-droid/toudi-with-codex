@@ -2,6 +2,41 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.TouDiFillingWorkflow=api;})(globalThis,function(){
 'use strict';
 const canonicalModule=value=>({work:'internship',projects:'project'}[value] || value || 'other');
+const moduleLabels={personal:'个人信息',education:'教育经历',internship:'工作实习',project:'项目经历','campus-role':'在校经历',awards:'荣誉获奖',publications:'论文发表',language:'语言与证书',family:'家庭成员',contact:'联系人',other:'其他内容'};
+// Preview the same whole-record allocation used by execution, including modules
+// with no rendered fields. A planned addition is not a verified field match.
+function preview(plan,mode='all',preflight={}){
+  const modules=new Map(),byGroup=new Map();
+  for(const placement of plan?.expansion || []){
+    const id=placement.sectionId || canonicalModule(placement.module),module=canonicalModule(placement.module);
+    const item={id,module,label:placement.label || moduleLabels[module] || module,rows:[],placement};
+    modules.set(id,item);for(const groupId of placement.groupIds || [])byGroup.set(groupId,item);
+  }
+  for(const row of plan?.rows || []){
+    const module=canonicalModule(row.recordBinding?.module || row.module),groupId=row.recordBinding?.groupId;
+    let item=byGroup.get(groupId);
+    if(!item){
+      const peers=[...modules.values()].filter(m=>m.module===module);
+      if(peers.length===1)item=peers[0];
+      else{const label=module==='other'?row.groupLabel:'',id='fields:'+module+(label?':'+label:'');if(!modules.has(id))modules.set(id,{id,module,label:label || moduleLabels[module] || module,rows:[]});item=modules.get(id);}
+    }
+    item.rows.push(row);
+  }
+  const canFill=row=>row.status==='ready' || mode!=='empty' && row.status==='conflict';
+  const order=Object.keys(moduleLabels),rank=module=>order.includes(module)?order.indexOf(module):order.length,result=[...modules.values()].sort((a,b)=>rank(a.module)-rank(b.module)).map(item=>{
+    const placement=item.placement,missing=placement?.missing || [],failure=(preflight.pending || []).find(p=>p.sectionId===placement?.sectionId);
+    const adding=!!placement?.canAdd && missing.length>0 && !failure;
+    const opening=!!placement?.canOpen,ready=item.rows.some(canFill);
+    const kept=row=>row.status==='already' || mode==='empty' && row.status==='conflict';
+    const complete=item.rows.some(kept) && item.rows.every(row=>kept(row) || row.status==='skipped') && !missing.length && !opening;
+    const needsHelp=item.rows.some(row=>!canFill(row) && !kept(row) && row.status!=='skipped') || !!failure || !!placement?.unresolved || missing.length>0 && !adding || opening;
+    const status=ready?'ready':adding?'planned':complete?'complete':!item.rows.length && !placement?.total && !opening?'empty':'pending';
+    const groups=new Map();for(const row of item.rows){const id=row.recordBinding?.groupId || row.groupLabel || item.label;if(!groups.has(id))groups.set(id,[]);groups.get(id).push(row);}
+    const records=[...groups.values()].map(rows=>({label:rows[0].recordBinding?.recordLabel || rows[0].groupLabel || '',ready:[...new Set(rows.filter(canFill).map(row=>row.label))].filter(Boolean),kept:[...new Set(rows.filter(kept).map(row=>row.label))].filter(Boolean),pending:[...new Set(rows.filter(row=>!canFill(row) && !kept(row) && row.status!=='skipped').map(row=>row.label))].filter(Boolean)}));
+    return {...item,status,statusLabel:{ready:needsHelp?'可填写 · 部分待确认':'可填写',planned:'填写时补齐',complete:'已填写',empty:'暂无资料',pending:opening?'待展开':'待处理'}[status],canProcess:ready || adding,records,planned:adding?missing:[],unplaced:!adding && !opening?missing:[],reason:failure?.reason || (needsHelp && placement?.reason) || ''};
+  });
+  return {modules:result,total:result.length,available:result.filter(m=>m.canProcess).length,complete:result.filter(m=>m.status==='complete').length,pending:result.filter(m=>!m.canProcess && !['complete','empty'].includes(m.status)).length};
+}
 function signature(f){return JSON.stringify([canonicalModule(f.module),String(f.label || '').normalize('NFKC').trim(),f.type,f.adapter || '',f.datePart || '',f.dateFormat || '',f.regionDepth || '',f.recordMode || '']);}
 function key(field,bindings={}){return JSON.stringify([signature(field),bindings[field.groupId] || '',field.groupId && !bindings[field.groupId]?field.groupId:'']);}
 function attemptKey(row,field,bindings={}){return JSON.stringify([key(field,bindings),bindings[field.groupId]?'':field.id,row.factKey,row.optionValue ?? row.value,field.options || [],field.constraints || {},field.required || false,field.unsupported || '']);}
@@ -64,5 +99,5 @@ const explanations={
 };
 function explain(reason,status){const known=explanations[reason];return known?{stage:known[0],message:known[1]}:{stage:status==='missing'?'资料':status==='ambiguous'?'记录归属':'填写',message:/[\u3400-\u9fff]/.test(reason || '')?reason:'此字段尚不能可靠写入，可在网页填写或从我的资料复制。'};}
 function diagnostic(state,report){return {protocol:2,checkedAt:new Date().toISOString(),extensionVersion:state.extensionVersion,engineVersion:state.scan.engineVersion,origin:state.origin,profileId:state.plan.profileId,sourceVersion:state.sourceVersion,summary:report.summary,passes:report.passes || 1,results:report.results.map(r=>{const f=state.scan.fields.find(f=>f.id===r.fieldId);return {fieldId:r.fieldId,module:canonicalModule(f?.module),type:f?.type || 'unknown',adapter:f?.adapter || 'generic',status:r.status,stage:explain(r.reason,r.status).stage,reason:Object.hasOwn(explanations,r.reason) || /^(readback-matched|invalid-value|required-empty|option-disabled)$/.test(r.reason || '')?r.reason:'unresolved'};}),submitted:false,saveState:'unconfirmed'};}
-return {signature,key,attemptKey,restore,repairs,explain,diagnostic};
+return {signature,key,attemptKey,restore,repairs,explain,diagnostic,preview};
 });

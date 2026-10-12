@@ -319,7 +319,7 @@
       const remaining=records.filter(r=>!used.has(r.id)),unresolved=relevant.filter(g=>g.status!=='bound' && !next[g.groupId] && scan.fields.some(f=>g.fieldIds.includes(f.id) && hasRecordContent(f))).length;
       const canAdd=!!section && section.addStatus==='ready' && !unresolved && !ambiguous && records.length>0;
       const canOpen=!!section && section.addStatus==='requires-expand' && !ambiguous;
-      modules.push({module,label:section?.label || relevant[0]?.label || module,total:records.length,matched:used.size,blank,missing:remaining,sectionId:section?.id || '',canAdd,canOpen,unresolved,reason:canOpen?'该模块尚未展开，填写前先展开检查已有记录。':section?.blockedReason || (unresolved?'已有经历无法确认归属，先纠正对应关系，避免重复添加。':ambiguous?'页面存在多个用途相同的模块，需确认新增位置。':section?.addStatus==='disabled'?'网站新增入口已停用或达到数量上限。':section?.addStatus==='ambiguous'?'该模块存在多个新增入口，需手动确认。':!canAdd && remaining.length?'未找到可直接操作的新增经历入口。':'')});
+      modules.push({module,label:section?.label || relevant[0]?.label || module,total:records.length,matched:used.size,blank,missing:remaining,sectionId:section?.id || '',groupIds:relevant.map(g=>g.groupId),canAdd,canOpen,unresolved,reason:canOpen?'该模块尚未展开，先展开检查已有记录。':section?.blockedReason || (unresolved?'已有经历无法确认归属，先纠正对应关系，避免重复添加。':ambiguous?'页面存在多个用途相同的模块，需确认新增位置。':section?.addStatus==='disabled'?'网站新增入口已停用或达到数量上限。':section?.addStatus==='ambiguous'?'该模块存在多个新增入口，需手动确认。':!canAdd && remaining.length?'未找到可直接操作的新增经历入口。':'')});
       }
     }
     return {bindings:next,modules,unusedGroups};

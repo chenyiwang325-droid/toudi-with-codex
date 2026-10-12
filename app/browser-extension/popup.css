@@ -58,5 +58,6 @@ main{display:flex;flex-direction:column;flex:1;min-height:0;padding:9px 12px 0;o
 /* Changing tabs reveals local content without resizing the page-owned shell. */
 #fillPane:not([hidden]),#copyLibrary:not([hidden]){animation:ui-content-enter var(--ui-motion-enter) var(--ui-ease)}
 .scan-module summary:before{transition:transform var(--ui-motion-enter) var(--ui-ease)}
+.scan-overview{display:flex;align-items:center;gap:8px;margin-bottom:12px}.scan-overview #scanSummary{flex:1;min-width:0;margin:0}.review-choice{flex:none}.review-choice button{padding:5px 9px;font-size:11px;background:transparent}.review-choice small{margin-left:6px;font-size:10px;color:var(--muted)}.fill-actions #fill{flex:0 0 42%}.scan-status{white-space:nowrap;font-variant-numeric:tabular-nums}.scan-status[data-status=ready],.scan-status[data-status=planned]{color:var(--accent)}.scan-planned h3{color:var(--ink)}.scan-reason{margin:0 0 10px 17px;font-size:11px;line-height:1.7;overflow-wrap:anywhere}
 .library-search input{transition:background-color var(--ui-motion-fast) var(--ui-ease),border-color var(--ui-motion-fast) var(--ui-ease),box-shadow var(--ui-motion-fast) var(--ui-ease)}
 .library-search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)}
